@@ -112,6 +112,23 @@
   --sidebar-ring: oklch(0.552 0.016 285.938);
 }
 
+/* Phone controls own their touch area; this also covers portaled model fields. */
+@media (max-width: 767px) {
+  button, a[href], input:not([type="hidden"]), select, textarea, summary,
+  [role="button"], [role="option"], [role="menuitem"], [role="tab"], [role="radio"], [role="checkbox"] {
+    min-height: 44px;
+  }
+  button, [role="button"], [role="option"], [role="menuitem"], [role="tab"], [role="radio"], [role="checkbox"] {
+    min-width: 44px;
+  }
+  a[href] { display: inline-flex; min-width: 44px; align-items: center; }
+  input[type="checkbox"], input[type="radio"] { min-width: 44px; }
+  [data-state][data-side], .fixed[data-state] { animation: none; }
+  [data-platform-shell]:has(> :not([data-mobile-platform-nav]) [data-sidebar="trigger"]) > [data-mobile-platform-nav] { display: none; }
+  :where(.grid) > *, main, section, article, form, fieldset, label { min-width: 0; }
+  input:not([type="hidden"]), select, textarea { min-width: 44px; max-width: 100%; font-size: 16px; }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

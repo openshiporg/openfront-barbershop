@@ -6,13 +6,10 @@ import { statelessSessions } from "@keystone-6/core/session";
 import { extendGraphqlSchema } from "./mutations";
 import { sendPasswordResetEmail } from "./lib/mail";
 
-const databaseURL = process.env.DATABASE_URL || "file:./keystone.db";
+import { bindDomainPrisma } from './utils/domainPrisma';
+import { runtimeConfig } from './utils/runtimeConfig';
 
-const sessionConfig = {
-  maxAge: 60 * 60 * 24 * 360, // How long they stay signed in?
-  secret:
-    process.env.SESSION_SECRET || "this secret should only be used in testing",
-};
+const { databaseURL, sessionConfig } = runtimeConfig();
 
 const {
   S3_BUCKET_NAME: bucketName = "keystone-test",
@@ -32,13 +29,22 @@ const { withAuth } = createAuth({
       role: {
         create: {
           name: "Admin",
-          canCreateTodos: true,
-          canManageAllTodos: true,
           canSeeOtherPeople: true,
           canEditOtherPeople: true,
           canManagePeople: true,
           canManageRoles: true,
           canAccessDashboard: true,
+          canManageOnboarding: true,
+          canManageServices: true,
+          canManageStaff: true,
+          canManageSchedules: true,
+          canManageAppointments: true,
+          canManageQueue: true,
+          canManageCustomers: true,
+          canManageCustomerNotes: true,
+          canManageMemberships: true,
+          canManagePayments: true,
+          canViewReports: true,
         },
       },
     },
@@ -52,16 +58,33 @@ const { withAuth } = createAuth({
   sessionData: `
     name
     email
+    onboardingStatus
+    activeShop { id slug status }
+    shopMemberships(where: { status: { equals: active } }) {
+      id
+      status
+      membershipRole
+      shop { id slug status }
+    }
     role {
       id
       name
-      canCreateTodos
-      canManageAllTodos
       canSeeOtherPeople
       canEditOtherPeople
       canManagePeople
       canManageRoles
       canAccessDashboard
+      canManageOnboarding
+      canManageServices
+      canManageStaff
+      canManageSchedules
+      canManageAppointments
+      canManageQueue
+      canManageCustomers
+      canManageCustomerNotes
+      canManageMemberships
+      canManagePayments
+      canViewReports
     }
   `,
 });
@@ -71,6 +94,7 @@ export default withAuth(
     db: {
       provider: "postgresql",
       url: databaseURL,
+      extendPrismaClient: bindDomainPrisma,
     },
     lists: models,
     storage: {

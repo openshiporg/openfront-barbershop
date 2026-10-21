@@ -1,0 +1,341 @@
+{
+  "shop": {
+    "name": "Stack & Fade",
+    "legalName": "Stack & Fade",
+    "slug": "stack-and-fade",
+    "tagline": "Haircuts · Beards · Walk-ins",
+    "address": "Brooklyn, NY",
+    "phone": "(718) 555-0198",
+    "timezone": "America/New_York",
+    "currencyCode": "USD",
+    "brandColor": "amber",
+    "jurisdictionCode": "US-NY",
+    "hours": {
+      "monday": "9:00 AM - 7:00 PM",
+      "tuesday": "9:00 AM - 7:00 PM",
+      "wednesday": "9:00 AM - 7:00 PM",
+      "thursday": "9:00 AM - 8:00 PM",
+      "friday": "9:00 AM - 8:00 PM",
+      "saturday": "8:00 AM - 6:00 PM",
+      "sunday": "10:00 AM - 4:00 PM"
+    }
+  },
+  "bookingPolicies": [
+    {
+      "name": "Standard booking policy",
+      "version": "2026-v1",
+      "jurisdictionCode": "US-NY",
+      "policyTextHash": "71b2983d920e78cc1cd1b59e9e595dd6d8fafde4f76555d417c075ab7e0525f7",
+      "status": "active",
+      "effectiveFrom": "2020-01-01T00:00:00.000Z",
+      "effectiveUntil": null,
+      "cancellationWindowMinutes": 1440,
+      "rescheduleWindowMinutes": 1440,
+      "lateCancellationFeeAmount": 0,
+      "rescheduleFeeAmount": 0,
+      "depositCancellationRule": "manual_review",
+      "maxCustomerReschedules": 2
+    }
+  ],
+  "noShowPolicies": [
+    {
+      "name": "Standard no-show policy",
+      "status": "active",
+      "feeAmount": 2500,
+      "graceMinutes": 10,
+      "appliesToMemberships": false,
+      "description": "A $25 fee after a 10-minute grace period; active memberships are waived."
+    }
+  ],
+  "paymentProviders": [
+    {
+      "name": "Manual Payments",
+      "code": "pp_manual",
+      "isInstalled": true,
+      "metadata": {
+        "adapter": "manual",
+        "settlement": "offline",
+        "description": "Manual operator ledger for cash and externally verified in-shop tenders; no live processor is connected."
+      },
+      "createPaymentFunction": "manual",
+      "capturePaymentFunction": "manual",
+      "refundPaymentFunction": "manual",
+      "getPaymentStatusFunction": "manual",
+      "generatePaymentLinkFunction": "manual",
+      "handleWebhookFunction": "manual"
+    }
+  ],
+  "serviceCategories": [
+    {
+      "name": "Haircuts",
+      "description": "Core barber cuts and styling.",
+      "displayOrder": 10
+    },
+    {
+      "name": "Beard & Shave",
+      "description": "Beard trims, lineups, and hot towel shaves.",
+      "displayOrder": 20
+    },
+    {
+      "name": "Packages",
+      "description": "Bundled high-value services.",
+      "displayOrder": 30
+    }
+  ],
+  "services": [
+    {
+      "name": "Classic Cut",
+      "category": "Haircuts",
+      "description": "Consultation, clipper/scissor cut, and style finish.",
+      "durationMinutes": 35,
+      "price": 4200,
+      "bookingBufferMinutes": 10,
+      "color": "#111827",
+      "imagePath": "/images/barbershop/photo/scissor-cut.webp"
+    },
+    {
+      "name": "Skin Fade",
+      "category": "Haircuts",
+      "description": "Tight fade with blend, razor neck cleanup, and style finish.",
+      "durationMinutes": 45,
+      "price": 5200,
+      "bookingBufferMinutes": 10,
+      "color": "#2563eb",
+      "imagePath": "/images/barbershop/photo/clipper-fade.webp"
+    },
+    {
+      "name": "Kids Cut",
+      "category": "Haircuts",
+      "description": "Quick cut for kids under 12.",
+      "durationMinutes": 25,
+      "price": 2800,
+      "bookingBufferMinutes": 5,
+      "color": "#16a34a",
+      "imagePath": "/images/barbershop/photo/barber-at-work.webp"
+    },
+    {
+      "name": "Beard Trim",
+      "category": "Beard & Shave",
+      "description": "Beard shaping, neckline, and cheek cleanup.",
+      "durationMinutes": 20,
+      "price": 2400,
+      "bookingBufferMinutes": 5,
+      "color": "#7c3aed",
+      "imagePath": "/images/barbershop/photo/beard-detail.webp"
+    },
+    {
+      "name": "Hot Towel Shave",
+      "category": "Beard & Shave",
+      "description": "Straight razor shave with hot towel prep and aftercare.",
+      "durationMinutes": 35,
+      "price": 3800,
+      "bookingBufferMinutes": 10,
+      "color": "#dc2626",
+      "depositRequired": true,
+      "depositAmount": 1000,
+      "imagePath": "/images/barbershop/photo/chair-service.webp"
+    },
+    {
+      "name": "Cut + Beard",
+      "category": "Packages",
+      "description": "Full haircut plus beard trim and lineup.",
+      "durationMinutes": 60,
+      "price": 6800,
+      "bookingBufferMinutes": 10,
+      "color": "#f59e0b",
+      "depositRequired": true,
+      "depositAmount": 1500,
+      "imagePath": "/images/barbershop/photo/shop-floor.webp"
+    }
+  ],
+  "barbers": [
+    {
+      "displayName": "Maya Brooks",
+      "legalName": "Maya Brooks",
+      "email": "maya@stackandfade.example",
+      "phone": "(718) 555-0101",
+      "chairNumber": "1",
+      "serviceCommissionRateBps": 5000,
+      "bio": "Fade specialist with a clean, modern finish.",
+      "specialties": [
+        "Skin Fade",
+        "Cut + Beard",
+        "Classic Cut"
+      ],
+      "imagePath": "/images/barbershop/photo/clipper-fade.webp"
+    },
+    {
+      "displayName": "Andre Miles",
+      "legalName": "Andre Miles",
+      "email": "andre@stackandfade.example",
+      "phone": "(718) 555-0102",
+      "chairNumber": "2",
+      "serviceCommissionRateBps": 4500,
+      "bio": "Classic scissor cuts, beard shaping, and hot towel shaves.",
+      "specialties": [
+        "Classic Cut",
+        "Beard Trim",
+        "Hot Towel Shave"
+      ],
+      "imagePath": "/images/barbershop/photo/scissor-cut.webp"
+    },
+    {
+      "displayName": "Leo Chen",
+      "legalName": "Leon Chen",
+      "email": "leo@stackandfade.example",
+      "phone": "(718) 555-0103",
+      "chairNumber": "3",
+      "serviceCommissionRateBps": 4000,
+      "bio": "Fast walk-ins, kids cuts, and reliable daily cuts.",
+      "specialties": [
+        "Kids Cut",
+        "Classic Cut",
+        "Beard Trim"
+      ],
+      "imagePath": "/images/barbershop/photo/barber-at-work.webp"
+    }
+  ],
+  "schedules": [
+    {
+      "barber": "Maya Brooks",
+      "days": [
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday"
+      ],
+      "startMinute": 600,
+      "endMinute": 1080,
+      "breakStartMinute": 840,
+      "breakEndMinute": 870
+    },
+    {
+      "barber": "Andre Miles",
+      "days": [
+        "monday",
+        "tuesday",
+        "thursday",
+        "friday",
+        "saturday"
+      ],
+      "startMinute": 540,
+      "endMinute": 1020,
+      "breakStartMinute": 780,
+      "breakEndMinute": 810
+    },
+    {
+      "barber": "Leo Chen",
+      "days": [
+        "monday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "sunday"
+      ],
+      "startMinute": 660,
+      "endMinute": 1140,
+      "breakStartMinute": 900,
+      "breakEndMinute": 930
+    }
+  ],
+  "servicePackages": [
+    {
+      "name": "Five Cut Pack",
+      "description": "Five prepaid classic cuts for regulars.",
+      "price": 19000,
+      "items": [
+        {
+          "service": "Classic Cut",
+          "quantity": 5
+        }
+      ]
+    },
+    {
+      "name": "Beard Maintenance Pack",
+      "description": "Six beard trims for members.",
+      "price": 12000,
+      "items": [
+        {
+          "service": "Beard Trim",
+          "quantity": 6
+        }
+      ]
+    }
+  ],
+  "membershipPlans": [
+    {
+      "name": "Monthly Regular",
+      "description": "One included visit per month plus 10% off add-ons.",
+      "price": 3900,
+      "billingInterval": "monthly",
+      "includedVisits": 1,
+      "discountPercent": 10
+    },
+    {
+      "name": "Chair Club",
+      "description": "Two visits per month for high-frequency regulars.",
+      "price": 7400,
+      "billingInterval": "monthly",
+      "includedVisits": 2,
+      "discountPercent": 15
+    }
+  ],
+  "products": [
+    {
+      "name": "Matte Clay Pomade",
+      "sku": "SF-MATTE-CLAY",
+      "productType": "pomade",
+      "price": 2200,
+      "cost": 900,
+      "description": "Low-shine styling clay used for textured finishes after cuts.",
+      "imagePath": "/images/barbershop/photo/scissor-cut.webp",
+      "inventoryTracked": true,
+      "metadata": {
+        "source": "onboarding",
+        "retailShelf": "front"
+      }
+    },
+    {
+      "name": "Beard Oil No. 3",
+      "sku": "SF-BEARD-OIL-3",
+      "productType": "beard_care",
+      "price": 1800,
+      "cost": 700,
+      "description": "Light cedar beard oil for hot towel and beard service aftercare.",
+      "imagePath": "/images/barbershop/photo/beard-detail.webp",
+      "inventoryTracked": true,
+      "metadata": {
+        "source": "onboarding",
+        "retailShelf": "front"
+      }
+    },
+    {
+      "name": "Sea Salt Texture Spray",
+      "sku": "SF-SEA-SALT",
+      "productType": "other",
+      "price": 1600,
+      "cost": 600,
+      "description": "Texture spray used for natural volume and beachy finish.",
+      "imagePath": "/images/barbershop/photo/shop-interior.webp",
+      "inventoryTracked": true,
+      "metadata": {
+        "source": "onboarding",
+        "retailShelf": "front"
+      }
+    }
+  ],
+  "suppliers": [
+    {
+      "name": "Brooklyn Grooming Supply",
+      "status": "active",
+      "contactName": "Riley Morgan",
+      "email": "orders@brooklyngrooming.example",
+      "phone": "(718) 555-4100",
+      "notes": "Retail stock supplier.",
+      "metadata": {
+        "source": "onboarding"
+      }
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+/* Hallmark · pre-emit critique: P5 H5 E4 S5 R5 V5
+ * genre: editorial · macrostructure: Photographic · persisted constrained brand palette
+ * enrichment: E8 real photography · nav: N6 masthead · footer: Ft1 mast-headed
+ * contrast: pass (46–50) · slop: pass (51–55) · honest: pass (56)
+ * chrome: pass (57) · tokens: pass (58) · responsive/mobile: pass (36, 59, 61–69) · icons: pass (60)
+ */
+
+[data-storefront] {
+  --color-paper: oklch(96% 0.014 79);
+  --color-paper-2: oklch(91% 0.021 75);
+  --color-paper-3: oklch(84% 0.031 68);
+  --color-ink: oklch(18% 0.024 52);
+  --color-ink-2: oklch(31% 0.026 54);
+  --color-ink-muted: oklch(44% 0.022 57);
+  --color-rule: oklch(78% 0.021 68);
+  --color-rule-strong: oklch(60% 0.03 62);
+  --color-accent: oklch(69% 0.125 70);
+  --color-accent-hover: oklch(62% 0.135 62);
+  --color-accent-ink: oklch(18% 0.024 52);
+  --color-accent-soft: oklch(90% 0.052 73);
+  --color-inverse: oklch(16% 0.023 50);
+  --color-inverse-2: oklch(22% 0.027 51);
+  --color-inverse-ink: oklch(95% 0.014 79);
+  --color-inverse-muted: oklch(77% 0.022 72);
+  --color-photo-shade: oklch(12% 0.023 48 / 0.74);
+  --color-photo-shade-mid: oklch(12% 0.023 48 / 0.5);
+  --color-photo-shade-soft: oklch(12% 0.023 48 / 0.32);
+  --color-focus: oklch(72% 0.16 82);
+  --color-error: oklch(48% 0.18 28);
+  --color-error-soft: oklch(92% 0.04 28);
+
+  --font-display: var(--font-instrument-serif), 'Iowan Old Style', 'Palatino Linotype', serif;
+  --font-body: var(--font-dm-sans), ui-sans-serif, sans-serif;
+
+  --text-display: clamp(3.25rem, 8.2vw, 6rem);
+  --text-display-s: clamp(2.4rem, 5vw, 4.25rem);
+  --text-title: clamp(2rem, 3.2vw, 3.25rem);
+  --text-lead: clamp(1.08rem, 1.8vw, 1.3rem);
+  --text-body: 1rem;
+  --text-small: 0.9rem;
+  --text-caption: 0.75rem;
+
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2.5rem;
+  --space-2xl: 4rem;
+  --space-3xl: 6rem;
+  --space-4xl: 9rem;
+
+  --radius-sm: 0.125rem;
+  --radius-md: 0.25rem;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 120ms;
+  --dur-med: 220ms;
+  --measure: 42rem;
+  --measure-wide: 82rem;
+  --z-sticky: 200;
+
+  color: var(--color-ink);
+  background: var(--color-paper);
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}

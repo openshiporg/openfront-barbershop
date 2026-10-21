@@ -12,69 +12,1603 @@ generator client {
 }
 
 model User {
-  id                      String    @id @default(cuid())
-  name                    String    @default("")
-  email                   String    @unique @default("")
-  password                String
-  role                    Role?     @relation("User_role", fields: [roleId], references: [id])
-  roleId                  String?   @map("role")
-  tasks                   Todo[]    @relation("Todo_assignedTo")
-  passwordResetToken      String?
-  passwordResetIssuedAt   DateTime?
-  passwordResetRedeemedAt DateTime?
+  id                          String                    @id @default(cuid())
+  name                        String                    @default("")
+  email                       String                    @unique @default("")
+  password                    String
+  role                        Role?                     @relation("User_role", fields: [roleId], references: [id])
+  roleId                      String?                   @map("role")
+  barberProfile               Barber?                   @relation("Barber_user")
+  shopMemberships             ShopMembership[]          @relation("ShopMembership_user")
+  activeShop                  Shop?                     @relation("User_activeShop", fields: [activeShopId], references: [id])
+  activeShopId                String?                   @map("activeShop")
+  customerProfile             Customer?                 @relation("Customer_user")
+  bookings                    Appointment[]             @relation("Appointment_account")
+  onboardingStatus            UserOnboardingStatusType? @default(not_started)
+  createdAt                   DateTime                  @default(now())
+  updatedAt                   DateTime                  @default(now()) @updatedAt
+  passwordResetToken          String?
+  passwordResetIssuedAt       DateTime?
+  passwordResetRedeemedAt     DateTime?
+  from_CustomerNote_createdBy CustomerNote[]            @relation("CustomerNote_createdBy")
 
   @@index([roleId])
+  @@index([activeShopId])
 }
 
 model Role {
-  id                 String  @id @default(cuid())
-  name               String  @default("")
-  canCreateTodos     Boolean @default(false)
-  canManageAllTodos  Boolean @default(false)
-  canSeeOtherPeople  Boolean @default(false)
-  canEditOtherPeople Boolean @default(false)
-  canManagePeople    Boolean @default(false)
-  canManageRoles     Boolean @default(false)
-  canAccessDashboard Boolean @default(false)
-  assignedTo         User[]  @relation("User_role")
+  id                     String   @id @default(cuid())
+  name                   String   @default("")
+  canSeeOtherPeople      Boolean  @default(false)
+  canEditOtherPeople     Boolean  @default(false)
+  canManagePeople        Boolean  @default(false)
+  canManageRoles         Boolean  @default(false)
+  canAccessDashboard     Boolean  @default(false)
+  canManageOnboarding    Boolean  @default(false)
+  canManageServices      Boolean  @default(false)
+  canManageStaff         Boolean  @default(false)
+  canManageSchedules     Boolean  @default(false)
+  canManageAppointments  Boolean  @default(false)
+  canManageQueue         Boolean  @default(false)
+  canManageCustomers     Boolean  @default(false)
+  canManageCustomerNotes Boolean  @default(false)
+  canManageMemberships   Boolean  @default(false)
+  canManagePayments      Boolean  @default(false)
+  canViewReports         Boolean  @default(false)
+  assignedTo             User[]   @relation("User_role")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @default(now()) @updatedAt
 }
 
-model Todo {
-  id                   String      @id @default(cuid())
-  label                String      @default("")
-  description          Json        @default("[{\"type\":\"paragraph\",\"children\":[{\"text\":\"\"}]}]")
-  isComplete           Boolean     @default(false)
-  status               String?     @default("todo")
-  priority             Int?        @default(1)
-  tags                 Json        @default("[]")
-  dueDate              DateTime?
-  weight               Float?      @default(1)
-  budget               Decimal?    @default("0.00") @postgresql.Decimal(10, 2)
-  isPrivate            Boolean     @default(false)
-  largeNumber          BigInt?
+model Shop {
+  id                            String                   @id @default(cuid())
+  name                          String                   @default("")
+  legalName                     String                   @default("")
+  slug                          String                   @unique @default("")
+  status                        ShopStatusType?          @default(active)
+  logoIcon                      String                   @default("<svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" height=\"100%\" width=\"100%\" viewBox=\"0 0 42 48\"><path fill=\"#155eef\" fill-rule=\"evenodd\" d=\"m22.102 20.86 9.9-9.9L29.88 8.84l-7.339 7.339V3h-3v13.178l-7.339-7.34-2.121 2.122 9.9 9.9 1.06 1.06zm2.12 2.121 9.9-9.9 2.121 2.122-7.339 7.339H42v3H28.904l7.34 7.339L34.121 35l-9.9-9.899-1.06-1.06zM7.96 35.001l9.9-9.899 1.06-1.06-1.06-1.061-9.9-9.9-2.121 2.122 7.339 7.339H.002v3h13.176l-7.34 7.339zm12.02-7.777-9.9 9.9 2.122 2.12 7.339-7.338V45h3V31.906l7.339 7.338L32 37.124l-9.9-9.9-1.06-1.061z\" clip-rule=\"evenodd\"/></svg>")
+  logoColor                     String                   @default("0")
+  tagline                       String                   @default("")
+  address                       String                   @default("")
+  phone                         String                   @default("")
+  timezone                      String                   @default("America/New_York")
+  currencyCode                  String                   @default("USD")
+  jurisdictionCode              String                   @default("")
+  hours                         Json?                    @default("{}")
+  brandColor                    ShopBrandColorType       @default(amber)
+  isPublic                      Boolean                  @default(false)
+  isDemo                        Boolean                  @default(false)
+  memberships                   ShopMembership[]         @relation("ShopMembership_shop")
+  activeUsers                   User[]                   @relation("User_activeShop")
+  chairs                        BarberChair[]            @relation("BarberChair_shop")
+  barbers                       Barber[]                 @relation("Barber_shop")
+  scheduleExceptions            ScheduleException[]      @relation("ScheduleException_shop")
+  staffShifts                   StaffShift[]             @relation("StaffShift_shop")
+  customers                     Customer[]               @relation("Customer_shop")
+  customerNotes                 CustomerNote[]           @relation("CustomerNote_shop")
+  groomingNotes                 GroomingNote[]           @relation("GroomingNote_shop")
+  waiverForms                   WaiverForm[]             @relation("WaiverForm_shop")
+  serviceCategories             ServiceCategory[]        @relation("ServiceCategory_shop")
+  services                      Service[]                @relation("Service_shop")
+  products                      Product[]                @relation("Product_shop")
+  servicePackages               ServicePackage[]         @relation("ServicePackage_shop")
+  membershipPlans               MembershipPlan[]         @relation("MembershipPlan_shop")
+  customerPackages              CustomerPackage[]        @relation("CustomerPackage_shop")
+  membershipEvents              MembershipEvent[]        @relation("MembershipEvent_shop")
+  appointments                  Appointment[]            @relation("Appointment_shop")
+  appointmentChangeEvents       AppointmentChangeEvent[] @relation("AppointmentChangeEvent_shop")
+  bookingPolicies               BookingPolicy[]          @relation("BookingPolicy_shop")
+  practitionerCredentials       PractitionerCredential[] @relation("PractitionerCredential_shop")
+  noShowPolicies                NoShowPolicy[]           @relation("NoShowPolicy_shop")
+  noShowEvents                  NoShowEvent[]            @relation("NoShowEvent_shop")
+  queueEntries                  WalkInQueueEntry[]       @relation("WalkInQueueEntry_shop")
+  waitlistEntries               WaitlistEntry[]          @relation("WaitlistEntry_shop")
+  transactions                  CheckoutTransaction[]    @relation("CheckoutTransaction_shop")
+  paymentProviders              PaymentProvider[]        @relation("PaymentProvider_shop")
+  paymentSessions               PaymentSession[]         @relation("PaymentSession_shop")
+  commissions                   Commission[]             @relation("Commission_shop")
+  commissionPayouts             CommissionPayout[]       @relation("CommissionPayout_shop")
+  tips                          Tip[]                    @relation("Tip_shop")
+  suppliers                     Supplier[]               @relation("Supplier_shop")
+  inventoryLots                 InventoryLot[]           @relation("InventoryLot_shop")
+  inventoryMovements            InventoryMovement[]      @relation("InventoryMovement_shop")
+  productSaleLines              ProductSaleLine[]        @relation("ProductSaleLine_shop")
+  paymentReconciliations        PaymentReconciliation[]  @relation("PaymentReconciliation_shop")
+  lifecycleEvents               LifecycleOutboxEvent[]   @relation("LifecycleOutboxEvent_shop")
+  createdAt                     DateTime                 @default(now())
+  updatedAt                     DateTime                 @default(now()) @updatedAt
+  from_GuestBookingCommand_shop GuestBookingCommand[]    @relation("GuestBookingCommand_shop")
+  from_CashRefund_shop          CashRefund[]             @relation("CashRefund_shop")
+}
+
+model ShopMembership {
+  id             String                            @id @default(cuid())
+  membershipKey  String                            @unique @default("")
+  shop           Shop                              @relation("ShopMembership_shop", fields: [shopId], references: [id])
+  shopId         String                            @map("shop")
+  user           User?                             @relation("ShopMembership_user", fields: [userId], references: [id])
+  userId         String?                           @map("user")
+  membershipRole ShopMembershipMembershipRoleType? @default(viewer)
+  status         ShopMembershipStatusType?         @default(invited)
+  createdAt      DateTime                          @default(now())
+  updatedAt      DateTime                          @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([userId])
+}
+
+model LifecycleOutboxEvent {
+  id            String                          @id @default(cuid())
+  eventKey      String                          @unique @default("")
+  eventType     String                          @default("")
+  schemaVersion Int                             @default(1)
+  aggregateType String                          @default("")
+  aggregateId   String                          @default("")
+  shop          Shop                            @relation("LifecycleOutboxEvent_shop", fields: [shopId], references: [id])
+  shopId        String                          @map("shop")
+  payload       Json?
+  actorId       String                          @default("")
+  payloadHash   String                          @default("")
+  occurredAt    DateTime
+  status        LifecycleOutboxEventStatusType? @default(pending)
+  attempts      Int?                            @default(0)
+  maxAttempts   Int?                            @default(8)
+  availableAt   DateTime
+  lockedAt      DateTime?
+  lastAttemptAt DateTime?
+  deliveredAt   DateTime?
+  lastError     String                          @default("")
+  replayCount   Int?                            @default(0)
+  createdAt     DateTime                        @default(now())
+  updatedAt     DateTime                        @default(now()) @updatedAt
+
+  @@index([shopId])
+}
+
+model NoShowEvent {
+  id                 String        @id @default(cuid())
+  shop               Shop          @relation("NoShowEvent_shop", fields: [shopId], references: [id])
+  shopId             String        @map("shop")
+  eventKey           String        @unique @default("")
+  appointment        Appointment?  @relation("NoShowEvent_appointment", fields: [appointmentId], references: [id])
+  appointmentId      String?       @map("appointment")
+  customer           Customer?     @relation("NoShowEvent_customer", fields: [customerId], references: [id])
+  customerId         String?       @map("customer")
+  policy             NoShowPolicy? @relation("NoShowEvent_policy", fields: [policyId], references: [id])
+  policyId           String?       @map("policy")
+  policyNameSnapshot String        @default("")
+  feeAmount          Int
+  graceMinutes       Int
+  feeWaived          Boolean       @default(false)
+  reason             String        @default("")
+  markedAt           DateTime
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([appointmentId])
+  @@index([customerId])
+  @@index([policyId])
+}
+
+model CommissionPayout {
+  id                 String                      @id @default(cuid())
+  shop               Shop                        @relation("CommissionPayout_shop", fields: [shopId], references: [id])
+  shopId             String                      @map("shop")
+  payoutNumber       String                      @unique @default("")
+  idempotencyKeyHash String                      @unique @default("")
+  barber             Barber?                     @relation("CommissionPayout_barber", fields: [barberId], references: [id])
+  barberId           String?                     @map("barber")
+  commissions        Commission[]                @relation("Commission_payout")
+  status             CommissionPayoutStatusType? @default(paid)
+  commissionCount    Int
+  totalAmount        Int
+  paidAt             DateTime
+  notes              String                      @default("")
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([barberId])
+}
+
+model ProductSaleLine {
+  id                  String                       @id @default(cuid())
+  shop                Shop                         @relation("ProductSaleLine_shop", fields: [shopId], references: [id])
+  shopId              String                       @map("shop")
+  lineNumber          String                       @unique @default("")
+  transaction         CheckoutTransaction?         @relation("ProductSaleLine_transaction", fields: [transactionId], references: [id])
+  transactionId       String?                      @map("transaction")
+  product             Product?                     @relation("ProductSaleLine_product", fields: [productId], references: [id])
+  productId           String?                      @map("product")
+  inventoryMovement   InventoryMovement?           @relation("InventoryMovement_productSaleLine")
+  originalLine        ProductSaleLine?             @relation("ProductSaleLine_originalLine", fields: [originalLineId], references: [id])
+  originalLineId      String?                      @map("originalLine")
+  returnLines         ProductSaleLine[]            @relation("ProductSaleLine_originalLine")
+  lineType            ProductSaleLineLineTypeType? @default(sale)
+  productNameSnapshot String                       @default("")
+  skuSnapshot         String                       @default("")
+  quantity            Int
+  unitPrice           Int
+  subtotal            Int
+  taxAmount           Int
+  total               Int
+  returnedQuantity    Int?                         @default(0)
+  occurredAt          DateTime
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([transactionId])
+  @@index([productId])
+  @@index([originalLineId])
+}
+
+model PaymentReconciliation {
+  id                  String          @id @default(cuid())
+  shop                Shop            @relation("PaymentReconciliation_shop", fields: [shopId], references: [id])
+  shopId              String          @map("shop")
+  eventKey            String          @unique @default("")
+  paymentSession      PaymentSession? @relation("PaymentReconciliation_paymentSession", fields: [paymentSessionId], references: [id])
+  paymentSessionId    String?         @map("paymentSession")
+  localStatusBefore   String          @default("")
+  remoteStatus        String          @default("")
+  localStatusAfter    String          @default("")
+  changed             Boolean         @default(false)
+  amount              Int
+  providerPayloadHash String          @default("")
+  observedAt          DateTime
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([paymentSessionId])
+}
+
+model ShopSettings {
+  id           Int      @id
+  key          String   @unique @default("primary")
+  name         String   @default("")
+  tagline      String   @default("")
+  address      String   @default("")
+  phone        String   @default("")
+  timezone     String   @default("America/New_York")
+  currencyCode String   @default("USD")
+  hours        Json?    @default("{}")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+}
+
+model ServiceCategory {
+  id           String                     @id @default(cuid())
+  shop         Shop                       @relation("ServiceCategory_shop", fields: [shopId], references: [id])
+  shopId       String                     @map("shop")
+  name         String                     @default("")
+  description  String                     @default("")
+  displayOrder Int?                       @default(0)
+  status       ServiceCategoryStatusType? @default(active)
+  services     Service[]                  @relation("Service_category")
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @default(now()) @updatedAt
+
+  @@index([shopId])
+}
+
+model Service {
+  id                                     String                   @id @default(cuid())
+  shop                                   Shop                     @relation("Service_shop", fields: [shopId], references: [id])
+  shopId                                 String                   @map("shop")
+  name                                   String                   @default("")
+  description                            String                   @default("")
+  imagePath                              String                   @default("")
+  durationMinutes                        Int                      @default(30)
+  price                                  Int
+  depositRequired                        Boolean                  @default(false)
+  depositAmount                          Int?                     @default(0)
+  waiverRequired                         Boolean                  @default(false)
+  waiverTemplateKey                      String                   @default("")
+  waiverTemplateVersion                  String                   @default("")
+  waiverTemplateText                     String                   @default("")
+  waiverTemplateHash                     String                   @default("")
+  status                                 ServiceStatusType?       @default(active)
+  bookingBufferMinutes                   Int?                     @default(10)
+  color                                  String                   @default("#111827")
+  category                               ServiceCategory?         @relation("Service_category", fields: [categoryId], references: [id])
+  categoryId                             String?                  @map("category")
+  specialists                            Barber[]                 @relation("Barber_specialties")
+  practitionerCredentials                PractitionerCredential[] @relation("PractitionerCredential_service")
+  appointments                           Appointment[]            @relation("Appointment_service")
+  appointmentLineItems                   AppointmentLineItem[]    @relation("AppointmentLineItem_service")
+  packageItems                           ServicePackageItem[]     @relation("ServicePackageItem_service")
+  createdAt                              DateTime                 @default(now())
+  updatedAt                              DateTime                 @default(now()) @updatedAt
+  from_WalkInQueueEntry_requestedService WalkInQueueEntry[]       @relation("WalkInQueueEntry_requestedService")
+  from_WaiverForm_service                WaiverForm[]             @relation("WaiverForm_service")
+  from_WaitlistEntry_requestedService    WaitlistEntry[]          @relation("WaitlistEntry_requestedService")
+
+  @@index([shopId])
+  @@index([categoryId])
+}
+
+model Barber {
+  id                                 String                   @id @default(cuid())
+  shop                               Shop                     @relation("Barber_shop", fields: [shopId], references: [id])
+  shopId                             String                   @map("shop")
+  chair                              BarberChair?             @relation("Barber_chair", fields: [chairId], references: [id])
+  chairId                            String?                  @map("chair")
+  displayName                        String                   @default("")
+  legalName                          String                   @default("")
+  bio                                String                   @default("")
+  imagePath                          String                   @default("")
+  phone                              String                   @default("")
+  email                              String                   @default("")
+  chairNumber                        String                   @default("")
+  status                             BarberStatusType?        @default(active)
+  bookingEnabled                     Boolean                  @default(true)
+  bufferMinutes                      Int?                     @default(10)
+  serviceCommissionRateBps           Int?                     @default(0)
+  user                               User?                    @relation("Barber_user", fields: [userId], references: [id])
+  userId                             String?                  @unique @map("user")
+  specialties                        Service[]                @relation("Barber_specialties")
+  credentials                        PractitionerCredential[] @relation("PractitionerCredential_barber")
+  supervisedCredentials              PractitionerCredential[] @relation("PractitionerCredential_supervisor")
+  schedules                          BarberSchedule[]         @relation("BarberSchedule_barber")
+  scheduleExceptions                 ScheduleException[]      @relation("ScheduleException_barber")
+  shifts                             StaffShift[]             @relation("StaffShift_barber")
+  appointments                       Appointment[]            @relation("Appointment_barber")
+  commissions                        Commission[]             @relation("Commission_barber")
+  queueEntries                       WalkInQueueEntry[]       @relation("WalkInQueueEntry_requestedBarber")
+  createdAt                          DateTime                 @default(now())
+  updatedAt                          DateTime                 @default(now()) @updatedAt
+  from_CommissionPayout_barber       CommissionPayout[]       @relation("CommissionPayout_barber")
+  from_Customer_preferredBarber      Customer[]               @relation("Customer_preferredBarber")
+  from_CheckoutTransaction_barber    CheckoutTransaction[]    @relation("CheckoutTransaction_barber")
+  from_GroomingNote_barber           GroomingNote[]           @relation("GroomingNote_barber")
+  from_WaitlistEntry_requestedBarber WaitlistEntry[]          @relation("WaitlistEntry_requestedBarber")
+  from_Tip_barber                    Tip[]                    @relation("Tip_barber")
+
+  @@index([shopId])
+  @@index([chairId])
+}
+
+model BarberSchedule {
+  id               String                      @id @default(cuid())
+  barber           Barber?                     @relation("BarberSchedule_barber", fields: [barberId], references: [id])
+  barberId         String?                     @map("barber")
+  dayOfWeek        BarberScheduleDayOfWeekType
+  isWorking        Boolean                     @default(true)
+  startMinute      Int?                        @default(540)
+  endMinute        Int?                        @default(1020)
+  breakStartMinute Int?
+  breakEndMinute   Int?
+  notes            String                      @default("")
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @default(now()) @updatedAt
+
+  @@unique([barberId, dayOfWeek])
+  @@index([barberId])
+}
+
+model ScheduleException {
+  id                 String                              @id @default(cuid())
+  shop               Shop                                @relation("ScheduleException_shop", fields: [shopId], references: [id])
+  shopId             String                              @map("shop")
+  barber             Barber?                             @relation("ScheduleException_barber", fields: [barberId], references: [id])
+  barberId           String?                             @map("barber")
+  chair              BarberChair?                        @relation("ScheduleException_chair", fields: [chairId], references: [id])
+  chairId            String?                             @map("chair")
+  idempotencyKeyHash String                              @unique @default("")
+  exceptionType      ScheduleExceptionExceptionTypeType? @default(time_off)
+  status             ScheduleExceptionStatusType?        @default(active)
+  startsAt           DateTime
+  endsAt             DateTime
+  reason             String                              @default("")
+  createdAt          DateTime                            @default(now())
+  updatedAt          DateTime                            @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([barberId])
+  @@index([chairId])
+}
+
+model StaffShift {
+  id                 String                @id @default(cuid())
+  shop               Shop                  @relation("StaffShift_shop", fields: [shopId], references: [id])
+  shopId             String                @map("shop")
+  barber             Barber?               @relation("StaffShift_barber", fields: [barberId], references: [id])
+  barberId           String?               @map("barber")
+  chair              BarberChair?          @relation("StaffShift_chair", fields: [chairId], references: [id])
+  chairId            String?               @map("chair")
+  idempotencyKeyHash String                @unique @default("")
+  status             StaffShiftStatusType? @default(scheduled)
+  scheduledStart     DateTime
+  scheduledEnd       DateTime
+  clockedInAt        DateTime?
+  clockedOutAt       DateTime?
+  notes              String                @default("")
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([barberId])
+  @@index([chairId])
+}
+
+model PractitionerCredential {
+  id                  String                                   @id @default(cuid())
+  shop                Shop                                     @relation("PractitionerCredential_shop", fields: [shopId], references: [id])
+  shopId              String                                   @map("shop")
+  barber              Barber?                                  @relation("PractitionerCredential_barber", fields: [barberId], references: [id])
+  barberId            String?                                  @map("barber")
+  service             Service?                                 @relation("PractitionerCredential_service", fields: [serviceId], references: [id])
+  serviceId           String?                                  @map("service")
+  supervisor          Barber?                                  @relation("PractitionerCredential_supervisor", fields: [supervisorId], references: [id])
+  supervisorId        String?                                  @map("supervisor")
+  credentialType      PractitionerCredentialCredentialTypeType
+  credentialNumber    String                                   @default("")
+  issuingAuthority    String                                   @default("")
+  jurisdictionCode    String                                   @default("")
+  scopeDescription    String                                   @default("")
+  evidenceHash        String                                   @default("")
+  status              PractitionerCredentialStatusType         @default(active)
+  effectiveFrom       DateTime
+  expiresAt           DateTime
+  verifiedAt          DateTime
+  supervisionRequired Boolean                                  @default(false)
+  createdAt           DateTime                                 @default(now())
+  updatedAt           DateTime                                 @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([barberId])
+  @@index([serviceId])
+  @@index([supervisorId])
+}
+
+model BookingPolicy {
+  id                        String                                    @id @default(cuid())
+  shop                      Shop                                      @relation("BookingPolicy_shop", fields: [shopId], references: [id])
+  shopId                    String                                    @map("shop")
+  name                      String                                    @default("")
+  version                   String                                    @default("")
+  jurisdictionCode          String                                    @default("")
+  policyTextHash            String                                    @default("")
+  status                    BookingPolicyStatusType?                  @default(active)
+  effectiveFrom             DateTime
+  effectiveUntil            DateTime?
+  cancellationWindowMinutes Int                                       @default(1440)
+  rescheduleWindowMinutes   Int                                       @default(1440)
+  lateCancellationFeeAmount Int                                       @default(0)
+  rescheduleFeeAmount       Int                                       @default(0)
+  depositCancellationRule   BookingPolicyDepositCancellationRuleType? @default(manual_review)
+  publicServiceEligibility  BookingPolicyPublicServiceEligibilityType @default(legacy_active_service)
+  maxCustomerReschedules    Int                                       @default(2)
+  createdAt                 DateTime                                  @default(now())
+  updatedAt                 DateTime                                  @default(now()) @updatedAt
+
+  @@index([shopId])
+}
+
+model AppointmentChangeEvent {
+  id                 String                                        @id @default(cuid())
+  shop               Shop                                          @relation("AppointmentChangeEvent_shop", fields: [shopId], references: [id])
+  shopId             String                                        @map("shop")
+  appointment        Appointment?                                  @relation("AppointmentChangeEvent_appointment", fields: [appointmentId], references: [id])
+  appointmentId      String?                                       @map("appointment")
+  eventKey           String                                        @unique @default("")
+  action             AppointmentChangeEventActionType
+  actorType          AppointmentChangeEventActorTypeType
+  actorReferenceHash String                                        @default("")
+  reason             String                                        @default("")
+  previousStartsAt   DateTime
+  previousEndsAt     DateTime?
+  nextStartsAt       DateTime?
+  nextEndsAt         DateTime?
+  policySnapshot     Json?
+  authoritySnapshot  Json?
+  feeAmount          Int                                           @default(0)
+  depositConsequence AppointmentChangeEventDepositConsequenceType? @default(none)
+  occurredAt         DateTime
+  createdAt          DateTime                                      @default(now())
+  updatedAt          DateTime                                      @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([appointmentId])
+}
+
+model Customer {
+  id                             String                              @id @default(cuid())
+  shop                           Shop                                @relation("Customer_shop", fields: [shopId], references: [id])
+  shopId                         String                              @map("shop")
+  firstName                      String                              @default("")
+  lastName                       String                              @default("")
+  phone                          String                              @default("")
+  email                          String                              @default("")
+  status                         CustomerStatusType?                 @default(active)
+  preferredContactMethod         CustomerPreferredContactMethodType? @default(sms)
+  acceptsMarketing               Boolean                             @default(false)
+  birthday                       DateTime?
+  lastVisitAt                    DateTime?
+  user                           User?                               @relation("Customer_user", fields: [userId], references: [id])
+  userId                         String?                             @unique @map("user")
+  preferredBarber                Barber?                             @relation("Customer_preferredBarber", fields: [preferredBarberId], references: [id])
+  preferredBarberId              String?                             @map("preferredBarber")
+  appointments                   Appointment[]                       @relation("Appointment_customer")
+  notes                          CustomerNote[]                      @relation("CustomerNote_customer")
+  packageBalances                CustomerPackage[]                   @relation("CustomerPackage_customer")
+  membershipEvents               MembershipEvent[]                   @relation("MembershipEvent_customer")
+  transactions                   CheckoutTransaction[]               @relation("CheckoutTransaction_customer")
+  createdAt                      DateTime                            @default(now())
+  updatedAt                      DateTime                            @default(now()) @updatedAt
+  from_NoShowEvent_customer      NoShowEvent[]                       @relation("NoShowEvent_customer")
+  from_WalkInQueueEntry_customer WalkInQueueEntry[]                  @relation("WalkInQueueEntry_customer")
+  from_WaiverForm_customer       WaiverForm[]                        @relation("WaiverForm_customer")
+  from_GroomingNote_customer     GroomingNote[]                      @relation("GroomingNote_customer")
+  from_WaitlistEntry_customer    WaitlistEntry[]                     @relation("WaitlistEntry_customer")
+  from_Tip_customer              Tip[]                               @relation("Tip_customer")
+
+  @@index([shopId])
+  @@index([preferredBarberId])
+}
+
+model CustomerNote {
+  id            String                      @id @default(cuid())
+  shop          Shop                        @relation("CustomerNote_shop", fields: [shopId], references: [id])
+  shopId        String                      @map("shop")
+  customer      Customer?                   @relation("CustomerNote_customer", fields: [customerId], references: [id])
+  customerId    String?                     @map("customer")
+  noteType      CustomerNoteNoteTypeType?   @default(general)
+  body          String                      @default("")
+  visibility    CustomerNoteVisibilityType? @default(staff)
+  appointment   Appointment?                @relation("CustomerNote_appointment", fields: [appointmentId], references: [id])
+  appointmentId String?                     @map("appointment")
+  createdBy     User?                       @relation("CustomerNote_createdBy", fields: [createdById], references: [id])
+  createdById   String?                     @map("createdBy")
+  createdAt     DateTime                    @default(now())
+  updatedAt     DateTime                    @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([customerId])
+  @@index([appointmentId])
+  @@index([createdById])
+}
+
+model Appointment {
+  id                                   String                        @id @default(cuid())
+  shop                                 Shop                          @relation("Appointment_shop", fields: [shopId], references: [id])
+  shopId                               String                        @map("shop")
+  account                              User?                         @relation("Appointment_account", fields: [accountId], references: [id])
+  accountId                            String?                       @map("account")
+  chair                                BarberChair?                  @relation("Appointment_chair", fields: [chairId], references: [id])
+  chairId                              String?                       @map("chair")
+  customer                             Customer?                     @relation("Appointment_customer", fields: [customerId], references: [id])
+  customerId                           String?                       @map("customer")
+  barber                               Barber?                       @relation("Appointment_barber", fields: [barberId], references: [id])
+  barberId                             String?                       @map("barber")
+  service                              Service?                      @relation("Appointment_service", fields: [serviceId], references: [id])
+  serviceId                            String?                       @map("service")
+  startsAt                             DateTime
+  endsAt                               DateTime?
+  durationMinutes                      Int?                          @default(30)
+  serviceTitleSnapshot                 String                        @default("")
+  serviceImagePathSnapshot             String                        @default("")
+  serviceModifiersSnapshot             Json?                         @default("[]")
+  barberNameSnapshot                   String                        @default("")
+  barberChairNumberSnapshot            String                        @default("")
+  bookingAuthoritySnapshot             Json?
+  executionAuthoritySnapshot           Json?
+  bookingPolicySnapshot                Json?
+  waiverRequirementSnapshot            Json?
+  serviceStartedAt                     DateTime?
+  serviceCompletedAt                   DateTime?
+  customerRescheduleCount              Int?                          @default(0)
+  status                               AppointmentStatusType?        @default(requested)
+  source                               AppointmentSourceType?        @default(online)
+  paymentStatus                        AppointmentPaymentStatusType? @default(not_required)
+  price                                Int?
+  depositAmount                        Int?                          @default(0)
+  cancellationReason                   String                        @default("")
+  customerNotes                        String                        @default("")
+  guestNameSnapshot                    String                        @default("")
+  internalNotes                        String                        @default("")
+  publicAccessTokenHash                String                        @default("")
+  queueEntry                           WalkInQueueEntry?             @relation("Appointment_queueEntry", fields: [queueEntryId], references: [id])
+  queueEntryId                         String?                       @unique @map("queueEntry")
+  transaction                          CheckoutTransaction?          @relation("Appointment_transaction", fields: [transactionId], references: [id])
+  transactionId                        String?                       @map("transaction")
+  lineItems                            AppointmentLineItem[]         @relation("AppointmentLineItem_appointment")
+  paymentSessions                      PaymentSession[]              @relation("PaymentSession_appointment")
+  noShowEvents                         NoShowEvent[]                 @relation("NoShowEvent_appointment")
+  changeEvents                         AppointmentChangeEvent[]      @relation("AppointmentChangeEvent_appointment")
+  packageUsages                        PackageUsage[]                @relation("PackageUsage_appointment")
+  createdAt                            DateTime                      @default(now())
+  updatedAt                            DateTime                      @default(now()) @updatedAt
+  from_CustomerNote_appointment        CustomerNote[]                @relation("CustomerNote_appointment")
+  from_GuestBookingCommand_appointment GuestBookingCommand[]         @relation("GuestBookingCommand_appointment")
+  from_WaiverForm_appointment          WaiverForm[]                  @relation("WaiverForm_appointment")
+  from_GroomingNote_appointment        GroomingNote[]                @relation("GroomingNote_appointment")
+  from_Tip_appointment                 Tip[]                         @relation("Tip_appointment")
+  from_Commission_appointment          Commission[]                  @relation("Commission_appointment")
+
+  @@index([shopId])
+  @@index([accountId])
+  @@index([chairId])
+  @@index([customerId])
+  @@index([barberId])
+  @@index([serviceId])
+  @@index([transactionId])
+}
+
+model GuestBookingCommand {
+  id            String       @id @default(cuid())
+  requestKey    String       @unique @default("")
+  purpose       String       @default("")
+  actor         String       @default("")
+  payloadHash   String       @default("")
+  proofHash     String       @default("")
+  shop          Shop         @relation("GuestBookingCommand_shop", fields: [shopId], references: [id])
+  shopId        String       @map("shop")
+  appointment   Appointment? @relation("GuestBookingCommand_appointment", fields: [appointmentId], references: [id])
+  appointmentId String?      @map("appointment")
+  receipt       Json?
+  expiresAt     DateTime?
+  revokedAt     DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([appointmentId])
+}
+
+model AppointmentLineItem {
+  id                    String               @id @default(cuid())
+  appointment           Appointment?         @relation("AppointmentLineItem_appointment", fields: [appointmentId], references: [id])
+  appointmentId         String?              @map("appointment")
+  transaction           CheckoutTransaction? @relation("AppointmentLineItem_transaction", fields: [transactionId], references: [id])
+  transactionId         String?              @map("transaction")
+  service               Service?             @relation("AppointmentLineItem_service", fields: [serviceId], references: [id])
+  serviceId             String?              @map("service")
+  title                 String               @default("")
+  price                 Int
+  durationMinutes       Int
+  imagePath             String               @default("")
+  modifiers             Json?                @default("[]")
+  barberName            String               @default("")
+  barberChairNumber     String               @default("")
+  packageBalanceId      String               @default("")
+  packageName           String               @default("")
+  packageVisitsConsumed Int?                 @default(0)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @default(now()) @updatedAt
+
+  @@index([appointmentId])
+  @@index([transactionId])
+  @@index([serviceId])
+}
+
+model WalkInQueueEntry {
+  id                    String                      @id @default(cuid())
+  shop                  Shop                        @relation("WalkInQueueEntry_shop", fields: [shopId], references: [id])
+  shopId                String                      @map("shop")
+  customerName          String                      @default("")
+  phone                 String                      @default("")
+  partySize             Int?                        @default(1)
+  status                WalkInQueueEntryStatusType? @default(waiting)
+  requestedService      Service?                    @relation("WalkInQueueEntry_requestedService", fields: [requestedServiceId], references: [id])
+  requestedServiceId    String?                     @map("requestedService")
+  requestedBarber       Barber?                     @relation("WalkInQueueEntry_requestedBarber", fields: [requestedBarberId], references: [id])
+  requestedBarberId     String?                     @map("requestedBarber")
+  quotedWaitMinutes     Int?
+  checkedInAt           DateTime?                   @default(now())
+  seatedAt              DateTime?
+  notes                 String                      @default("")
+  publicAccessTokenHash String                      @default("")
+  appointment           Appointment?                @relation("Appointment_queueEntry")
+  customer              Customer?                   @relation("WalkInQueueEntry_customer", fields: [customerId], references: [id])
+  customerId            String?                     @map("customer")
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([requestedServiceId])
+  @@index([requestedBarberId])
+  @@index([customerId])
+}
+
+model MembershipPlan {
+  id              String                             @id @default(cuid())
+  shop            Shop                               @relation("MembershipPlan_shop", fields: [shopId], references: [id])
+  shopId          String                             @map("shop")
+  name            String                             @default("")
+  description     String                             @default("")
+  price           Int
+  billingInterval MembershipPlanBillingIntervalType? @default(monthly)
+  includedVisits  Int?                               @default(1)
+  discountPercent Int?                               @default(0)
+  status          MembershipPlanStatusType?          @default(active)
+  members         CustomerPackage[]                  @relation("CustomerPackage_membershipPlan")
+  events          MembershipEvent[]                  @relation("MembershipEvent_membershipPlan")
+  createdAt       DateTime                           @default(now())
+  updatedAt       DateTime                           @default(now()) @updatedAt
+
+  @@index([shopId])
+}
+
+model ServicePackage {
+  id               String                    @id @default(cuid())
+  shop             Shop                      @relation("ServicePackage_shop", fields: [shopId], references: [id])
+  shopId           String                    @map("shop")
+  name             String                    @default("")
+  description      String                    @default("")
+  price            Int
+  status           ServicePackageStatusType? @default(active)
+  items            ServicePackageItem[]      @relation("ServicePackageItem_package")
+  customerBalances CustomerPackage[]         @relation("CustomerPackage_servicePackage")
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @default(now()) @updatedAt
+
+  @@index([shopId])
+}
+
+model ServicePackageItem {
+  id        String          @id @default(cuid())
+  package   ServicePackage? @relation("ServicePackageItem_package", fields: [packageId], references: [id])
+  packageId String?         @map("package")
+  service   Service?        @relation("ServicePackageItem_service", fields: [serviceId], references: [id])
+  serviceId String?         @map("service")
+  quantity  Int?            @default(1)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @default(now()) @updatedAt
+
+  @@index([packageId])
+  @@index([serviceId])
+}
+
+model CustomerPackage {
+  id               String                     @id @default(cuid())
+  shop             Shop                       @relation("CustomerPackage_shop", fields: [shopId], references: [id])
+  shopId           String                     @map("shop")
+  customer         Customer?                  @relation("CustomerPackage_customer", fields: [customerId], references: [id])
+  customerId       String?                    @map("customer")
+  servicePackage   ServicePackage?            @relation("CustomerPackage_servicePackage", fields: [servicePackageId], references: [id])
+  servicePackageId String?                    @map("servicePackage")
+  membershipPlan   MembershipPlan?            @relation("CustomerPackage_membershipPlan", fields: [membershipPlanId], references: [id])
+  membershipPlanId String?                    @map("membershipPlan")
+  remainingVisits  Int?                       @default(0)
+  status           CustomerPackageStatusType? @default(active)
+  startsAt         DateTime?                  @default(now())
+  expiresAt        DateTime?
+  nextBillingAt    DateTime?
+  pausedAt         DateTime?
+  cancelledAt      DateTime?
+  autoRenew        Boolean                    @default(false)
+  lastUsedAt       DateTime?
+  transactions     CheckoutTransaction[]      @relation("CheckoutTransaction_packageBalance")
+  membershipEvents MembershipEvent[]          @relation("MembershipEvent_customerPackage")
+  usageLedger      PackageUsage[]             @relation("PackageUsage_customerPackage")
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([customerId])
+  @@index([servicePackageId])
+  @@index([membershipPlanId])
+}
+
+model MembershipEvent {
+  id                 String                       @id @default(cuid())
+  shop               Shop                         @relation("MembershipEvent_shop", fields: [shopId], references: [id])
+  shopId             String                       @map("shop")
+  customer           Customer?                    @relation("MembershipEvent_customer", fields: [customerId], references: [id])
+  customerId         String?                      @map("customer")
+  membershipPlan     MembershipPlan?              @relation("MembershipEvent_membershipPlan", fields: [membershipPlanId], references: [id])
+  membershipPlanId   String?                      @map("membershipPlan")
+  customerPackage    CustomerPackage?             @relation("MembershipEvent_customerPackage", fields: [customerPackageId], references: [id])
+  customerPackageId  String?                      @map("customerPackage")
+  transaction        CheckoutTransaction?         @relation("MembershipEvent_transaction", fields: [transactionId], references: [id])
+  transactionId      String?                      @map("transaction")
+  idempotencyKeyHash String                       @unique @default("")
+  eventType          MembershipEventEventTypeType
+  planNameSnapshot   String                       @default("")
+  amount             Int?                         @default(0)
+  visitsDelta        Int?                         @default(0)
+  resultingVisits    Int?                         @default(0)
+  occurredAt         DateTime
+  reason             String                       @default("")
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([customerId])
+  @@index([membershipPlanId])
+  @@index([customerPackageId])
+  @@index([transactionId])
+}
+
+model CheckoutTransaction {
+  id                          String                                @id @default(cuid())
+  shop                        Shop                                  @relation("CheckoutTransaction_shop", fields: [shopId], references: [id])
+  shopId                      String                                @map("shop")
+  customer                    Customer?                             @relation("CheckoutTransaction_customer", fields: [customerId], references: [id])
+  customerId                  String?                               @map("customer")
+  barber                      Barber?                               @relation("CheckoutTransaction_barber", fields: [barberId], references: [id])
+  barberId                    String?                               @map("barber")
+  appointments                Appointment[]                         @relation("Appointment_transaction")
+  lineItems                   AppointmentLineItem[]                 @relation("AppointmentLineItem_transaction")
+  productLines                ProductSaleLine[]                     @relation("ProductSaleLine_transaction")
+  paymentSession              PaymentSession?                       @relation("CheckoutTransaction_paymentSession", fields: [paymentSessionId], references: [id])
+  paymentSessionId            String?                               @unique @map("paymentSession")
+  cashRefund                  CashRefund?                           @relation("CashRefund_transaction")
+  packageUsages               PackageUsage[]                        @relation("PackageUsage_transaction")
+  membershipEvents            MembershipEvent[]                     @relation("MembershipEvent_transaction")
+  packageBalance              CustomerPackage?                      @relation("CheckoutTransaction_packageBalance", fields: [packageBalanceId], references: [id])
+  packageBalanceId            String?                               @map("packageBalance")
+  status                      CheckoutTransactionStatusType?        @default(open)
+  subtotal                    Int?                                  @default(0)
+  tipAmount                   Int?                                  @default(0)
+  taxAmount                   Int?                                  @default(0)
+  discountAmount              Int?                                  @default(0)
+  total                       Int?                                  @default(0)
+  paymentMethod               CheckoutTransactionPaymentMethodType? @default(card)
+  currencyCode                String                                @default("USD")
+  merchantSnapshot            Json?
+  taxRuleSnapshot             Json?
+  providerPaymentId           String                                @default("")
+  completedAt                 DateTime?
+  notes                       String                                @default("")
+  createdAt                   DateTime                              @default(now())
+  updatedAt                   DateTime                              @default(now()) @updatedAt
+  from_Tip_transaction        Tip[]                                 @relation("Tip_transaction")
+  from_Commission_transaction Commission[]                          @relation("Commission_transaction")
+
+  @@index([shopId])
+  @@index([customerId])
+  @@index([barberId])
+  @@index([packageBalanceId])
+}
+
+model CashRefund {
+  id            String               @id @default(cuid())
+  shop          Shop                 @relation("CashRefund_shop", fields: [shopId], references: [id])
+  shopId        String               @map("shop")
+  transaction   CheckoutTransaction? @relation("CashRefund_transaction", fields: [transactionId], references: [id])
+  transactionId String?              @unique @map("transaction")
+  eventKey      String               @unique @default("")
+  actorId       String               @default("")
+  reason        String               @default("")
+  amount        Int?
+  tipAmount     Int?                 @default(0)
+  taxAmount     Int?                 @default(0)
+  refundedAt    DateTime?            @default(now())
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @default(now()) @updatedAt
+
+  @@index([shopId])
+}
+
+model PaymentProvider {
+  id                          String           @id @default(cuid())
+  shop                        Shop             @relation("PaymentProvider_shop", fields: [shopId], references: [id])
+  shopId                      String           @map("shop")
+  name                        String           @default("")
+  code                        String           @default("")
+  isInstalled                 Boolean          @default(true)
+  credentials                 Json?            @default("{}")
+  metadata                    Json?            @default("{}")
+  createPaymentFunction       String           @default("manual")
+  capturePaymentFunction      String           @default("manual")
+  refundPaymentFunction       String           @default("manual")
+  getPaymentStatusFunction    String           @default("manual")
+  generatePaymentLinkFunction String           @default("manual")
+  paymentSessions             PaymentSession[] @relation("PaymentSession_paymentProvider")
+  handleWebhookFunction       String           @default("manual")
+  createdAt                   DateTime         @default(now())
+  updatedAt                   DateTime         @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([code])
+}
+
+model PaymentSession {
+  id                 String                    @id @default(cuid())
+  shop               Shop                      @relation("PaymentSession_shop", fields: [shopId], references: [id])
+  shopId             String                    @map("shop")
+  appointment        Appointment?              @relation("PaymentSession_appointment", fields: [appointmentId], references: [id])
+  appointmentId      String?                   @map("appointment")
+  transaction        CheckoutTransaction?      @relation("CheckoutTransaction_paymentSession")
+  paymentProvider    PaymentProvider?          @relation("PaymentSession_paymentProvider", fields: [paymentProviderId], references: [id])
+  paymentProviderId  String?                   @map("paymentProvider")
+  reconciliations    PaymentReconciliation[]   @relation("PaymentReconciliation_paymentSession")
+  idempotencyKeyHash String                    @unique @default("")
+  status             PaymentSessionStatusType? @default(pending)
+  amount             Int
+  currencyCode       String                    @default("USD")
+  providerPaymentId  String                    @default("")
+  expiresAt          DateTime?
+  capturedAt         DateTime?
+  cancelledAt        DateTime?
+  refundedAmount     Int?                      @default(0)
+  metadata           Json?                     @default("{}")
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([appointmentId])
+  @@index([paymentProviderId])
+}
+
+model PaymentWebhookEvent {
+  id              String   @id @default(cuid())
+  replayKey       String   @unique @default("")
+  providerCode    String   @default("")
+  providerEventId String   @default("")
+  eventType       String   @default("")
+  payloadHash     String   @default("")
+  processedAt     DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+}
+
+model InventoryMovement {
+  id                String                            @id @default(cuid())
+  shop              Shop                              @relation("InventoryMovement_shop", fields: [shopId], references: [id])
+  shopId            String                            @map("shop")
+  product           Product?                          @relation("InventoryMovement_product", fields: [productId], references: [id])
+  productId         String?                           @map("product")
+  inventoryLot      InventoryLot?                     @relation("InventoryMovement_inventoryLot", fields: [inventoryLotId], references: [id])
+  inventoryLotId    String?                           @map("inventoryLot")
+  productSaleLine   ProductSaleLine?                  @relation("InventoryMovement_productSaleLine", fields: [productSaleLineId], references: [id])
+  productSaleLineId String?                           @unique @map("productSaleLine")
+  movementType      InventoryMovementMovementTypeType
+  quantityDelta     Int
+  quantityAfter     Int
+  reason            String                            @default("")
+  referenceKey      String                            @unique @default("")
+  occurredAt        DateTime
+  createdAt         DateTime                          @default(now())
+  updatedAt         DateTime                          @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([productId])
+  @@index([inventoryLotId])
+}
+
+model PackageUsage {
+  id                String                    @id @default(cuid())
+  customerPackage   CustomerPackage?          @relation("PackageUsage_customerPackage", fields: [customerPackageId], references: [id])
+  customerPackageId String?                   @map("customerPackage")
+  appointment       Appointment?              @relation("PackageUsage_appointment", fields: [appointmentId], references: [id])
+  appointmentId     String?                   @map("appointment")
+  transaction       CheckoutTransaction?      @relation("PackageUsage_transaction", fields: [transactionId], references: [id])
+  transactionId     String?                   @map("transaction")
+  usageType         PackageUsageUsageTypeType
+  visitsDelta       Int
+  balanceAfter      Int
+  reason            String                    @default("")
+  referenceKey      String                    @unique @default("")
+  occurredAt        DateTime
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @default(now()) @updatedAt
+
+  @@index([customerPackageId])
+  @@index([appointmentId])
+  @@index([transactionId])
+}
+
+model WaiverForm {
+  id               String                    @id @default(cuid())
+  shop             Shop                      @relation("WaiverForm_shop", fields: [shopId], references: [id])
+  shopId           String                    @map("shop")
+  title            String                    @default("")
+  customer         Customer?                 @relation("WaiverForm_customer", fields: [customerId], references: [id])
+  customerId       String?                   @map("customer")
+  appointment      Appointment?              @relation("WaiverForm_appointment", fields: [appointmentId], references: [id])
+  appointmentId    String?                   @map("appointment")
+  service          Service?                  @relation("WaiverForm_service", fields: [serviceId], references: [id])
+  serviceId        String?                   @map("service")
+  waiverType       WaiverFormWaiverTypeType? @default(general)
+  status           WaiverFormStatusType?     @default(draft)
+  templateKey      String                    @default("")
+  templateVersion  String                    @default("")
+  templateHash     String                    @default("")
+  signatureKeyHash String                    @unique @default("")
+  signedByName     String                    @default("")
+  signerRole       WaiverFormSignerRoleType?
+  guardianName     String                    @default("")
+  affirmation      Boolean                   @default(false)
+  affirmationHash  String                    @default("")
+  signedAt         DateTime?
+  documentUrl      String                    @default("")
+  metadata         Json?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([customerId])
+  @@index([appointmentId])
+  @@index([serviceId])
+}
+
+model GroomingNote {
+  id             String                    @id @default(cuid())
+  shop           Shop                      @relation("GroomingNote_shop", fields: [shopId], references: [id])
+  shopId         String                    @map("shop")
+  title          String                    @default("")
+  customer       Customer?                 @relation("GroomingNote_customer", fields: [customerId], references: [id])
+  customerId     String?                   @map("customer")
+  barber         Barber?                   @relation("GroomingNote_barber", fields: [barberId], references: [id])
+  barberId       String?                   @map("barber")
+  appointment    Appointment?              @relation("GroomingNote_appointment", fields: [appointmentId], references: [id])
+  appointmentId  String?                   @map("appointment")
+  noteType       GroomingNoteNoteTypeType? @default(cut_formula)
+  body           String                    @default("")
+  photoUrl       String                    @default("")
+  privateToStaff Boolean                   @default(true)
+  metadata       Json?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([customerId])
+  @@index([barberId])
+  @@index([appointmentId])
+}
+
+model WaitlistEntry {
+  id                 String                   @id @default(cuid())
+  shop               Shop                     @relation("WaitlistEntry_shop", fields: [shopId], references: [id])
+  shopId             String                   @map("shop")
+  customerName       String                   @default("")
+  phone              String                   @default("")
+  customer           Customer?                @relation("WaitlistEntry_customer", fields: [customerId], references: [id])
+  customerId         String?                  @map("customer")
+  requestedService   Service?                 @relation("WaitlistEntry_requestedService", fields: [requestedServiceId], references: [id])
+  requestedServiceId String?                  @map("requestedService")
+  requestedBarber    Barber?                  @relation("WaitlistEntry_requestedBarber", fields: [requestedBarberId], references: [id])
+  requestedBarberId  String?                  @map("requestedBarber")
+  status             WaitlistEntryStatusType? @default(waiting)
+  preferredAt        DateTime?
+  notifiedAt         DateTime?
+  notes              String                   @default("")
+  metadata           Json?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([customerId])
+  @@index([requestedServiceId])
+  @@index([requestedBarberId])
+}
+
+model NoShowPolicy {
+  id                   String                  @id @default(cuid())
+  shop                 Shop                    @relation("NoShowPolicy_shop", fields: [shopId], references: [id])
+  shopId               String                  @map("shop")
+  name                 String                  @default("")
+  status               NoShowPolicyStatusType? @default(active)
+  feeAmount            Int?                    @default(0)
+  graceMinutes         Int?                    @default(10)
+  appliesToMemberships Boolean                 @default(false)
+  description          String                  @default("")
+  events               NoShowEvent[]           @relation("NoShowEvent_policy")
   metadata             Json?
-  secretNote           String?
-  coverImage_id        String?
-  coverImage_filesize  Int?
-  coverImage_width     Int?
-  coverImage_height    Int?
-  coverImage_extension String?
-  todoImages           TodoImage[] @relation("Todo_todoImages")
-  assignedTo           User?       @relation("Todo_assignedTo", fields: [assignedToId], references: [id])
-  assignedToId         String?     @map("assignedTo")
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @default(now()) @updatedAt
 
-  @@index([assignedToId])
+  @@index([shopId])
 }
 
-model TodoImage {
-  id              String  @id @default(cuid())
-  image_id        String?
-  image_filesize  Int?
-  image_width     Int?
-  image_height    Int?
-  image_extension String?
-  imagePath       String  @default("")
-  altText         String  @default("")
-  todos           Todo[]  @relation("Todo_todoImages")
-  metadata        Json?
+model Tip {
+  id            String                @id @default(cuid())
+  shop          Shop                  @relation("Tip_shop", fields: [shopId], references: [id])
+  shopId        String                @map("shop")
+  tipNumber     String                @unique @default("")
+  barber        Barber?               @relation("Tip_barber", fields: [barberId], references: [id])
+  barberId      String?               @map("barber")
+  customer      Customer?             @relation("Tip_customer", fields: [customerId], references: [id])
+  customerId    String?               @map("customer")
+  transaction   CheckoutTransaction?  @relation("Tip_transaction", fields: [transactionId], references: [id])
+  transactionId String?               @map("transaction")
+  appointment   Appointment?          @relation("Tip_appointment", fields: [appointmentId], references: [id])
+  appointmentId String?               @map("appointment")
+  amount        Int?                  @default(0)
+  paymentMethod TipPaymentMethodType? @default(card)
+  paidAt        DateTime?
+  metadata      Json?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([barberId])
+  @@index([customerId])
+  @@index([transactionId])
+  @@index([appointmentId])
+}
+
+model Commission {
+  id               String                @id @default(cuid())
+  shop             Shop                  @relation("Commission_shop", fields: [shopId], references: [id])
+  shopId           String                @map("shop")
+  commissionNumber String                @unique @default("")
+  barber           Barber?               @relation("Commission_barber", fields: [barberId], references: [id])
+  barberId         String?               @map("barber")
+  transaction      CheckoutTransaction?  @relation("Commission_transaction", fields: [transactionId], references: [id])
+  transactionId    String?               @map("transaction")
+  appointment      Appointment?          @relation("Commission_appointment", fields: [appointmentId], references: [id])
+  appointmentId    String?               @map("appointment")
+  payout           CommissionPayout?     @relation("Commission_payout", fields: [payoutId], references: [id])
+  payoutId         String?               @map("payout")
+  status           CommissionStatusType? @default(projected)
+  serviceAmount    Int?                  @default(0)
+  productAmount    Int?                  @default(0)
+  commissionRate   Decimal?              @default("0") @postgresql.Decimal(18, 4)
+  commissionAmount Int?                  @default(0)
+  paidAt           DateTime?
+  metadata         Json?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([barberId])
+  @@index([transactionId])
+  @@index([appointmentId])
+  @@index([payoutId])
+}
+
+model Supplier {
+  id                         String              @id @default(cuid())
+  shop                       Shop                @relation("Supplier_shop", fields: [shopId], references: [id])
+  shopId                     String              @map("shop")
+  name                       String              @default("")
+  status                     SupplierStatusType? @default(active)
+  contactName                String              @default("")
+  email                      String              @default("")
+  phone                      String              @default("")
+  website                    String              @default("")
+  notes                      String              @default("")
+  metadata                   Json?
+  createdAt                  DateTime            @default(now())
+  updatedAt                  DateTime            @default(now()) @updatedAt
+  from_InventoryLot_supplier InventoryLot[]      @relation("InventoryLot_supplier")
+
+  @@index([shopId])
+}
+
+model InventoryLot {
+  id                String                  @id @default(cuid())
+  shop              Shop                    @relation("InventoryLot_shop", fields: [shopId], references: [id])
+  shopId            String                  @map("shop")
+  lotNumber         String                  @default("")
+  product           Product?                @relation("InventoryLot_product", fields: [productId], references: [id])
+  productId         String?                 @map("product")
+  supplier          Supplier?               @relation("InventoryLot_supplier", fields: [supplierId], references: [id])
+  supplierId        String?                 @map("supplier")
+  quantityReceived  Int?                    @default(0)
+  quantityRemaining Int?                    @default(0)
+  unitCost          Int?                    @default(0)
+  receivedAt        DateTime?
+  expiresAt         DateTime?
+  status            InventoryLotStatusType? @default(active)
+  metadata          Json?
+  movements         InventoryMovement[]     @relation("InventoryMovement_inventoryLot")
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @default(now()) @updatedAt
+
+  @@unique([shopId, lotNumber], map: "InventoryLot_shop_lotNumber_key")
+  @@index([shopId])
+  @@index([lotNumber])
+  @@index([productId])
+  @@index([supplierId])
+}
+
+model Product {
+  id                 String                  @id @default(cuid())
+  shop               Shop                    @relation("Product_shop", fields: [shopId], references: [id])
+  shopId             String                  @map("shop")
+  name               String                  @default("")
+  sku                String                  @default("")
+  status             ProductStatusType?      @default(active)
+  productType        ProductProductTypeType? @default(other)
+  price              Int?                    @default(0)
+  cost               Int?                    @default(0)
+  description        String                  @default("")
+  imagePath          String                  @default("")
+  inventoryTracked   Boolean                 @default(true)
+  metadata           Json?
+  inventoryLots      InventoryLot[]          @relation("InventoryLot_product")
+  inventoryMovements InventoryMovement[]     @relation("InventoryMovement_product")
+  saleLines          ProductSaleLine[]       @relation("ProductSaleLine_product")
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @default(now()) @updatedAt
+
+  @@unique([shopId, sku], map: "Product_shop_sku_key")
+  @@index([shopId])
+  @@index([sku])
+}
+
+model BarberChair {
+  id                 String                 @id @default(cuid())
+  shop               Shop                   @relation("BarberChair_shop", fields: [shopId], references: [id])
+  shopId             String                 @map("shop")
+  chairNumber        String                 @default("")
+  stationName        String                 @default("")
+  status             BarberChairStatusType? @default(active)
+  assignedBarbers    Barber[]               @relation("Barber_chair")
+  scheduleExceptions ScheduleException[]    @relation("ScheduleException_chair")
+  shifts             StaffShift[]           @relation("StaffShift_chair")
+  appointments       Appointment[]          @relation("Appointment_chair")
+  locationNote       String                 @default("")
+  metadata           Json?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @default(now()) @updatedAt
+
+  @@unique([shopId, chairNumber], map: "BarberChair_shop_chairNumber_key")
+  @@index([shopId])
+  @@index([chairNumber])
+}
+
+enum UserOnboardingStatusType {
+  not_started
+  in_progress
+  completed
+  dismissed
+}
+
+enum ShopStatusType {
+  active
+  paused
+  inactive
+}
+
+enum ShopBrandColorType {
+  amber
+  indigo
+  emerald
+  rose
+  slate
+}
+
+enum ShopMembershipMembershipRoleType {
+  owner
+  manager
+  front_desk
+  barber
+  viewer
+}
+
+enum ShopMembershipStatusType {
+  invited
+  active
+  suspended
+  revoked
+}
+
+enum LifecycleOutboxEventStatusType {
+  pending
+  processing
+  delivered
+  dead_letter
+}
+
+enum CommissionPayoutStatusType {
+  paid
+  voided
+}
+
+enum ProductSaleLineLineTypeType {
+  sale
+  return
+}
+
+enum ServiceCategoryStatusType {
+  active
+  hidden
+}
+
+enum ServiceStatusType {
+  active
+  hidden
+  archived
+}
+
+enum BarberStatusType {
+  active
+  away
+  inactive
+}
+
+enum BarberScheduleDayOfWeekType {
+  monday
+  tuesday
+  wednesday
+  thursday
+  friday
+  saturday
+  sunday
+}
+
+enum ScheduleExceptionExceptionTypeType {
+  time_off
+  shop_closure
+  chair_unavailable
+  working_override
+}
+
+enum ScheduleExceptionStatusType {
+  active
+  cancelled
+}
+
+enum StaffShiftStatusType {
+  scheduled
+  clocked_in
+  completed
+  cancelled
+}
+
+enum PractitionerCredentialCredentialTypeType {
+  barber
+  master_barber
+  apprentice
+  cosmetology
+  other
+}
+
+enum PractitionerCredentialStatusType {
+  active
+  suspended
+  revoked
+  expired
+}
+
+enum BookingPolicyStatusType {
+  active
+  retired
+}
+
+enum BookingPolicyDepositCancellationRuleType {
+  refund
+  forfeit
+  manual_review
+}
+
+enum BookingPolicyPublicServiceEligibilityType {
+  legacy_active_service
+  active_catalog
+}
+
+enum AppointmentChangeEventActionType {
+  cancelled
+  rescheduled
+}
+
+enum AppointmentChangeEventActorTypeType {
+  customer
+  operator
+}
+
+enum AppointmentChangeEventDepositConsequenceType {
+  none
+  refund_required
+  forfeiture_pending
+  manual_review
+}
+
+enum CustomerStatusType {
+  active
+  vip
+  needs_attention
+  blocked
+}
+
+enum CustomerPreferredContactMethodType {
+  sms
+  email
+  phone
+}
+
+enum CustomerNoteNoteTypeType {
+  preference
+  formula
+  service_issue
+  general
+}
+
+enum CustomerNoteVisibilityType {
+  staff
+  owner
+}
+
+enum AppointmentStatusType {
+  requested
+  confirmed
+  checked_in
+  in_chair
+  completed
+  cancelled
+  no_show
+}
+
+enum AppointmentSourceType {
+  online
+  phone
+  walk_in
+  staff
+}
+
+enum AppointmentPaymentStatusType {
+  not_required
+  deposit_due
+  deposit_paid
+  paid
+  refunded
+}
+
+enum WalkInQueueEntryStatusType {
+  waiting
+  texted
+  in_chair
+  served
+  left
+}
+
+enum MembershipPlanBillingIntervalType {
+  monthly
+  quarterly
+  annual
+}
+
+enum MembershipPlanStatusType {
+  active
+  paused
+  archived
+}
+
+enum ServicePackageStatusType {
+  active
+  hidden
+  archived
+}
+
+enum CustomerPackageStatusType {
+  active
+  paused
+  used_up
+  expired
+  cancelled
+}
+
+enum MembershipEventEventTypeType {
+  purchased
+  renewed
+  paused
+  resumed
+  cancelled
+}
+
+enum CheckoutTransactionStatusType {
+  open
+  paid
+  partially_refunded
+  refunded
+  voided
+}
+
+enum CheckoutTransactionPaymentMethodType {
+  cash
+  card
+  package
+  gift_card
+  other
+}
+
+enum PaymentSessionStatusType {
+  pending
+  authorized
+  captured
+  failed
+  expired
+  cancelled
+  partially_refunded
+  refunded
+}
+
+enum InventoryMovementMovementTypeType {
+  receive
+  sale
+  return
+  waste
+  adjustment
+}
+
+enum PackageUsageUsageTypeType {
+  grant
+  consume
+  restore
+  expire
+  adjustment
+}
+
+enum WaiverFormWaiverTypeType {
+  service
+  chemical_service
+  minor_consent
+  photo_release
+  general
+}
+
+enum WaiverFormStatusType {
+  draft
+  sent
+  signed
+  expired
+}
+
+enum WaiverFormSignerRoleType {
+  customer
+  guardian
+}
+
+enum GroomingNoteNoteTypeType {
+  cut_formula
+  beard_detail
+  product_preference
+  allergy
+}
+
+enum WaitlistEntryStatusType {
+  waiting
+  notified
+  booked
+  expired
+}
+
+enum NoShowPolicyStatusType {
+  active
+  paused
+  archived
+}
+
+enum TipPaymentMethodType {
+  card
+  cash
+  wallet
+}
+
+enum CommissionStatusType {
+  projected
+  approved
+  paid
+  voided
+}
+
+enum SupplierStatusType {
+  active
+  paused
+  archived
+}
+
+enum InventoryLotStatusType {
+  active
+  consumed
+  expired
+}
+
+enum ProductStatusType {
+  active
+  draft
+  archived
+}
+
+enum ProductProductTypeType {
+  pomade
+  beard_care
+  shampoo
+  tool
+  other
+}
+
+enum BarberChairStatusType {
+  active
+  maintenance
+  reserved
 }

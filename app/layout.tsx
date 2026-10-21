@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Next x Keystone Starter",
-  description: "Next, Keystone, and Tailwind Starter Template",
+  title: "Openfront Barbershop",
+  description: "Merchant-owned barbershop booking and operations.",
 };
 
 export default function RootLayout({

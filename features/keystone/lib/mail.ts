@@ -1,27 +1,44 @@
-'use server' 
+// Internal utility, not a remotely callable Server Action.
+import { createTransport } from "nodemailer";
 
-import { createTransport, getTestMessageUrl } from "nodemailer";
+import { domainPrisma } from "../utils/domainPrisma";
 
-// Utility function to get base URL for emails
-function getBaseUrlForEmails(): string {
-  if (process.env.SMTP_STORE_LINK) {
-    return process.env.SMTP_STORE_LINK;
+// Reset links must be absolute and point at this application. A missing or
+// malformed origin never produces a relative or attacker-shaped link.
+function resetLinkOrigin(baseUrl?: string): string {
+  const configured = baseUrl || process.env.SMTP_STORE_LINK || "";
+  let url: URL;
+  try { url = new URL(configured); } catch { throw new Error("Email delivery unavailable."); }
+  const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  if ((url.protocol !== "https:" && !(url.protocol === "http:" && local)) || url.username || url.password) {
+    throw new Error("Email delivery unavailable.");
   }
-  
-  // Fallback warning - this should be set in production
-  console.warn('SMTP_STORE_LINK not set. Please add SMTP_STORE_LINK to your environment variables for email links to work properly.');
-  return '';
+  return url.origin;
 }
 
-const transport = createTransport({
-  // @ts-ignore
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD,
-  },
-});
+// Staff (dashboard access or an active shop membership) reset in the dashboard;
+// everyone else is a storefront customer and resets from their account page.
+async function resetPathFor(email: string): Promise<string> {
+  const user = await domainPrisma.user.findUnique({
+    where: { email },
+    select: {
+      role: { select: { canAccessDashboard: true } },
+      shopMemberships: { where: { status: "active" }, select: { id: true }, take: 1 },
+    },
+  });
+  return user?.role?.canAccessDashboard || user?.shopMemberships?.length ? "/dashboard/reset" : "/account/reset";
+}
+
+function escapeHtmlAttribute(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function mailTransport() {
+  const { SMTP_HOST: host, SMTP_USER: user, SMTP_PASSWORD: pass } = process.env;
+  const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined;
+  if (!host || !user || !pass || (port !== undefined && (!Number.isInteger(port) || port < 1 || port > 65535))) throw new Error('Email delivery unavailable.');
+  return createTransport({ host, port, auth: { user, pass }, disableFileAccess: true, disableUrlAccess: true });
+}
 
 function passwordResetEmail({ url }: { url: string }): string {
   const backgroundColor = "#f9f9f9";
@@ -43,7 +60,7 @@ function passwordResetEmail({ url }: { url: string }): string {
           <td align="center" style="padding: 20px 0;">
             <table border="0" cellspacing="0" cellpadding="0">
               <tr>
-                <td align="center" style="border-radius: 5px;" bgcolor="${buttonBackgroundColor}"><a href="${url}" target="_blank" style="font-size: 18px; font-family: Helvetica, Arial, sans-serif; color: ${buttonTextColor}; text-decoration: none; border-radius: 5px; padding: 10px 20px; border: 1px solid ${buttonBorderColor}; display: inline-block; font-weight: bold;">Reset Password</a></td>
+                <td align="center" style="border-radius: 5px;" bgcolor="${buttonBackgroundColor}"><a href="${escapeHtmlAttribute(url)}" target="_blank" style="font-size: 18px; font-family: Helvetica, Arial, sans-serif; color: ${buttonTextColor}; text-decoration: none; border-radius: 5px; padding: 10px 20px; border: 1px solid ${buttonBorderColor}; display: inline-block; font-weight: bold;">Reset Password</a></td>
               </tr>
             </table>
           </td>
@@ -59,19 +76,18 @@ function passwordResetEmail({ url }: { url: string }): string {
 }
 
 export async function sendPasswordResetEmail(resetToken: string, to: string, baseUrl?: string): Promise<void> {
-  // Use provided baseUrl or fall back to utility function
-  const frontendUrl = baseUrl || getBaseUrlForEmails();
-  
-  // email the user a token
-  const info = await transport.sendMail({
+  const url = new URL(await resetPathFor(to), resetLinkOrigin(baseUrl));
+  url.searchParams.set("token", resetToken);
+
+  const info = await mailTransport().sendMail({
     to,
     from: process.env.SMTP_FROM,
-    subject: "Your password reset token!",
-    html: passwordResetEmail({
-      url: `${frontendUrl}/dashboard/reset?token=${resetToken}`,
-    }),
+    subject: "Reset your password",
+    html: passwordResetEmail({ url: url.toString() }),
   });
-  if (process.env.MAIL_USER?.includes("ethereal.email")) {
-    console.log(`📧 Message Sent!  Preview it at ${getTestMessageUrl(info as any)}`);
+  // A resolved send is not acceptance: require the server to accept this recipient.
+  const accepted = ((info.accepted || []) as Array<string | { address?: string }>).map((entry) => String(typeof entry === "string" ? entry : entry.address || "").toLowerCase());
+  if ((info.rejected || []).length || !accepted.includes(to.toLowerCase())) {
+    throw new Error("The mail server did not accept the password reset email.");
   }
 }
