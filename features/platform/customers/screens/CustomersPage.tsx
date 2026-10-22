@@ -1,6 +1,7 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PageContainer } from '@/features/dashboard/components/PageContainer';
 import { basePath } from '@/features/dashboard/lib/config';
+import { PageHeader, PillLink, Track } from '@/features/platform/lib/ui';
 import { getCustomerHistoryData } from '../actions/customers';
 import { CustomersPageClient } from './CustomersPageClient';
 
@@ -15,10 +16,7 @@ const breadcrumbs = [
 ];
 
 const customersHeader = (
-  <div>
-    <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">Customers</h1>
-    <p className="text-muted-foreground">Customer profiles, visit history, notes, memberships and waivers</p>
-  </div>
+  <PageHeader title="Customers" actions={<Track><PillLink variant="primary" href="/dashboard/customers/create">New customer</PillLink></Track>} />
 );
 
 function param(value: string | string[] | undefined) {

@@ -1,13 +1,13 @@
 'use client';
 
 import { useId, useMemo, useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCommandKey } from '@/features/platform/lib/useCommandKey';
+import { Notice, Pill, selectClass as kitSelectClass, Track } from '@/features/platform/lib/ui';
 import { assignQueueEntryAction, createStaffQueueEntryAction, type QueueBarberOption, type QueueServiceOption } from '../actions/queue';
 
-const selectClass = 'h-9 rounded-md border bg-background px-3 text-sm';
+const selectClass = kitSelectClass;
 
 function eligibleBarbers(barbers: QueueBarberOption[], service?: QueueServiceOption) {
   return barbers.filter((barber) => !service?.specialistIds.length || service.specialistIds.includes(barber.id));
@@ -71,16 +71,16 @@ export function AddWalkInForm({ services, barbers, onClose }: { services: QueueS
             {barberOptions.map((item) => <option key={item.id} value={item.id}>{item.displayName || 'Barber'}</option>)}
           </select>
         </div>
-        <div className="grid gap-1"><Label htmlFor={`${id}-wait`}>Quoted wait in minutes (optional)</Label><Input id={`${id}-wait`} value={wait} inputMode="numeric" onChange={(event) => setWait(event.target.value)} /></div>
+        <div className="grid gap-1"><Label htmlFor={`${id}-wait`}>Quoted wait, min (optional)</Label><Input id={`${id}-wait`} value={wait} inputMode="numeric" onChange={(event) => setWait(event.target.value)} /></div>
         <div className="grid gap-1 sm:col-span-2 lg:col-span-3"><Label htmlFor={`${id}-notes`}>Notes (optional)</Label><Input id={`${id}-notes`} value={notes} maxLength={1000} onChange={(event) => setNotes(event.target.value)} /></div>
       </div>
-      <div className="flex gap-2">
-        <Button type="button" disabled={pending} onClick={submit}>{pending ? 'Adding…' : 'Add to queue'}</Button>
-        <Button type="button" variant="ghost" disabled={pending} onClick={onClose}>Close</Button>
-      </div>
+      <Track>
+        <Pill variant="primary" disabled={pending} onClick={submit}>{pending ? 'Adding…' : 'Add to queue'}</Pill>
+        <Pill disabled={pending} onClick={onClose}>Close</Pill>
+      </Track>
       <div aria-live="polite">
-        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-        {status && <p role="status" className="text-sm">{status}</p>}
+        {error && <Notice tone="alert">{error}</Notice>}
+        {status && <Notice>{status}</Notice>}
       </div>
     </div>
   );
@@ -108,7 +108,7 @@ export function AssignQueueEntryForm({ queueEntryId, currentServiceId, currentBa
         const result = await assignQueueEntryAction(input, key);
         if (!result.success || result.data?.queueEntryId !== queueEntryId) { setError(result.error || 'The change could not be confirmed. Refresh the queue before retrying.'); return; }
         settle();
-        setStatus('Service and barber saved. You can now seat this guest.');
+        setStatus('Service and barber saved.');
       } catch {
         setError('Connection interrupted. The change may have been saved. Submit again without edits to check.');
       }
@@ -116,7 +116,7 @@ export function AssignQueueEntryForm({ queueEntryId, currentServiceId, currentBa
   };
 
   return (
-    <div className="mt-3 space-y-2 rounded-md border p-3">
+    <div className="mt-3 space-y-2 border-t pt-3">
       <div className="grid gap-2 sm:grid-cols-2">
         <div className="grid gap-1">
           <Label htmlFor={`${id}-service`}>Service</Label>
@@ -128,18 +128,18 @@ export function AssignQueueEntryForm({ queueEntryId, currentServiceId, currentBa
         <div className="grid gap-1">
           <Label htmlFor={`${id}-barber`}>Barber</Label>
           <select id={`${id}-barber`} className={selectClass} value={barberId} onChange={(event) => setBarberId(event.target.value)}>
-            <option value="">Any barber (first available alphabetically)</option>
+            <option value="">Any barber</option>
             {barberOptions.map((item) => <option key={item.id} value={item.id}>{item.displayName || 'Barber'}{item.chairNumber ? ` · Chair ${item.chairNumber}` : ''}</option>)}
           </select>
         </div>
       </div>
-      <div className="flex gap-2">
-        <Button type="button" size="sm" disabled={pending} onClick={submit}>{pending ? 'Saving…' : 'Save'}</Button>
-        <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={onClose}>Close</Button>
-      </div>
+      <Track>
+        <Pill size="sm" variant="primary" disabled={pending} onClick={submit}>{pending ? 'Saving…' : 'Save'}</Pill>
+        <Pill size="sm" disabled={pending} onClick={onClose}>Close</Pill>
+      </Track>
       <div aria-live="polite">
-        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-        {status && <p role="status" className="text-sm">{status}</p>}
+        {error && <Notice tone="alert">{error}</Notice>}
+        {status && <Notice>{status}</Notice>}
       </div>
     </div>
   );

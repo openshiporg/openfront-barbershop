@@ -21,7 +21,7 @@ export default async function BookingPageServer() {
   const accountId = identity.success ? identity.data.authenticatedItem?.id || '' : '';
   return (
     <StorefrontShell allowUnavailableChildren>
-        <Suspense fallback={<div className="min-h-screen bg-background" aria-label="Loading booking" />}>
+        <Suspense fallback={<div className="min-h-screen" aria-label="Loading booking" />}>
           <BookingPage accountId={accountId} services={catalog.services} barbers={catalog.barbers} settings={settings} bookingEligibility={bookingEligibility} catalogError={catalog.error} />
         </Suspense>
     </StorefrontShell>

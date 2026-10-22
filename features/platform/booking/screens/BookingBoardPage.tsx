@@ -1,6 +1,7 @@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { PageContainer } from '@/features/dashboard/components/PageContainer';
 import { basePath } from '@/features/dashboard/lib/config';
+import { PageHeader } from '@/features/platform/lib/ui';
 import { getBookingBoardData } from '../actions/appointments';
 import { BookingBoardPageClient } from './BookingBoardPageClient';
 
@@ -23,7 +24,7 @@ export default async function BookingBoardPage({ searchParams }: PageProps) {
 
   if (!response.success) {
     return (
-      <PageContainer title="Booking board" breadcrumbs={breadcrumbs} header={<div><h1 className="text-2xl font-semibold">Booking board</h1><p className="text-muted-foreground">Daily appointments and status flow</p></div>}>
+      <PageContainer title="Booking board" breadcrumbs={breadcrumbs} header={<PageHeader title="Booking board" tone="alert" />}>
         <div className="px-4 md:px-6">
           <Alert variant="destructive">
             <AlertTitle>{response.kind === 'forbidden' ? 'Booking access restricted' : 'Booking board unavailable'}</AlertTitle>

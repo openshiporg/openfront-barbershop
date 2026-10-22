@@ -1,21 +1,27 @@
 import type { Metadata } from 'next';
-import { DM_Sans, Instrument_Serif } from 'next/font/google';
+import { Big_Shoulders, Instrument_Sans, JetBrains_Mono } from 'next/font/google';
 import { getPublicStorefrontSettings } from '@/features/storefront/lib/data/settings';
 import { trustedOrigin } from '@/features/shared/trusted-origin';
 import { sanitizeStoreLogoSvg } from '@/features/shared/sanitize-store-logo';
 import { normalizeStoreLogoColor } from '@/features/platform/store-settings/lib/store-logo';
 import '@/features/storefront/styles/storefront.css';
 
-const instrumentSerif = Instrument_Serif({
-  variable: '--font-instrument-serif',
+const bigShoulders = Big_Shoulders({
+  variable: '--font-big-shoulders',
   subsets: ['latin'],
-  weight: '400',
+  weight: ['700', '800'],
 });
 
-const dmSans = DM_Sans({
-  variable: '--font-dm-sans',
+const instrumentSans = Instrument_Sans({
+  variable: '--font-instrument-sans',
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: '--font-jetbrains-mono',
+  subsets: ['latin'],
+  weight: ['500', '600'],
 });
 
 /** The shop's own logo (with its chosen colour) as the storefront icon. */
@@ -64,5 +70,5 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function StorefrontLayout({ children }: { children: React.ReactNode }) {
-  return <div className={`${instrumentSerif.variable} ${dmSans.variable}`}>{children}</div>;
+  return <div className={`${bigShoulders.variable} ${instrumentSans.variable} ${jetbrainsMono.variable}`}>{children}</div>;
 }

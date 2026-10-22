@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { StorefrontImage } from '../components/StorefrontImage';
 import { createStorefrontBooking, recoverStorefrontBooking, type StorefrontBookedAppointment } from '../lib/data/appointments';
 import { clearResolvedGuestBooking, dispatchSavedGuestBooking, readGuestBookingStorage, saveNewGuestBooking } from '../lib/guest-booking-storage';
 import type { GuestBookingCommand } from '../../shared/guest-booking-command';
@@ -45,9 +44,6 @@ function barbersForService(service: StorefrontService | undefined, barbers: Stor
   const specialists = service?.specialists || [];
   return specialists.length ? specialists : barbers;
 }
-
-const selectedClass = 'border-[var(--color-ink)] bg-[var(--color-ink)] text-[var(--color-inverse-ink)]';
-const unselectedClass = 'border-[var(--color-rule)] bg-[var(--color-paper)] hover:border-[var(--color-ink-muted)]';
 
 export function BookingPage({ services, barbers, settings, bookingEligibility, accountId = '', catalogError = null }: BookingPageProps) {
   const searchParams = useSearchParams();
@@ -255,295 +251,179 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
   };
 
   const pendingPanel = savedCommand ? (
-    <section className="sf-panel p-[var(--space-lg)] mb-6" aria-labelledby="pending-booking-heading">
-      <h2 id="pending-booking-heading" className="sf-eyebrow">Earlier booking request</h2>
-      <p role="status" className="mt-3">We couldn’t confirm whether your last booking request went through. Check it before booking another time, so you don’t end up with two appointments.</p>
-      {error && <p role="alert" className="mt-3">{error}</p>}
-      <div className="mt-4 flex flex-wrap gap-3">
-        <button type="button" disabled={pending} onClick={() => resolveSaved('recover')} className="sf-btn sf-btn-primary">Check again</button>
-        <button type="button" disabled={pending} onClick={() => resolveSaved('retry')} className="sf-btn sf-btn-ghost">Send the same request again</button>
-        <button type="button" disabled={pending} onClick={() => resolveSaved('close')} className="sf-btn sf-btn-ghost">Cancel it if it wasn’t booked</button>
+    <section className="sf-card-dark sf-on-dark mb-8" aria-labelledby="pending-booking-heading">
+      <h2 id="pending-booking-heading" className="sf-eyebrow"><span className="sf-dot is-wait" aria-hidden="true" />Earlier request unconfirmed</h2>
+      <p role="status">Your last booking request may have gone through. Check it before booking another time.</p>
+      {error && <p role="alert" className="sf-notice">{error}</p>}
+      <div className="sf-track">
+        <button type="button" disabled={pending} onClick={() => resolveSaved('recover')} className="sf-pill is-primary">Check again</button>
+        <button type="button" disabled={pending} onClick={() => resolveSaved('retry')} className="sf-pill">Send same request</button>
+        <button type="button" disabled={pending} onClick={() => resolveSaved('close')} className="sf-pill">Cancel if not booked</button>
       </div>
     </section>
   ) : null;
 
   if (createdAppointment) {
     return (
-      <main id="main-content" className="sf-container-narrow py-[var(--space-4xl)]">
-          <div className="sf-panel-inverse p-[var(--space-2xl)] md:p-[var(--space-3xl)]" role="status">
-            <p className="sf-eyebrow text-[var(--color-accent)]">Request received</p>
-            <h1 className="sf-display mt-3 text-[var(--text-display-s)] text-[var(--color-inverse-ink)]">
-              Request submitted.
-            </h1>
-            <p className="mt-[var(--space-lg)] text-[var(--text-lead)] text-[var(--color-inverse-muted)]">
-              Your time is held while the shop reviews your request. Check its status for confirmation.
-            </p>
-
-            <div className="mt-[var(--space-xl)] border border-[color-mix(in_oklch,var(--color-inverse-ink)_14%,transparent)] p-[var(--space-lg)]">
-              <strong className="block text-lg text-[var(--color-inverse-ink)]">{createdAppointment.service?.name}</strong>
-              <span className="mt-1 block text-[var(--text-small)] text-[var(--color-inverse-muted)]">
-                {createdAppointment.startsAt ? (createdAppointment.bookingTimezone ? formatShopDateTime(createdAppointment.startsAt, createdAppointment.bookingTimezone) : createdAppointment.startsAt) : 'Time to be confirmed'}
-                {createdAppointment.barber?.displayName ? ` · ${createdAppointment.barber.displayName}` : ''}
-              </span>
+      <main id="main-content" className="sf-container-narrow py-[var(--space-2xl)]">
+        <p className="sf-eyebrow mb-3"><span className="sf-dot is-wait" aria-hidden="true" />Requested</p>
+        <h1 className="sf-display mb-8 text-[var(--text-display-s)]">Chair held</h1>
+        <section className="sf-ticket" role="status" aria-label="Booking request">
+          <div className="sf-ticket-head">
+            <div className="grid gap-2">
+              <p className="sf-eyebrow text-[var(--color-inverse-muted)]">Awaiting shop confirmation</p>
+              <p className="sf-subtitle text-[2rem]">{createdAppointment.service?.name}</p>
             </div>
-
-            <div className="mt-[var(--space-xl)] flex flex-wrap gap-3">
-              <Link href={`/appointment?id=${encodeURIComponent(createdAppointment.id)}`} className="sf-btn sf-btn-accent">
-                View status
-              </Link>
-              <Link href="/" className="sf-btn sf-btn-ghost !text-[var(--color-inverse-ink)] !shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--color-inverse-ink)_25%,transparent)]">
-                Back to shop
-              </Link>
-            </div>
-            <p className="mt-[var(--space-lg)] text-[var(--text-small)] text-[var(--color-inverse-muted)]">
-              {accountId ? 'This booking is saved to your account.' : 'Open the status page from this browser, or create an account next time to see bookings on any device.'}
-            </p>
           </div>
+          <dl>
+            <div><dt>When</dt><dd className="sf-mono">{createdAppointment.startsAt ? (createdAppointment.bookingTimezone ? formatShopDateTime(createdAppointment.startsAt, createdAppointment.bookingTimezone) : createdAppointment.startsAt) : 'To be confirmed'}</dd></div>
+            <div><dt>Barber</dt><dd>{createdAppointment.barber?.displayName || 'First available'}</dd></div>
+            <div><dt>Saved to</dt><dd>{accountId ? 'Your account' : 'This browser'}</dd></div>
+          </dl>
+          <div className="sf-track">
+            <Link href={`/appointment?id=${encodeURIComponent(createdAppointment.id)}`} className="sf-pill is-primary">View status</Link>
+            <Link href="/" className="sf-pill">Back to shop</Link>
+          </div>
+        </section>
       </main>
     );
   }
 
-  if (!settings) return <main id="main-content" className="sf-container-narrow py-[var(--space-2xl)]">{pendingPanel}<p role="alert">Online booking is unavailable right now. Try again later or contact the shop.</p></main>;
+  if (!settings) return <main id="main-content" className="sf-container-narrow py-[var(--space-2xl)]">{pendingPanel}<p role="alert" className="sf-notice is-error">Online booking is unavailable right now. Try again later or contact the shop.</p></main>;
+
+  const canSubmit = !pending && storageReady && !savedCommand && bookingEligibility.success && Boolean(bookingEligibility.data);
 
   return (
     <main id="main-content">
-        <section className="border-b border-[var(--color-rule)]">
-          <div className="sf-container py-[var(--space-3xl)]">
-            <p className="sf-eyebrow">Appointments</p>
-            <h1 className="sf-display mt-3 text-[var(--text-display-s)]">Book a visit.</h1>
-            <p className="sf-lead mt-[var(--space-lg)]">
-              Times shown in {settings.timezone}. The shop confirms each request.
-            </p>
-          </div>
-        </section>
+      <section className="sf-container sf-page-head">
+        <p className="sf-eyebrow">Times in {settings.timezone}</p>
+        <h1 className="sf-display">Book a chair</h1>
+      </section>
 
-        <div className="sf-container py-[var(--space-2xl)]">
-          {pendingPanel}
-          {notice && <p role="status" className="mb-6">{notice}</p>}
-          {!bookingEligibility.success && <p role="alert" className="mb-6 text-[var(--text-small)] text-[var(--color-ink-muted)]">{bookingEligibility.error || 'Online booking is unavailable right now. Contact the shop.'}</p>}
-          {catalogError ? (
-            <div role="alert" className="border border-dashed border-[var(--color-rule-strong)] p-[var(--space-2xl)]">
-              <h2 className="sf-display text-[var(--text-title)]">Booking couldn’t load</h2>
-              <p className="mt-2 text-[var(--color-ink-muted)]">{catalogError}</p>
-            </div>
-          ) : !services.length || !barbers.length ? (
-            <div className="border border-dashed border-[var(--color-rule-strong)] p-[var(--space-2xl)]">
-              <h2 className="sf-display text-[var(--text-title)]">Online booking isn’t open yet</h2>
-              <p className="mt-2 text-[var(--color-ink-muted)]">
-                Call or visit the shop to book.
-              </p>
-              <Link href="/services" className="sf-btn sf-btn-primary mt-6">
-                Browse menu
-              </Link>
-            </div>
-          ) : (
-            <form onSubmit={submitBooking} className="grid gap-[var(--space-2xl)] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-              <div className="space-y-[var(--space-xl)]">
-                <fieldset className="sf-panel p-[var(--space-lg)]">
-                  <legend className="sf-eyebrow px-1">Service</legend>
-                  <div className="mt-[var(--space-md)] space-y-2">
-                    {services.map((service) => (
-                      <button
-                        type="button"
-                        key={service.id}
-                        aria-pressed={selectedServiceId === service.id}
-                        onClick={() => chooseService(service)}
-                        className={`w-full rounded-[var(--radius-sm)] border p-[var(--space-md)] text-left transition-colors ${selectedServiceId === service.id ? selectedClass : unselectedClass}`}
-                      >
-                        <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3">
-                          <StorefrontImage
-                            src={service.imagePath?.endsWith('.svg') ? '/images/barbershop/photo/scissor-cut.webp' : service.imagePath}
-                            fallbackSrc="/images/barbershop/photo/scissor-cut.webp"
-                            alt=""
-                            className="aspect-[4/3] border border-current/20"
-                            sizes="88px"
-                          />
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap justify-between gap-x-3">
-                              <strong className="break-words">{service.name}</strong>
-                              <span className="tabular-nums">{formatMoney(service.price)}</span>
-                            </div>
-                            <div className="mt-1 text-[var(--text-small)] opacity-80">
-                              {formatDuration(service.durationMinutes)}
-                              {service.depositRequired && ` · Deposit ${formatMoney(service.depositAmount || 0)}`}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </fieldset>
+      <div className="sf-container pt-[var(--space-xl)]">
+        {pendingPanel}
+        {notice && <p role="status" className="sf-notice mb-6">{notice}</p>}
+        {!bookingEligibility.success && <p role="alert" className="sf-notice is-error mb-6">{bookingEligibility.error || 'Online booking is unavailable right now. Contact the shop.'}</p>}
+      </div>
 
-                <fieldset className="sf-panel p-[var(--space-lg)]">
-                  <legend className="sf-eyebrow px-1">Barber</legend>
-                  {barberNotice && <p role="status" className="mt-3 text-[var(--text-small)]">{barberNotice}</p>}
-                  <div className="mt-[var(--space-md)] space-y-2">
-                    <button
-                      type="button"
-                      aria-pressed={selectedBarberId === 'any'}
-                      onClick={() => {
-                        setSelectedBarberId('any');
-                        setSelectedStartsAt('');
-                        setBarberNotice(null);
-                      }}
-                      className={`w-full rounded-[var(--radius-sm)] border p-[var(--space-md)] text-left transition-colors ${selectedBarberId === 'any' ? selectedClass : unselectedClass}`}
-                    >
-                      <strong>First available</strong>
-                      <div className="mt-1 text-[var(--text-small)] opacity-80">Any barber who offers this service and is free at your time</div>
-                    </button>
-                    {serviceBarbers.map((barber) => (
-                      <button
-                        type="button"
-                        key={barber.id}
-                        aria-pressed={selectedBarberId === barber.id}
-                        onClick={() => {
-                          setSelectedBarberId(barber.id);
-                          setSelectedStartsAt('');
-                          setBarberNotice(null);
-                        }}
-                        className={`w-full rounded-[var(--radius-sm)] border p-[var(--space-md)] text-left transition-colors ${selectedBarberId === barber.id ? selectedClass : unselectedClass}`}
-                      >
-                        <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-3">
-                          <StorefrontImage
-                            src={barber.imagePath?.endsWith('.svg') ? '/images/barbershop/photo/barber-at-work.webp' : barber.imagePath}
-                            fallbackSrc="/images/barbershop/photo/barber-at-work.webp"
-                            alt=""
-                            className="aspect-square border border-current/20"
-                            sizes="72px"
-                          />
-                          <div className="min-w-0">
-                            <strong className="break-words">{barber.displayName}</strong>
-                            <div className="mt-1 text-[var(--text-small)] opacity-80">
-                              {barber.chairNumber ? `Chair ${barber.chairNumber}` : 'Open chair'}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </fieldset>
-              </div>
-
-              <div className="space-y-[var(--space-xl)]">
-                <fieldset className="sf-panel-inverse p-[var(--space-lg)]">
-                  <legend className="sf-eyebrow px-1 text-[var(--color-accent)]">Date & time</legend>
-                  <label htmlFor="booking-date" className="mt-[var(--space-md)] block text-[var(--text-small)] text-[var(--color-inverse-muted)]">Date</label>
-                  <input
-                    id="booking-date"
-                    name="date"
-                    type="date"
-                    value={selectedDate}
-                    onChange={(event) => {
-                      setSelectedDate(event.target.value);
-                      setSelectedStartsAt('');
-                    }}
-                    className="sf-input mt-2 !border-[color-mix(in_oklch,var(--color-inverse-ink)_20%,transparent)] !bg-[color-mix(in_oklch,var(--color-inverse-ink)_6%,transparent)] !text-[var(--color-inverse-ink)] [color-scheme:dark]"
-                  />
-                  <p className="mt-3 text-[var(--text-small)] text-[var(--color-inverse-muted)]">
-                    Times are checked again when you book.
-                  </p>
-                  {!loadingSlots && availabilityError && <p role="status" className="mt-3 text-[var(--text-small)] text-[var(--color-inverse-muted)]">{availabilityError}</p>}
-                  <div role="group" aria-label="Available times" aria-busy={loadingSlots} className="mt-[var(--space-md)] grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-2">
-                    {loadingSlots && (
-                      <p role="status" className="col-span-full text-[var(--text-small)] text-[var(--color-inverse-muted)]">Checking times…</p>
-                    )}
-                    {!loadingSlots &&
-                      mergedSlots.map((slot) => (
-                        <button
-                          type="button"
-                          key={slot.startsAt}
-                          aria-pressed={selectedStartsAt === slot.startsAt}
-                          onClick={() => setSelectedStartsAt(slot.startsAt)}
-                          className={`sf-slot ${selectedStartsAt === slot.startsAt ? 'is-selected !bg-[var(--color-accent)] !border-[var(--color-accent)] !text-[var(--color-ink)]' : '!border-[color-mix(in_oklch,var(--color-inverse-ink)_18%,transparent)] !bg-[color-mix(in_oklch,var(--color-inverse-ink)_6%,transparent)] !text-[var(--color-inverse-ink)]'}`}
-                        >
-                          {slot.label}
-                        </button>
-                      ))}
-                    {!loadingSlots && !availabilityError && !mergedSlots.length && (
-                      <p className="col-span-full text-[var(--text-small)] text-[var(--color-inverse-muted)]">
-                        No times on this date. Try another day or barber.
-                      </p>
-                    )}
-                  </div>
-                </fieldset>
-
-                <div className="grid gap-[var(--space-xl)] xl:grid-cols-[minmax(0,1fr)_minmax(0,0.75fr)]">
-                  <fieldset className="sf-panel p-[var(--space-lg)]">
-                    <legend className="sf-eyebrow px-1">Your details</legend>
-                    <div className="mt-[var(--space-md)] grid gap-3">
-                      <label className="block text-[var(--text-small)] font-semibold">Full name
-                        <input name="name" autoComplete="name" maxLength={120} value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} className="sf-input mt-1" required />
-                      </label>
-                      <label className="block text-[var(--text-small)] font-semibold">Phone
-                        <input name="phone" type="tel" inputMode="tel" autoComplete="tel" maxLength={40} value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} className="sf-input mt-1" required />
-                      </label>
-                      <label className="block text-[var(--text-small)] font-semibold">Email (optional)
-                        <input name="email" type="email" autoComplete="email" maxLength={254} value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} className="sf-input mt-1" />
-                      </label>
-                      <label className="block text-[var(--text-small)] font-semibold">Notes for the barber (optional)
-                        <textarea name="notes" maxLength={2000} value={customer.notes} onChange={(e) => setCustomer({ ...customer, notes: e.target.value })} className="sf-textarea mt-1" />
-                      </label>
-                    </div>
-                    {error && !savedCommand && (
-                      <p role="alert" className="mt-4 rounded-[var(--radius-sm)] bg-[var(--color-error-soft)] p-3 text-[var(--text-small)] font-medium text-[var(--color-error)] break-words">
-                        {error}
-                      </p>
-                    )}
-                    <button type="submit" disabled={pending || !storageReady || !!savedCommand || !bookingEligibility.success || !bookingEligibility.data} className="sf-btn sf-btn-primary mt-5 w-full">
-                      {pending ? 'Booking…' : 'Request appointment'}
-                    </button>
-                  </fieldset>
-
-                  <aside className="sf-panel h-fit overflow-hidden" aria-label="Visit summary">
-                    <StorefrontImage
-                      src={(selectedBarber?.imagePath || selectedService?.imagePath)?.endsWith('.svg') ? '/images/barbershop/photo/chair-service.webp' : selectedBarber?.imagePath || selectedService?.imagePath}
-                      fallbackSrc="/images/barbershop/photo/chair-service.webp"
-                      alt=""
-                      className="aspect-[4/3] border-b border-[var(--color-rule)]"
-                      priority
-                      sizes="(max-width: 1280px) 100vw, 28vw"
-                    />
-                    <div className="p-[var(--space-lg)]">
-                    <p className="sf-eyebrow">Visit summary</p>
-                    <dl className="mt-[var(--space-md)] space-y-4 text-[var(--text-small)]">
-                      <div>
-                        <dt className="font-semibold text-[var(--color-ink-muted)]">Service</dt>
-                        <dd className="mt-1 font-medium">{selectedService?.name || '—'}</dd>
-                        {selectedService && (
-                          <dd className="text-[var(--color-ink-muted)]">
-                            {formatDuration(selectedService.durationMinutes)} · {formatMoney(selectedService.price)}
-                          </dd>
-                        )}
-                      </div>
-                      <div>
-                        <dt className="font-semibold text-[var(--color-ink-muted)]">Barber</dt>
-                        <dd className="mt-1 font-medium">{selectedBarber?.displayName || 'First available'}</dd>
-                      </div>
-                      <div>
-                        <dt className="font-semibold text-[var(--color-ink-muted)]">When</dt>
-                        <dd className="mt-1 font-medium">{selectedSlot ? formatShopDateTime(selectedSlot.startsAt, settings.timezone) : 'Choose a time'}</dd>
-                      </div>
-                      <div className="border-t border-[var(--color-rule)] pt-4">
-                        {selectedService?.depositRequired
-                          ? `Deposit expected: ${formatMoney(selectedService.depositAmount || 0)}`
-                          : 'Pay in the shop after your visit.'}
-                      </div>
-                    </dl>
-                    </div>
-                  </aside>
-                </div>
-              </div>
-            </form>
-          )}
+      {catalogError ? (
+        <div className="sf-container sf-empty mb-[var(--space-3xl)]" role="alert">
+          <p className="sf-subtitle">Booking couldn’t load</p>
+          <p className="sf-muted">{catalogError}</p>
         </div>
+      ) : !services.length || !barbers.length ? (
+        <div className="sf-container sf-empty mb-[var(--space-3xl)]">
+          <p className="sf-subtitle">Online booking isn’t open yet</p>
+          <div className="sf-track">
+            <Link href="/queue" className="sf-pill is-primary">Join walk-ins</Link>
+            <Link href="/services" className="sf-pill">Services</Link>
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={submitBooking} className="sf-container sf-book">
+          <div className="sf-book-main">
+            <fieldset className="sf-step">
+              <legend><span className="sf-step-no">01</span><span className="sf-step-title">Service</span></legend>
+              <div className="sf-options">
+                {services.map((service) => (
+                  <button type="button" key={service.id} aria-pressed={selectedServiceId === service.id} onClick={() => chooseService(service)} className="sf-option">
+                    <span className="sf-option-title">{service.name}</span>
+                    <span className="sf-mono">{formatMoney(service.price)}</span>
+                    <span className="sf-option-meta"><span className="sf-mono">{formatDuration(service.durationMinutes)}</span>{service.depositRequired && ` · Deposit ${formatMoney(service.depositAmount || 0)}`}</span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
 
-        {settings.phone ? (
-          <section className="border-t border-[var(--color-rule)] bg-[var(--color-paper-2)]">
-            <div className="sf-container-narrow py-[var(--space-lg)] text-center text-[var(--text-small)] text-[var(--color-ink-muted)]">
-              Questions? Call {settings.phone}.
+            <fieldset className="sf-step">
+              <legend><span className="sf-step-no">02</span><span className="sf-step-title">Barber</span></legend>
+              {barberNotice && <p role="status" className="sf-notice">{barberNotice}</p>}
+              <div className="sf-options">
+                <button
+                  type="button"
+                  aria-pressed={selectedBarberId === 'any'}
+                  onClick={() => { setSelectedBarberId('any'); setSelectedStartsAt(''); setBarberNotice(null); }}
+                  className="sf-option"
+                >
+                  <span className="sf-option-title">First available</span>
+                  <span className="sf-option-meta">{serviceBarbers.length} {serviceBarbers.length === 1 ? 'barber' : 'barbers'} for this service</span>
+                </button>
+                {serviceBarbers.map((barber) => (
+                  <button
+                    type="button"
+                    key={barber.id}
+                    aria-pressed={selectedBarberId === barber.id}
+                    onClick={() => { setSelectedBarberId(barber.id); setSelectedStartsAt(''); setBarberNotice(null); }}
+                    className="sf-option"
+                  >
+                    <span className="sf-option-title">{barber.displayName}</span>
+                    {barber.chairNumber ? <span className="sf-mono sf-small sf-muted">Chair {barber.chairNumber}</span> : <span />}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <fieldset className="sf-step">
+              <legend><span className="sf-step-no">03</span><span className="sf-step-title">Time</span></legend>
+              <label htmlFor="booking-date" className="sf-field max-w-xs">
+                <span>Date</span>
+                <input
+                  id="booking-date"
+                  name="date"
+                  type="date"
+                  value={selectedDate}
+                  onChange={(event) => { setSelectedDate(event.target.value); setSelectedStartsAt(''); }}
+                  className="sf-input sf-mono"
+                />
+              </label>
+              {!loadingSlots && availabilityError && <p role="status" className="sf-notice">{availabilityError}</p>}
+              <div role="group" aria-label="Available times" aria-busy={loadingSlots} className="sf-slots">
+                {loadingSlots && <p role="status">Checking times…</p>}
+                {!loadingSlots && mergedSlots.map((slot) => (
+                  <button type="button" key={slot.startsAt} aria-pressed={selectedStartsAt === slot.startsAt} onClick={() => setSelectedStartsAt(slot.startsAt)} className="sf-slot">
+                    {slot.label}
+                  </button>
+                ))}
+                {!loadingSlots && !availabilityError && !mergedSlots.length && <p>No times on this date.</p>}
+              </div>
+            </fieldset>
+
+            <fieldset className="sf-step">
+              <legend><span className="sf-step-no">04</span><span className="sf-step-title">Your details</span></legend>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="sf-field"><span>Full name</span>
+                  <input name="name" autoComplete="name" maxLength={120} value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} className="sf-input" required />
+                </label>
+                <label className="sf-field"><span>Phone</span>
+                  <input name="phone" type="tel" inputMode="tel" autoComplete="tel" maxLength={40} value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} className="sf-input" required />
+                </label>
+                <label className="sf-field sm:col-span-2"><span>Email (optional)</span>
+                  <input name="email" type="email" autoComplete="email" maxLength={254} value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} className="sf-input" />
+                </label>
+                <label className="sf-field sm:col-span-2"><span>Notes for the barber (optional)</span>
+                  <textarea name="notes" maxLength={2000} value={customer.notes} onChange={(e) => setCustomer({ ...customer, notes: e.target.value })} className="sf-textarea" />
+                </label>
+              </div>
+            </fieldset>
+          </div>
+
+          <aside className="sf-summary sf-on-dark" aria-label="Visit summary">
+            <p className="sf-eyebrow">Visit</p>
+            <dl>
+              <div><dt>Service</dt><dd>{selectedService?.name || '—'}{selectedService ? <span className="sf-mono block text-[var(--color-inverse-muted)]">{formatDuration(selectedService.durationMinutes)}</span> : null}</dd></div>
+              <div><dt>Barber</dt><dd>{selectedBarber?.displayName || 'First available'}</dd></div>
+              <div><dt>When</dt><dd className="sf-mono">{selectedSlot ? formatShopDateTime(selectedSlot.startsAt, settings.timezone) : '—'}</dd></div>
+              <div><dt>Pay</dt><dd>{selectedService?.depositRequired ? `Deposit ${formatMoney(selectedService.depositAmount || 0)}` : 'In the shop'}</dd></div>
+            </dl>
+            <div className="sf-summary-total"><span className="sf-eyebrow">Total</span><strong>{formatMoney(selectedService?.price)}</strong></div>
+            {error && !savedCommand && <p role="alert" className="sf-notice is-error">{error}</p>}
+            <div className="sf-track is-block">
+              <button type="submit" disabled={!canSubmit} className="sf-pill is-accent">{pending ? 'Booking…' : 'Request appointment'}</button>
             </div>
-          </section>
-        ) : null}
+            {settings.phone ? <p className="sf-small sf-muted">Questions: <span className="sf-mono">{settings.phone}</span></p> : null}
+          </aside>
+        </form>
+      )}
     </main>
   );
 }

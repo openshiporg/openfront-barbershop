@@ -1,13 +1,13 @@
 'use client';
 
 import { useId, useMemo, useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useCommandKey } from '@/features/platform/lib/useCommandKey';
 import { createStaffAppointmentAction, searchBookingCustomersAction, type CustomerMatch, type StaffBookingInput } from '../actions/appointments';
 import { parseShopDateTime } from '../lib/shopTimeInput';
+import { Notice, Pill, selectClass, Track } from '@/features/platform/lib/ui';
 
 type ServiceOption = { id: string; name?: string | null; durationMinutes?: number | null; depositRequired?: boolean | null; specialistIds?: string[] };
 type BarberOption = { id: string; displayName?: string | null; name?: string | null; bookingEnabled?: boolean | null };
@@ -96,7 +96,7 @@ export function StaffBookingForm(props: StaffBookingFormProps) {
           tone: 'status',
           message: response.data?.replayed
             ? 'This booking was already recorded; no duplicate was created.'
-            : `Appointment booked as Requested. Confirm it on the board when ready.${response.data?.waiverRequired ? ' This service needs a signed waiver before it starts.' : ''}`,
+            : `Appointment booked as Requested.${response.data?.waiverRequired ? ' Signed waiver required before it starts.' : ''}`,
           link: token ? `/appointment?id=${encodeURIComponent(appointmentId)}&token=${encodeURIComponent(token)}` : undefined,
         });
         props.onDone?.(appointmentId);
@@ -111,25 +111,25 @@ export function StaffBookingForm(props: StaffBookingFormProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Customer">
-        <Button type="button" size="sm" variant={mode === 'existing' ? 'default' : 'outline'} aria-pressed={mode === 'existing'} onClick={() => setMode('existing')}>Existing customer</Button>
-        <Button type="button" size="sm" variant={mode === 'new' ? 'default' : 'outline'} aria-pressed={mode === 'new'} onClick={() => setMode('new')}>New customer</Button>
-      </div>
+      <Track label="Customer">
+        <Pill size="sm" variant="flat" aria-pressed={mode === 'existing'} onClick={() => setMode('existing')}>Existing customer</Pill>
+        <Pill size="sm" variant="flat" aria-pressed={mode === 'new'} onClick={() => setMode('new')}>New customer</Pill>
+      </Track>
 
       {mode === 'existing' ? (
         <div className="space-y-2">
           <Label htmlFor={`${id}-search`}>Find customer</Label>
           <div className="flex gap-2">
             <Input id={`${id}-search`} value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); runSearch(); } }} placeholder="Name, phone, or email" aria-describedby={described('customer')} />
-            <Button type="button" variant="outline" disabled={searching || search.trim().length < 2} onClick={runSearch}>{searching ? 'Searching…' : 'Search'}</Button>
+            <Track><Pill disabled={searching || search.trim().length < 2} onClick={runSearch}>{searching ? 'Searching…' : 'Search'}</Pill></Track>
           </div>
           {searchMessage && <p role="status" className="text-xs text-muted-foreground">{searchMessage}</p>}
           {matches.length > 0 && (
-            <div className="grid gap-1" role="group" aria-label="Matching customers">
+            <div className="grid gap-1 rounded-xl bg-muted p-1 shadow-[inset_0_1px_2px_rgb(0_0_0/0.08)]" role="group" aria-label="Matching customers">
               {matches.map((match) => (
-                <Button key={match.id} type="button" size="sm" variant={customerId === match.id ? 'default' : 'outline'} aria-pressed={customerId === match.id} className="justify-start" onClick={() => { setCustomerId(match.id); setSelectedLabel(customerLabel(match)); }}>
+                <Pill key={match.id} size="sm" variant="flat" aria-pressed={customerId === match.id} className="justify-start overflow-hidden text-ellipsis rounded-lg" onClick={() => { setCustomerId(match.id); setSelectedLabel(customerLabel(match)); }}>
                   {customerLabel(match)}
-                </Button>
+                </Pill>
               ))}
             </div>
           )}
@@ -142,14 +142,13 @@ export function StaffBookingForm(props: StaffBookingFormProps) {
           <div className="grid gap-1"><Label htmlFor={`${id}-last`}>Last name</Label><Input id={`${id}-last`} value={lastName} maxLength={80} onChange={(event) => setLastName(event.target.value)} /></div>
           <div className="grid gap-1"><Label htmlFor={`${id}-phone`}>Phone</Label><Input id={`${id}-phone`} value={phone} maxLength={40} inputMode="tel" onChange={(event) => setPhone(event.target.value)} aria-describedby={described('phone')} />{errorFor('phone')}</div>
           <div className="grid gap-1"><Label htmlFor={`${id}-email`}>Email (optional)</Label><Input id={`${id}-email`} value={email} maxLength={200} type="email" onChange={(event) => setEmail(event.target.value)} /></div>
-          <p className="text-xs text-muted-foreground sm:col-span-2">A new customer profile is created. It is not merged with existing customers who share this phone or email.</p>
         </div>
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="grid gap-1">
           <Label htmlFor={`${id}-service`}>Service</Label>
-          <select id={`${id}-service`} value={serviceId} onChange={(event) => { setServiceId(event.target.value); setBarberId(''); }} aria-describedby={described('service')} className="h-9 rounded-md border bg-background px-3 text-sm">
+          <select id={`${id}-service`} value={serviceId} onChange={(event) => { setServiceId(event.target.value); setBarberId(''); }} aria-describedby={described('service')} className={selectClass}>
             <option value="">Choose a service</option>
             {props.services.map((item) => <option key={item.id} value={item.id}>{item.name || 'Service'}{item.durationMinutes ? ` · ${item.durationMinutes} min` : ''}{item.depositRequired ? ' · deposit due' : ''}</option>)}
           </select>
@@ -157,7 +156,7 @@ export function StaffBookingForm(props: StaffBookingFormProps) {
         </div>
         <div className="grid gap-1">
           <Label htmlFor={`${id}-barber`}>Barber</Label>
-          <select id={`${id}-barber`} value={barberId} onChange={(event) => setBarberId(event.target.value)} aria-describedby={described('barber')} className="h-9 rounded-md border bg-background px-3 text-sm">
+          <select id={`${id}-barber`} value={barberId} onChange={(event) => setBarberId(event.target.value)} aria-describedby={described('barber')} className={selectClass}>
             <option value="">Choose a barber</option>
             {barbers.map((item) => <option key={item.id} value={item.id}>{item.displayName || item.name || 'Barber'}</option>)}
           </select>
@@ -171,7 +170,7 @@ export function StaffBookingForm(props: StaffBookingFormProps) {
         </div>
         <div className="grid gap-1">
           <Label htmlFor={`${id}-source`}>Booked via</Label>
-          <select id={`${id}-source`} value={source} onChange={(event) => setSource(event.target.value as 'phone' | 'staff' | 'walk_in')} className="h-9 rounded-md border bg-background px-3 text-sm">
+          <select id={`${id}-source`} value={source} onChange={(event) => setSource(event.target.value as 'phone' | 'staff' | 'walk_in')} className={selectClass}>
             <option value="phone">Phone</option>
             <option value="staff">In person</option>
             <option value="walk_in">Walk-in</option>
@@ -179,18 +178,17 @@ export function StaffBookingForm(props: StaffBookingFormProps) {
         </div>
         <div className="grid gap-1 sm:col-span-2"><Label htmlFor={`${id}-notes`}>Internal notes (optional)</Label><Textarea id={`${id}-notes`} value={notes} maxLength={2000} onChange={(event) => setNotes(event.target.value)} /></div>
       </div>
-      <p className="text-xs text-muted-foreground">Availability, chair, shift, and practitioner credential are checked when you book.</p>
 
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" disabled={pending} onClick={submit}>{pending ? 'Booking…' : props.submitLabel || 'Book appointment'}</Button>
-        {props.onCancel && <Button type="button" variant="ghost" disabled={pending} onClick={props.onCancel}>Close</Button>}
-      </div>
+      <Track>
+        <Pill variant="primary" disabled={pending} onClick={submit}>{pending ? 'Booking…' : props.submitLabel || 'Book appointment'}</Pill>
+        {props.onCancel && <Pill disabled={pending} onClick={props.onCancel}>Close</Pill>}
+      </Track>
       <div aria-live="polite">
         {result && (
-          <div role={result.tone} className={`rounded-md border p-3 text-sm ${result.tone === 'alert' ? 'border-destructive/40 text-destructive' : ''}`}>
-            <p>{result.message}</p>
+          <div className="space-y-2">
+            <Notice tone={result.tone}>{result.message}</Notice>
             {result.link && (
-              <p className="mt-2 break-all text-xs">Customer appointment link (shown once; share it with the customer to view or sign required waivers): <a className="underline" href={result.link} target="_blank" rel="noreferrer">{result.link}</a></p>
+              <p className="break-all text-xs">Customer link, shown once: <a className="font-mono underline" href={result.link} target="_blank" rel="noreferrer">{result.link}</a></p>
             )}
           </div>
         )}

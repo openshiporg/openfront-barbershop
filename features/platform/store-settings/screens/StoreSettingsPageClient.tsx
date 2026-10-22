@@ -1,10 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { sanitizeStoreLogoSvg } from '@/features/shared/sanitize-store-logo';
@@ -16,6 +14,8 @@ import { ActiveShopSelector } from '@/features/platform/barbershop/screens/Activ
 import type { ShopChoice } from '@/features/platform/barbershop/actions/shop';
 import { LogoPicker } from '../components/LogoPicker';
 import { DEFAULT_STORE_LOGO_ICON } from '../lib/store-logo';
+import { StoreLogo } from '@/features/storefront/components/StoreLogo';
+import { Notice, PageHeader, Pill, PillLink, StatusDot, Track } from '@/features/platform/lib/ui';
 import {
   updateActiveShopStorefrontSettingsAction,
   type ActiveShopStorefrontSettings,
@@ -94,10 +94,10 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
 
   if (initialError || !initialData || !form || !saved) {
     return (
-      <div className="p-6 max-w-2xl">
-        <h1 className="text-2xl font-bold mb-6">Store Settings</h1>
+      <div className="max-w-2xl space-y-6 px-4 py-6 md:px-6">
+        <PageHeader title="Store Settings" tone="alert" />
         {shopSelector}
-        <div role="alert" className="text-red-500">Error: {initialError || 'Select an active shop to edit its settings.'}</div>
+        <Notice tone="alert">{initialError || 'Select an active shop to edit its settings.'}</Notice>
       </div>
     );
   }
@@ -136,89 +136,109 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
     }
   };
 
+  const swatch = STOREFRONT_BRAND_COLOR_OPTIONS.find((option) => option.value === form.brandColor)?.swatch;
+
   return (
-    <div className="p-6 max-w-2xl">
-      <h1 className="text-2xl font-bold mb-6">Store Settings</h1>
+    <div className="flex min-w-0 flex-col gap-6 px-4 py-6 md:px-6">
+      <PageHeader
+        title="Store Settings"
+        tone={saved.isPublic ? 'live' : 'off'}
+        meta={saved.isPublic ? 'Storefront published' : 'Storefront unpublished'}
+        actions={<Track><PillLink href="/">View storefront</PillLink></Track>}
+      />
       {shopSelector}
 
-      <form onSubmit={handleSave} className="space-y-6" noValidate={false}>
-        <div>
-          <Label htmlFor="store-name">Shop Name</Label>
-          <Input id="store-name" value={form.name} maxLength={120} required onChange={(e) => update({ name: e.target.value })} className="mt-2" />
+      <form onSubmit={handleSave} className="grid min-w-0 gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]" noValidate={false}>
+        <div className="min-w-0 space-y-8">
+          <section aria-labelledby="settings-identity" className="space-y-4">
+            <h2 id="settings-identity" className="border-b pb-2 text-sm font-semibold">Identity</h2>
+            <div>
+              <Label htmlFor="store-name">Shop Name</Label>
+              <Input id="store-name" value={form.name} maxLength={120} required onChange={(e) => update({ name: e.target.value })} className="mt-2" />
+            </div>
+            <div className="flex flex-wrap gap-6">
+              <LogoPicker
+                logoIcon={form.logoIcon}
+                logoColor={form.logoColor}
+                disabled={isLoading}
+                onIconChange={(logoIcon) => update({ logoIcon })}
+                onColorChange={(logoColor) => update({ logoColor })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="tagline">Tagline</Label>
+              <Textarea id="tagline" value={form.tagline} maxLength={240} onChange={(e) => update({ tagline: e.target.value })} className="mt-2" />
+            </div>
+            <div>
+              <Label id="brand-color-label">Storefront Color</Label>
+              <Track label="Storefront Color" className="mt-2">
+                {STOREFRONT_BRAND_COLOR_OPTIONS.map((option) => (
+                  <Pill key={option.value} size="sm" variant="flat" role="radio" aria-checked={form.brandColor === option.value} disabled={isLoading} onClick={() => update({ brandColor: option.value as StorefrontBrandColor })}>
+                    <span className="size-3.5 rounded-full ring-1 ring-black/10" style={{ backgroundColor: option.swatch }} aria-hidden="true" />{option.label}
+                  </Pill>
+                ))}
+              </Track>
+            </div>
+          </section>
+
+          <section aria-labelledby="settings-shop" className="space-y-4">
+            <h2 id="settings-shop" className="border-b pb-2 text-sm font-semibold">Shop</h2>
+            <div>
+              <Label htmlFor="address">Address</Label>
+              <Input id="address" value={form.address} maxLength={300} onChange={(e) => update({ address: e.target.value })} className="mt-2" />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <Label htmlFor="phone">Phone</Label>
+                <Input id="phone" value={form.phone} maxLength={40} onChange={(e) => update({ phone: e.target.value })} className="mt-2 font-mono" />
+              </div>
+              <div>
+                <Label htmlFor="timezone">Timezone</Label>
+                <Input id="timezone" value={form.timezone} maxLength={100} required onChange={(e) => update({ timezone: e.target.value })} className="mt-2 font-mono" />
+              </div>
+              <div>
+                <Label htmlFor="currency">Currency</Label>
+                <Input id="currency" value={form.currencyCode} readOnly aria-describedby="currency-help" className="mt-2 font-mono uppercase" />
+                <p id="currency-help" className="mt-1 text-xs text-muted-foreground">USD only</p>
+              </div>
+            </div>
+          </section>
+
+          <section aria-labelledby="settings-publish" className="space-y-1">
+            <h2 id="settings-publish" className="border-b pb-2 text-sm font-semibold">Publication</h2>
+            <div className="flex items-center justify-between gap-4 border-b py-3">
+              <Label htmlFor="published"><StatusDot tone={form.isPublic ? 'live' : 'off'} />Published Storefront</Label>
+              <Switch id="published" checked={form.isPublic} disabled={isLoading} onCheckedChange={(isPublic) => update({ isPublic })} />
+            </div>
+            <div className="flex items-center justify-between gap-4 py-3">
+              <Label htmlFor="demo"><StatusDot tone={form.isDemo ? 'wait' : 'off'} />Sample Shop</Label>
+              <Switch id="demo" checked={form.isDemo} disabled={isLoading} onCheckedChange={(isDemo) => update({ isDemo })} />
+            </div>
+          </section>
         </div>
 
-        <LogoPicker
-          logoIcon={form.logoIcon}
-          logoColor={form.logoColor}
-          disabled={isLoading}
-          onIconChange={(logoIcon) => update({ logoIcon })}
-          onColorChange={(logoColor) => update({ logoColor })}
-        />
-
-        <div>
-          <Label htmlFor="tagline">Tagline</Label>
-          <Textarea id="tagline" value={form.tagline} maxLength={240} onChange={(e) => update({ tagline: e.target.value })} className="mt-2" />
-        </div>
-
-        <div>
-          <Label htmlFor="address">Address</Label>
-          <Input id="address" value={form.address} maxLength={300} onChange={(e) => update({ address: e.target.value })} className="mt-2" />
-        </div>
-
-        <div className="grid gap-6 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="phone">Phone</Label>
-            <Input id="phone" value={form.phone} maxLength={40} onChange={(e) => update({ phone: e.target.value })} className="mt-2" />
+        <aside className="min-w-0 space-y-4 xl:sticky xl:top-6 xl:self-start" aria-label="Preview and save">
+          <div className="overflow-hidden rounded-2xl ring-1 ring-border">
+            <div className="flex items-center justify-between gap-2 bg-zinc-900 px-3 py-1.5 text-[11px] text-zinc-300"><span className="truncate"><StatusDot tone={form.isPublic ? 'live' : 'off'} />{form.address || 'Address'}</span><span className="font-mono">{form.phone}</span></div>
+            <div className="flex items-center gap-2.5 bg-[#f6f3ee] px-4 py-4 text-[#111a33]">
+              {safeLogo ? <StoreLogo svg={safeLogo} color={form.logoColor} className="size-7" /> : <span className="size-7 rounded bg-red-200" aria-hidden="true" />}
+              <span className="min-w-0 truncate text-xl font-extrabold uppercase tracking-tight">{form.name || 'Shop name'}</span>
+              <span className="ml-auto shrink-0 rounded-full bg-[#111a33] px-3 py-1 text-xs font-semibold text-white">Book</span>
+            </div>
+            <div className="h-1.5" style={{ background: `repeating-linear-gradient(-45deg, #c62f2a 0 6px, #f6f3ee 6px 12px, ${swatch || '#155eef'} 12px 18px, #f6f3ee 18px 24px)` }} aria-hidden="true" />
+            {form.tagline ? <p className="bg-[#f6f3ee] px-4 pb-4 pt-3 text-xs text-[#4b5268]">{form.tagline}</p> : null}
           </div>
-          <div>
-            <Label htmlFor="timezone">Timezone</Label>
-            <Input id="timezone" value={form.timezone} maxLength={100} required onChange={(e) => update({ timezone: e.target.value })} className="mt-2" />
+
+          <div aria-live="polite" role="status" className="font-mono text-xs text-muted-foreground">
+            {isLoading ? 'Saving…' : status || (dirty ? 'Unsaved changes' : 'Saved')}
           </div>
-        </div>
-
-        <div>
-          <Label htmlFor="currency">Currency</Label>
-          <Input id="currency" value={form.currencyCode} readOnly aria-describedby="currency-help" className="mt-2 uppercase" />
-          <p id="currency-help" className="mt-1 text-xs text-muted-foreground">Payments are recorded in USD.</p>
-        </div>
-
-        <div>
-          <Label id="brand-color-label">Storefront Color</Label>
-          <RadioGroup
-            aria-labelledby="brand-color-label"
-            value={form.brandColor}
-            onValueChange={(value) => update({ brandColor: value as StorefrontBrandColor })}
-            disabled={isLoading}
-            className="mt-2 grid gap-2 sm:grid-cols-3"
-          >
-            {STOREFRONT_BRAND_COLOR_OPTIONS.map((option) => (
-              <Label key={option.value} htmlFor={`brand-${option.value}`} className="flex cursor-pointer items-center gap-3 rounded-md border p-3 text-sm font-normal has-[[data-state=checked]]:border-primary">
-                <RadioGroupItem id={`brand-${option.value}`} value={option.value} />
-                <span className="size-5 rounded-full border" style={{ backgroundColor: option.swatch }} aria-hidden="true" />
-                <span>{option.label}</span>
-              </Label>
-            ))}
-          </RadioGroup>
-        </div>
-
-        <div className="flex items-center justify-between gap-4">
-          <Label htmlFor="published">Published Storefront</Label>
-          <Switch id="published" checked={form.isPublic} disabled={isLoading} onCheckedChange={(isPublic) => update({ isPublic })} />
-        </div>
-
-        <div className="flex items-center justify-between gap-4">
-          <Label htmlFor="demo">Sample Shop</Label>
-          <Switch id="demo" checked={form.isDemo} disabled={isLoading} onCheckedChange={(isDemo) => update({ isDemo })} />
-        </div>
-
-        <div aria-live="polite" role="status" className="text-sm text-muted-foreground">
-          {isLoading ? 'Saving…' : status || (dirty ? 'Unsaved changes' : '')}
-        </div>
-        {error && <p role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
-
-        <Button type="submit" disabled={isLoading || !safeLogo || !dirty}>
-          {isLoading ? 'Saving...' : 'Save Settings'}
-        </Button>
+          {error && <Notice tone="alert">{error}</Notice>}
+          <Track block>
+            <Pill type="submit" variant="primary" disabled={isLoading || !safeLogo || !dirty}>
+              {isLoading ? 'Saving…' : 'Save Settings'}
+            </Pill>
+          </Track>
+        </aside>
       </form>
     </div>
   );

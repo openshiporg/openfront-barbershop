@@ -1,13 +1,10 @@
 import Link from 'next/link';
-import { Plus, Scissors } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { EmptyState } from '@/components/ui/empty-state';
 import { PageContainer } from '@/features/dashboard/components/PageContainer';
 import { basePath } from '@/features/dashboard/lib/config';
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient';
+import { Empty, PageHeader, PillLink, Readouts, Section, StatusDot, Tag, Track, type Tone } from '@/features/platform/lib/ui';
 import { WorkforceControls } from './WorkforceControls';
 import { BarberAccountLink } from './BarberAccountLink';
 
@@ -38,24 +35,19 @@ const breadcrumbs = [
   { type: 'page' as const, label: 'Barbers & schedules' },
 ];
 
-function header() {
+function header(tone?: Tone) {
   return (
-    <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">Barbers & schedules</h1>
-        <p className="text-muted-foreground">Roster, weekly hours, shifts, time off, chairs, and commission.</p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Button asChild size="sm"><Link href={`${basePath}/barbers/create`}><Plus className="size-4" /> New barber</Link></Button>
-        <Button asChild size="sm" variant="outline"><Link href={`${basePath}/barber-chairs`}>Chairs</Link></Button>
-      </div>
-    </div>
+    <PageHeader
+      title="Barbers & schedules"
+      tone={tone}
+      actions={<Track><PillLink variant="primary" href={`${basePath}/barbers/create`}><Plus /> Barber</PillLink><PillLink href={`${basePath}/barber-chairs`}>Chairs</PillLink></Track>}
+    />
   );
 }
 
 function MoreLink({ shown, total, href, label }: { shown: number; total: number; href: string; label: string }) {
   if (total <= shown) return null;
-  return <p className="text-xs text-muted-foreground">Showing {shown} of {total} {label}. <Link className="text-primary underline" href={href}>View all</Link></p>;
+  return <p className="pt-2 text-xs text-muted-foreground"><span className="font-mono tabular-nums">{shown} / {total}</span> {label} · <Link className="font-medium text-foreground underline-offset-4 hover:underline" href={href}>All</Link></p>;
 }
 
 export default async function StaffPage() {
@@ -64,7 +56,7 @@ export default async function StaffPage() {
 
   if (!response.success || !result?.success || !result.data) {
     return (
-      <PageContainer title="Barbers & schedules" header={header()} breadcrumbs={breadcrumbs}>
+      <PageContainer title="Barbers & schedules" header={header('alert')} breadcrumbs={breadcrumbs}>
         <div className="px-4 pb-8 md:px-6">
           <Alert variant="destructive"><AlertDescription>{result?.error || response.error || 'The staff roster is temporarily unavailable. Refresh to try again.'}</AlertDescription></Alert>
         </div>
@@ -75,53 +67,74 @@ export default async function StaffPage() {
   const data = result.data;
   return (
     <PageContainer title="Barbers & schedules" header={header()} breadcrumbs={breadcrumbs}>
-      <div className="flex flex-col gap-6 px-4 pb-8 md:px-6">
-        <Card>
-          <CardHeader><CardTitle>Shop-wide closures</CardTitle></CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Close the whole shop for holidays, weather, or maintenance. Closures block booking and walk-in seating for that window.</p>
-            <WorkforceControls timeZone={data.timeZone} shifts={[]} exceptions={data.shopWideExceptions} />
-            <MoreLink shown={data.shopWideExceptions.length} total={data.shopWideExceptionCount} href={`${basePath}/schedule-exceptions`} label="upcoming closures" />
-          </CardContent>
-        </Card>
+      <div className="flex min-w-0 flex-col gap-8 px-4 pb-8 md:px-6">
+        <Readouts items={[
+          { label: 'Barbers', value: data.metrics.total },
+          { label: 'Bookable', value: data.metrics.bookable, tone: data.metrics.bookable ? 'live' : 'off' },
+          { label: 'Open shifts', value: data.metrics.openShifts },
+          { label: 'Projected commission', value: commissionLabel(data.metrics.projectedCommission ?? null, data.commissionAccess) },
+        ]} />
+
+        <Section id="staff-closures" title="Shop closures" tone={data.shopWideExceptions.length ? 'wait' : undefined} count={data.shopWideExceptionCount}>
+          <WorkforceControls timeZone={data.timeZone} shifts={[]} exceptions={data.shopWideExceptions} />
+          <MoreLink shown={data.shopWideExceptions.length} total={data.shopWideExceptionCount} href={`${basePath}/schedule-exceptions`} label="closures" />
+        </Section>
+
         {!data.barbers.length && (
-          <div className="rounded-lg border border-dashed">
-            <EmptyState title="No barbers yet" description="Add a barber, then set their chair, services, and weekly hours." icons={[Scissors]} className="p-8" />
-            <div className="-mt-4 pb-6 text-center"><Button asChild size="sm" variant="outline"><Link href={`${basePath}/barbers/create`}>Add a barber</Link></Button></div>
-          </div>
+          <Section id="staff-empty" title="Roster" count={0}>
+            <Empty>No barbers yet. <Link className="underline" href={`${basePath}/barbers/create`}>Add a barber</Link></Empty>
+          </Section>
         )}
-        <div className="grid gap-4 lg:grid-cols-2">{data.barbers.map((barber) => (
-          <Card key={barber.id}>
-            <CardHeader>
-              <div className="flex items-start justify-between gap-3">
-                <CardTitle>{barber.displayName}</CardTitle>
-                <Badge variant={barber.bookingEnabled ? 'default' : 'secondary'}>{barber.status}{barber.bookingEnabled ? ' · bookable' : ' · not bookable'}</Badge>
-              </div>
-              <div className="flex flex-wrap gap-2 pt-1 text-xs">
-                <Link className="text-primary underline" href={`${basePath}/barbers/${barber.id}`}>Edit profile, chair & services</Link>
-                <Link className="text-primary underline" href={`${basePath}/barber-schedules${filterBy('barber', barber.id)}`}>Weekly hours</Link>
-                <Link className="text-primary underline" href={`${basePath}/barber-schedules/create`}>Add weekly hours</Link>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">Chair {barber.chair?.chairNumber || barber.chairNumber || 'unassigned'}{barber.chair ? ` · ${barber.chair.status}` : ''} · {barber.accountLinked ? 'sign-in account linked' : 'no sign-in account'}</p>
-              {data.members && <BarberAccountLink barberId={barber.id} linkedUserId={barber.linkedUserId ?? null} members={data.members} />}
-              <div className="mt-3 flex flex-wrap gap-1">{barber.specialties.map((item) => <Badge key={item.id} variant="outline">{item.name}</Badge>)}{!barber.specialties.length && <span className="text-xs text-muted-foreground">No services assigned.</span>}</div>
-              <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-4">
-                {barber.schedules.length ? barber.schedules.map((schedule) => (
-                  <span key={schedule.id} className={schedule.isWorking ? '' : 'text-muted-foreground'}>
-                    {DAYS[schedule.dayOfWeek] || schedule.dayOfWeek} {schedule.isWorking ? `${clock(schedule.startMinute)}–${clock(schedule.endMinute)}${schedule.breakStartMinute != null ? ` (break ${clock(schedule.breakStartMinute)}–${clock(schedule.breakEndMinute)})` : ''}` : 'off'}
-                  </span>
-                )) : <span className="col-span-full text-muted-foreground">No weekly hours set.</span>}
-              </div>
-              <div className="mt-4 flex justify-between border-t pt-3 text-sm"><span>Commission rate</span><strong>{((barber.serviceCommissionRateBps || 0) / 100).toFixed(0)}%</strong></div>
-              <div className="flex justify-between text-sm"><span>Projected commission</span><strong>{commissionLabel(barber.projectedCommission, data.commissionAccess)}</strong></div>
-              <WorkforceControls timeZone={data.timeZone} barberId={barber.id} chairId={barber.chair?.id} shifts={barber.shifts} exceptions={barber.scheduleExceptions} />
-              <MoreLink shown={barber.shifts.length} total={barber.openShiftCount} href={`${basePath}/staff-shifts${filterBy('barber', barber.id)}`} label="open shifts" />
-              <MoreLink shown={barber.scheduleExceptions.length} total={barber.upcomingExceptionCount} href={`${basePath}/schedule-exceptions${filterBy('barber', barber.id)}`} label="upcoming exceptions" />
-            </CardContent>
-          </Card>
-        ))}</div>
+
+        <div className="grid min-w-0 gap-x-10 gap-y-10 xl:grid-cols-2">
+          {data.barbers.map((barber) => {
+            const byDay = new Map(barber.schedules.map((schedule) => [schedule.dayOfWeek, schedule]));
+            const chair = barber.chair?.chairNumber || barber.chairNumber;
+            return (
+              <section key={barber.id} aria-labelledby={`barber-${barber.id}`} className="min-w-0">
+                <div className="flex flex-wrap items-end justify-between gap-3 border-b pb-3">
+                  <div className="min-w-0">
+                    <h2 id={`barber-${barber.id}`} className="text-lg font-semibold tracking-tight"><StatusDot tone={barber.bookingEnabled ? 'live' : 'off'} />{barber.displayName}</h2>
+                    <p className="text-xs text-muted-foreground"><span className="font-mono">{chair ? `Chair ${chair}` : 'No chair'}</span>{barber.chair ? ` · ${barber.chair.status}` : ''} · {barber.status} · {barber.bookingEnabled ? 'bookable' : 'not bookable'} · {barber.accountLinked ? 'account linked' : 'no account'}</p>
+                  </div>
+                  <Track>
+                    <PillLink size="sm" href={`${basePath}/barbers/${barber.id}`}>Profile</PillLink>
+                    <PillLink size="sm" href={`${basePath}/barber-schedules${filterBy('barber', barber.id)}`}>Hours</PillLink>
+                    <PillLink size="sm" href={`${basePath}/barber-schedules/create`}><Plus /> Hours</PillLink>
+                  </Track>
+                </div>
+
+                <ol className="mt-3 grid grid-cols-7 gap-px overflow-hidden rounded-lg bg-border ring-1 ring-border" aria-label={`${barber.displayName} weekly hours`}>
+                  {Object.entries(DAYS).map(([day, short]) => {
+                    const schedule = byDay.get(day);
+                    const working = Boolean(schedule?.isWorking);
+                    return (
+                      <li key={day} className={`min-w-0 px-1 py-2 text-center ${working ? 'bg-background' : 'bg-muted/60 text-muted-foreground'}`}>
+                        <p className="text-[10px] font-medium uppercase tracking-wider">{short}</p>
+                        <p className="mt-1 font-mono text-[10px] leading-tight tabular-nums sm:text-[11px]">{working ? <>{clock(schedule?.startMinute)}<br />{clock(schedule?.endMinute)}</> : schedule ? 'off' : '—'}</p>
+                      </li>
+                    );
+                  })}
+                </ol>
+                {barber.schedules.some((schedule) => schedule.breakStartMinute != null) && (
+                  <p className="mt-1.5 font-mono text-[11px] text-muted-foreground">Breaks: {barber.schedules.filter((schedule) => schedule.isWorking && schedule.breakStartMinute != null).map((schedule) => `${DAYS[schedule.dayOfWeek] || schedule.dayOfWeek} ${clock(schedule.breakStartMinute)}–${clock(schedule.breakEndMinute)}`).join(' · ')}</p>
+                )}
+
+                <div className="mt-3 flex flex-wrap gap-1.5">{barber.specialties.map((service) => <Tag key={service.id}>{service.name}</Tag>)}{!barber.specialties.length && <span className="text-xs text-muted-foreground">No services assigned.</span>}</div>
+
+                <dl className="mt-3 grid grid-cols-2 gap-4 border-t pt-3 text-sm">
+                  <div><dt className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Commission rate</dt><dd className="font-mono font-semibold tabular-nums">{((barber.serviceCommissionRateBps || 0) / 100).toFixed(0)}%</dd></div>
+                  <div><dt className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Projected</dt><dd className="font-mono font-semibold tabular-nums">{commissionLabel(barber.projectedCommission, data.commissionAccess)}</dd></div>
+                </dl>
+
+                {data.members && <BarberAccountLink barberId={barber.id} linkedUserId={barber.linkedUserId ?? null} members={data.members} />}
+                <WorkforceControls timeZone={data.timeZone} barberId={barber.id} chairId={barber.chair?.id} shifts={barber.shifts} exceptions={barber.scheduleExceptions} />
+                <MoreLink shown={barber.shifts.length} total={barber.openShiftCount} href={`${basePath}/staff-shifts${filterBy('barber', barber.id)}`} label="open shifts" />
+                <MoreLink shown={barber.scheduleExceptions.length} total={barber.upcomingExceptionCount} href={`${basePath}/schedule-exceptions${filterBy('barber', barber.id)}`} label="upcoming exceptions" />
+              </section>
+            );
+          })}
+        </div>
       </div>
     </PageContainer>
   );

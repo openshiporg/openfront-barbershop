@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { ArrowUpRight } from 'lucide-react';
+import { phoneHref } from '@/features/shared/storefront-settings';
 import { StorefrontShell } from './StorefrontShell';
 import { AccountForms } from '../components/AccountForms';
 import { AccountDataExport } from '../components/AccountDataExport';
@@ -10,6 +12,8 @@ function bookingTime(startsAt: string, timeZone: string | null) {
   return new Date(startsAt).toLocaleString('en-US', { ...(timeZone ? { timeZone } : {}), dateStyle: 'medium', timeStyle: 'short' }) + (timeZone ? ` (${timeZone})` : '');
 }
 
+const bookingTone: Record<string, string> = { requested: 'is-wait', confirmed: 'is-accent', checked_in: 'is-live', in_chair: 'is-live', completed: '', cancelled: 'is-alert', no_show: 'is-alert' };
+
 export default async function AccountPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams || {};
   const page = Math.max(1, Math.floor(Number(typeof params.page === 'string' ? params.page : 1)) || 1);
@@ -18,29 +22,68 @@ export default async function AccountPage({ searchParams }: { searchParams?: Pro
   const history = user ? await getStorefrontBookingHistory(page) : null;
   const result = history?.success ? history.data.accountBookings : null;
   const data = result?.success ? result.data : null;
+  const telephoneHref = phoneHref(settings?.phone);
+
   // Existing bookings stay reachable even if the public storefront is paused.
-  return <StorefrontShell allowUnavailableChildren><main id="main-content" className="sf-container py-10">
-    <div className="mb-8 flex flex-wrap items-center justify-between gap-4"><h1 className="sf-display text-4xl">{user ? 'Your bookings' : 'Account'}</h1>{user ? <form action={signOutAccount}><button className="sf-btn sf-btn-ghost">Sign out</button></form> : null}</div>
-    {account.status === 'unavailable' ? <p role="alert" className="sf-panel p-5">Your account couldn’t load. Reload this page in a moment.</p> : !user ? <AccountForms /> : <>
-      <p className="mb-6 break-words">{user.name} · {user.email}</p>
-      {!data ? <p role="alert">{history?.success ? result?.error || 'Your bookings couldn’t load.' : 'Your bookings couldn’t load. Reload this page in a moment.'}</p> : <div className="space-y-4">
-        {data.bookings.map(booking => <Link key={booking.id} href={`/appointment?id=${encodeURIComponent(booking.id)}`} className="sf-panel flex flex-wrap items-center justify-between gap-4 p-5 no-underline hover:border-[var(--color-ink-muted)]">
-          <div className="min-w-0"><h2 className="font-semibold break-words">{booking.serviceTitleSnapshot}</h2><p>{bookingTime(booking.startsAt, booking.timeZone)}</p><p className="break-words">{booking.barberNameSnapshot}</p></div>
-          <div><p className="capitalize">{statusLabel(booking.status)}</p><p>{formatMoney(booking.price)}</p><p className="capitalize">{statusLabel(booking.paymentStatus)}</p><p className="sf-link mt-1 text-[var(--text-small)]">View or change</p></div>
-        </Link>)}
-        {!data.bookings.length ? <p>{page > 1 ? 'No more bookings.' : 'No bookings yet.'}</p> : null}
-        {page > 1 || data.hasMore ? <nav aria-label="Booking pages" className="flex flex-wrap items-center gap-3">
-          {page > 1 ? <Link className="sf-btn sf-btn-ghost" href={`/account?page=${page - 1}`}>Newer bookings</Link> : null}
-          <span className="text-[var(--text-small)]">Page {page} of {Math.max(1, Math.ceil(data.total / data.pageSize))}</span>
-          {data.hasMore ? <Link className="sf-btn sf-btn-ghost" href={`/account?page=${page + 1}`}>Older bookings</Link> : null}
-        </nav> : null}
-      </div>}
-      <Link href="/book" className="sf-btn sf-btn-primary mt-6">Book a chair</Link>
-      <section className="sf-panel mt-10 p-5" aria-labelledby="your-data-heading">
-        <h2 id="your-data-heading" className="font-semibold">Your data</h2>
-        <p className="mt-2 text-[var(--text-small)] text-[var(--color-ink-muted)]">Download your account details and bookings. To correct or delete your information, contact the shop{settings?.phone ? ` at ${settings.phone}` : ''}.</p>
-        <div className="mt-4"><AccountDataExport /></div>
-      </section>
-    </>}
-  </main></StorefrontShell>;
+  return (
+    <StorefrontShell allowUnavailableChildren>
+      <main id="main-content" className={user ? 'sf-container pb-[var(--space-3xl)]' : 'sf-container-narrow pb-[var(--space-3xl)]'}>
+        <section className="sf-page-head">
+          <p className="sf-eyebrow">{user ? <span className="break-words">{user.name} · {user.email}</span> : 'Account'}</p>
+          <div className="sf-page-head-row">
+            <h1 className="sf-display">{user ? 'Your visits' : 'Sign in'}</h1>
+            {user ? (
+              <div className="sf-track">
+                <Link href="/book" className="sf-pill is-primary">Book a chair</Link>
+                <form action={signOutAccount} className="contents"><button className="sf-pill">Sign out</button></form>
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        {account.status === 'unavailable' ? <p role="alert" className="sf-notice is-error mt-8">Your account couldn’t load. Reload this page in a moment.</p> : !user ? <div className="pt-8"><AccountForms /></div> : (
+          <div className="grid gap-10 pt-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+            <section aria-label="Bookings">
+              {!data ? <p role="alert" className="sf-notice is-error">{history?.success ? result?.error || 'Your bookings couldn’t load.' : 'Your bookings couldn’t load. Reload this page in a moment.'}</p> : (
+                <>
+                  <ul>
+                    {data.bookings.map(booking => (
+                      <li key={booking.id}>
+                        <Link href={`/appointment?id=${encodeURIComponent(booking.id)}`} className="sf-booking-row">
+                          <span className="grid min-w-0 gap-1">
+                            <span className="sf-subtitle text-[1.35rem]"><span className={`sf-dot ${bookingTone[booking.status] ?? ''}`} aria-hidden="true" />{booking.serviceTitleSnapshot}</span>
+                            <span className="sf-small sf-muted break-words">{bookingTime(booking.startsAt, booking.timeZone)} · {booking.barberNameSnapshot}</span>
+                          </span>
+                          <span className="grid justify-items-end gap-1 text-end">
+                            <span className="sf-mono font-semibold">{formatMoney(booking.price)}</span>
+                            <span className="sf-small sf-muted capitalize">{statusLabel(booking.status)} · {statusLabel(booking.paymentStatus)}</span>
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                  {!data.bookings.length ? <div className="sf-empty"><p className="sf-subtitle">{page > 1 ? 'No more bookings' : 'No bookings yet'}</p></div> : null}
+                  {page > 1 || data.hasMore ? (
+                    <nav aria-label="Booking pages" className="mt-6 flex flex-wrap items-center justify-between gap-3">
+                      <div className="sf-track">
+                        {page > 1 ? <Link className="sf-pill" href={`/account?page=${page - 1}`}>Newer</Link> : null}
+                        {data.hasMore ? <Link className="sf-pill" href={`/account?page=${page + 1}`}>Older</Link> : null}
+                      </div>
+                      <span className="sf-mono sf-small sf-muted">Page {page} / {Math.max(1, Math.ceil(data.total / data.pageSize))}</span>
+                    </nav>
+                  ) : null}
+                </>
+              )}
+            </section>
+            <aside className="sf-block content-start lg:border-t-0 lg:pt-0" aria-labelledby="your-data-heading">
+              <h2 id="your-data-heading" className="sf-eyebrow">Your data</h2>
+              <AccountDataExport />
+              <p className="sf-small sf-muted">Corrections or deletion: contact the shop{telephoneHref && settings?.phone ? <> at <a className="sf-link" href={`tel:${telephoneHref}`}>{settings.phone}</a></> : null}.</p>
+              <Link href="/appointment" className="sf-arrow-link">Find an appointment <ArrowUpRight aria-hidden="true" /></Link>
+            </aside>
+          </div>
+        )}
+      </main>
+    </StorefrontShell>
+  );
 }

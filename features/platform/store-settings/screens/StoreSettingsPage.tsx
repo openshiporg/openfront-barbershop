@@ -10,7 +10,7 @@ export default async function StoreSettingsPage() {
   ]);
 
   return (
-    <section className="overflow-hidden flex flex-col">
+    <section className="flex min-w-0 flex-col">
       <PageBreadcrumbs
         items={[
           {

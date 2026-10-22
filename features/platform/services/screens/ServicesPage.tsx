@@ -1,14 +1,11 @@
 import Link from 'next/link';
-import { PackageOpen, Plus, ShoppingBag } from 'lucide-react';
+import { Plus, ShoppingBag } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { EmptyState } from '@/components/ui/empty-state';
 import { PageContainer } from '@/features/dashboard/components/PageContainer';
 import { basePath } from '@/features/dashboard/lib/config';
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient';
 import type { PublicBookingEligibility } from '@/features/shared/public-booking-eligibility';
+import { Empty, PageHeader, PillLink, Readouts, Restricted, Section, StatusDot, Track, type Tone } from '@/features/platform/lib/ui';
 
 type ServiceItem = { id: string; name: string; status: string; durationMinutes?: number; price?: number; depositAmount?: number | null };
 type Data = {
@@ -33,32 +30,44 @@ const breadcrumbs = [
   { type: 'page' as const, label: 'Services & packages' },
 ];
 
-function header() {
+const statusTone = (status?: string | null): Tone => (status === 'active' ? 'live' : status === 'draft' ? 'wait' : 'off');
+
+function header(tone?: Tone) {
   return (
-    <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">Services & packages</h1>
-        <p className="text-muted-foreground">Services, prices, deposits, packages, memberships, and retail products.</p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Button asChild size="sm"><Link href={create('services')}><Plus className="size-4" /> New service</Link></Button>
-        <Button asChild size="sm" variant="outline"><Link href={create('service-categories')}>New category</Link></Button>
-      </div>
-    </div>
+    <PageHeader
+      title="Services & packages"
+      tone={tone}
+      actions={<Track><PillLink variant="primary" href={create('services')}><Plus /> Service</PillLink><PillLink href={create('service-categories')}>Category</PillLink></Track>}
+    />
   );
 }
 
-function SectionEmpty({ title, description, href, label }: { title: string; description: string; href: string; label: string }) {
+function ServiceRows({ services }: { services: ServiceItem[] }) {
   return (
-    <div className="rounded-lg border border-dashed">
-      <EmptyState title={title} description={description} icons={[PackageOpen]} className="p-8" />
-      <div className="-mt-4 pb-6 text-center"><Button asChild size="sm" variant="outline"><Link href={href}>{label}</Link></Button></div>
-    </div>
+    <ul>
+      {services.map((service) => (
+        <li key={service.id}>
+          <Link href={item('services', service.id)} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 border-b py-2.5 last:border-b-0 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <span className="min-w-0 truncate font-medium"><StatusDot tone={statusTone(service.status)} />{service.name}</span>
+            <span className="font-mono text-sm tabular-nums">{money(service.price)}</span>
+            <span className="col-span-2 pl-4 text-xs text-muted-foreground"><span className="font-mono">{service.durationMinutes || 30} min</span> · {service.status}{service.depositAmount ? ` · deposit ${money(service.depositAmount)}` : ''}</span>
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
 
-function ServiceList({ services }: { services: ServiceItem[] }) {
-  return <div className="grid gap-2 md:grid-cols-2">{services.map((service) => <Link key={service.id} href={item('services', service.id)} className="rounded-lg border p-3 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div className="flex justify-between gap-3"><strong>{service.name}</strong><span>{money(service.price)}</span></div><p className="text-sm text-muted-foreground">{service.durationMinutes || 30} min · {service.status}{service.depositAmount ? ` · deposit ${money(service.depositAmount)}` : ''}</p><span className="text-xs text-primary">Edit service</span></Link>)}</div>;
+function PriceRow({ href, name, sub, price, status }: { href: string; name: string; sub: string; price?: number; status: string }) {
+  return (
+    <li>
+      <Link href={href} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 border-b py-2.5 last:border-b-0 hover:bg-muted/40">
+        <span className="min-w-0 truncate font-medium"><StatusDot tone={statusTone(status)} />{name}</span>
+        <span className="font-mono text-sm tabular-nums">{money(price)}</span>
+        <span className="col-span-2 pl-4 text-xs text-muted-foreground">{sub}</span>
+      </Link>
+    </li>
+  );
 }
 
 export default async function ServicesPage() {
@@ -69,7 +78,7 @@ export default async function ServicesPage() {
 
   if (!response.success || !result?.success || !result.data) {
     return (
-      <PageContainer title="Services & packages" header={header()} breadcrumbs={breadcrumbs}>
+      <PageContainer title="Services & packages" header={header('alert')} breadcrumbs={breadcrumbs}>
         <div className="px-4 pb-8 md:px-6">
           <Alert variant="destructive"><AlertDescription>{result?.error || response.error || 'The service catalog is temporarily unavailable. Refresh to try again.'}</AlertDescription></Alert>
         </div>
@@ -82,64 +91,71 @@ export default async function ServicesPage() {
   const restrictedMemberships = data.membershipsAccess === 'restricted' || data.packages === null || data.memberships === null;
   const packages = data.packages || [];
   const memberships = data.memberships || [];
+  const eligibility = data.bookingEligibility;
 
   return (
     <PageContainer title="Services & packages" header={header()} breadcrumbs={breadcrumbs}>
-      <div className="flex flex-col gap-6 px-4 pb-8 md:px-6">
-        <Card>
-          <CardHeader><CardTitle>Online booking eligibility</CardTitle></CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p>{data.bookingEligibility?.data?.description || data.bookingEligibility?.error || 'Booking eligibility could not be loaded.'}</p>
-            {data.bookingEligibility?.data && <p className="text-muted-foreground">Policy version {data.bookingEligibility.data.version} · {data.bookingEligibility.data.publicServiceEligibility}</p>}
-            <p className="text-muted-foreground">Services without a category stay bookable by staff but are not listed on the storefront. Change eligibility by adding a new booking policy; existing appointments keep the policy they were booked under.</p>
-            <Button asChild size="sm" variant="outline"><Link href={`${basePath}/booking-policies`}>Booking policies</Link></Button>
-          </CardContent>
-        </Card>
+      <div className="flex min-w-0 flex-col gap-8 px-4 pb-8 md:px-6">
+        <Readouts items={[
+          { label: 'Services', value: data.metrics.services },
+          { label: 'Packages', value: data.metrics.packages ?? '—' },
+          { label: 'Memberships', value: data.metrics.memberships ?? '—' },
+          { label: 'Retail products', value: data.metrics.products },
+        ]} />
 
-        <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-          <Card>
-            <CardHeader><div className="flex items-center justify-between gap-2"><CardTitle>Service menu</CardTitle><Badge variant="secondary">{data.metrics.services} services</Badge></div></CardHeader>
-            <CardContent className="space-y-4">
-              {!hasServices && !data.categories.length && <SectionEmpty title="No services yet" description="Add the services customers can book." href={create('services')} label="Add a service" />}
+        <Section
+          id="svc-eligibility"
+          title="Online booking"
+          tone={eligibility?.data ? 'live' : 'alert'}
+          actions={<Track><PillLink size="sm" href={`${basePath}/booking-policies`}>Booking policies</PillLink></Track>}
+        >
+          <p className="text-sm">{eligibility?.data?.description || eligibility?.error || 'Booking eligibility could not be loaded.'}</p>
+          {eligibility?.data && <p className="mt-1 font-mono text-xs text-muted-foreground">v{eligibility.data.version} · {eligibility.data.publicServiceEligibility}</p>}
+          {data.uncategorizedServices.length > 0 && <p className="mt-2 text-xs text-muted-foreground"><StatusDot tone="off" />Uncategorized services: staff booking only.</p>}
+        </Section>
+
+        <div className="grid min-w-0 gap-8 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
+          <Section id="svc-menu" title="Service menu" count={data.metrics.services}>
+            {!hasServices && !data.categories.length && <Empty>No services yet. <Link className="underline" href={create('services')}>Add a service</Link></Empty>}
+            <div className="space-y-6">
               {data.categories.map((category) => (
-                <section key={category.id}>
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <h2 className="font-semibold"><Link className="hover:underline" href={item('service-categories', category.id)}>{category.name}</Link></h2>
-                    <Badge variant="secondary">{category.status}</Badge>
-                  </div>
-                  {category.services.length ? <ServiceList services={category.services} /> : <p className="text-sm text-muted-foreground">No services in this category.</p>}
-                </section>
-              ))}
-              {data.uncategorizedServices.length > 0 && <section><div className="mb-2 flex items-center justify-between"><h2 className="font-semibold">Services without a category</h2><Badge variant="outline">No category</Badge></div><ServiceList services={data.uncategorizedServices} /></section>}
-            </CardContent>
-          </Card>
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle>Packages & memberships</CardTitle>
-                  {!restrictedMemberships && <div className="flex gap-1"><Button asChild size="sm" variant="outline"><Link href={create('service-packages')}>New package</Link></Button><Button asChild size="sm" variant="outline"><Link href={create('membership-plans')}>New plan</Link></Button></div>}
+                <div key={category.id}>
+                  <h3 className="flex items-baseline justify-between gap-2 pb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <Link className="hover:text-foreground hover:underline" href={item('service-categories', category.id)}><StatusDot tone={statusTone(category.status)} />{category.name}</Link>
+                    <span className="font-mono tabular-nums">{category.services.length}</span>
+                  </h3>
+                  {category.services.length ? <ServiceRows services={category.services} /> : <Empty>No services in this category.</Empty>}
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {restrictedMemberships
-                  ? <p role="status" className="text-sm text-muted-foreground">Packages and memberships restricted. Your role does not include membership access for this shop.</p>
-                  : !packages.length && !memberships.length
-                    ? <SectionEmpty title="No packages or memberships" description="Sell prepaid visits or recurring plans." href={create('service-packages')} label="Add a package" />
-                    : <>
-                        {packages.map((pkg) => <Link key={pkg.id} href={item('service-packages', pkg.id)} className="flex justify-between rounded-lg border p-3 hover:bg-muted/50"><span>{pkg.name}<small className="block text-muted-foreground">Package · {pkg.status}</small></span><strong>{money(pkg.price)}</strong></Link>)}
-                        {memberships.map((plan) => <Link key={plan.id} href={item('membership-plans', plan.id)} className="flex justify-between rounded-lg border p-3 hover:bg-muted/50"><span>{plan.name}<small className="block text-muted-foreground">Membership · {plan.includedVisits ?? 0} visits · {plan.status}</small></span><strong>{money(plan.price)}</strong></Link>)}
-                      </>}
-                <p className="text-xs text-muted-foreground">Price changes apply to new sales only; balances customers already bought keep their original terms.</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader><div className="flex items-center justify-between gap-2"><CardTitle>Retail products</CardTitle><Button asChild size="sm" variant="outline"><Link href={create('products')}><ShoppingBag className="size-4" /> New product</Link></Button></div></CardHeader>
-              <CardContent className="space-y-2">
-                {!data.products.length && <SectionEmpty title="No retail products" description="Add products to sell at checkout." href={create('products')} label="Add a product" />}
-                {data.products.map((product) => <Link key={product.id} href={item('products', product.id)} className="flex justify-between rounded-lg border p-3 hover:bg-muted/50"><span>{product.name}<small className="block text-muted-foreground">{product.sku} · {product.status}</small></span><strong>{money(product.price)}</strong></Link>)}
-              </CardContent>
-            </Card>
+              ))}
+              {data.uncategorizedServices.length > 0 && (
+                <div>
+                  <h3 className="pb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground"><StatusDot tone="off" />No category</h3>
+                  <ServiceRows services={data.uncategorizedServices} />
+                </div>
+              )}
+            </div>
+          </Section>
+
+          <div className="grid min-w-0 content-start gap-8">
+            <Section
+              id="svc-plans"
+              title="Packages & memberships"
+              count={restrictedMemberships ? undefined : packages.length + memberships.length}
+              actions={!restrictedMemberships ? <Track><PillLink size="sm" href={create('service-packages')}>Package</PillLink><PillLink size="sm" href={create('membership-plans')}>Plan</PillLink></Track> : undefined}
+            >
+              {restrictedMemberships
+                ? <Restricted>Packages and memberships restricted for your role.</Restricted>
+                : !packages.length && !memberships.length
+                  ? <Empty>No packages or memberships.</Empty>
+                  : <ul>
+                      {packages.map((pkg) => <PriceRow key={pkg.id} href={item('service-packages', pkg.id)} name={pkg.name} sub={`Package · ${pkg.status}`} price={pkg.price} status={pkg.status} />)}
+                      {memberships.map((plan) => <PriceRow key={plan.id} href={item('membership-plans', plan.id)} name={plan.name} sub={`Membership · ${plan.includedVisits ?? 0} visits · ${plan.status}`} price={plan.price} status={plan.status} />)}
+                    </ul>}
+            </Section>
+            <Section id="svc-retail" title="Retail" count={data.products.length} actions={<Track><PillLink size="sm" href={create('products')}><ShoppingBag /> Product</PillLink></Track>}>
+              {!data.products.length && <Empty>No retail products.</Empty>}
+              <ul>{data.products.map((product) => <PriceRow key={product.id} href={item('products', product.id)} name={product.name} sub={`${product.sku} · ${product.status}`} price={product.price} status={product.status} />)}</ul>
+            </Section>
           </div>
         </div>
       </div>

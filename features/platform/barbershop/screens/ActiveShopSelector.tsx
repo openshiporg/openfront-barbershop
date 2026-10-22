@@ -22,7 +22,7 @@ export function ActiveShopSelector({ activeShop, shops, total, hasUnsavedChanges
   const [status, setStatus] = useState('');
 
   if (!shops.length) {
-    return <p role="status" className="text-sm text-muted-foreground">You have no active shop memberships. Ask a shop owner to invite you.</p>;
+    return <p role="status" className="text-sm text-muted-foreground">No active shop memberships.</p>;
   }
 
   const change = (shopId: string) => {
@@ -53,9 +53,8 @@ export function ActiveShopSelector({ activeShop, shops, total, hasUnsavedChanges
         </SelectContent>
       </Select>
       {typeof total === 'number' && total > shops.length && (
-        <p className="text-xs text-muted-foreground">Showing {shops.length} of {total} shops.</p>
+        <p className="font-mono text-xs tabular-nums text-muted-foreground">{shops.length} / {total} shops</p>
       )}
-      {!activeShop && <p className="text-sm text-muted-foreground">Select the shop you want to work in.</p>}
       <p role="status" aria-live="polite" className="text-sm text-muted-foreground">{pending ? 'Switching shop…' : status}</p>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     </div>

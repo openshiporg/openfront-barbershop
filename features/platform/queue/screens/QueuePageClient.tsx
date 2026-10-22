@@ -2,12 +2,10 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { RefreshCw, UserRoundPlus } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { RefreshCw } from 'lucide-react';
 import { PageContainer } from '@/features/dashboard/components/PageContainer';
 import { useLiveRefresh } from '@/features/platform/lib/useLiveRefresh';
+import { Empty, liveStamp, Notice, PageHeader, Pager, Pill, PillLink, Readouts, Section, selectClass, StatusDot, Track, type Tone } from '@/features/platform/lib/ui';
 import { createAppointmentFromQueue, updateQueueEntryStatus, type QueueEntry, type QueueProjectionData } from '../actions/queue';
 import { AddWalkInForm, AssignQueueEntryForm } from '../components/QueueForms';
 import { interruptedQueueSeatMessage, interruptedQueueStatusMessage, queueSeatFeedback, queueStatusFeedback, type QueueActionResult } from '../lib/queueActionFeedback';
@@ -25,8 +23,10 @@ function waitAge(checkedInAt: string | null | undefined, now: number) {
 }
 
 const actionByStatus: Partial<Record<QueueStatus, { label: string; status: QueueStatus }>> = {
-  waiting: { label: 'Mark manually contacted', status: 'texted' },
+  waiting: { label: 'Contacted', status: 'texted' },
 };
+
+const queueTone: Partial<Record<QueueStatus, Tone>> = { waiting: 'wait', texted: 'info', in_chair: 'live' };
 
 function queueHref(search: string, page: number) {
   const params = new URLSearchParams();
@@ -67,121 +67,121 @@ export function QueuePageClient({ data, breadcrumbs }: { data: QueueProjectionDa
   const firstShown = data.activeMatching ? (data.page - 1) * data.pageSize + 1 : 0;
   const lastShown = Math.min(data.activeMatching, data.page * data.pageSize);
 
+  const waiting = byStatus.waiting || [];
+  const longest = waiting.reduce<string | null>((oldest, entry) => (!entry.checkedInAt ? oldest : !oldest || entry.checkedInAt < oldest ? entry.checkedInAt : oldest), null);
+
   const header = (
-    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">Walk-in queue</h1>
-        <p className="text-muted-foreground">Walk-ins, quoted waits, and seating</p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" onClick={live.refresh} disabled={live.refreshing}><RefreshCw className="size-4" />{live.refreshing ? 'Refreshing…' : 'Refresh'}</Button>
-        <Button variant="outline" asChild><Link href="/dashboard/platform/booking">Booking board</Link></Button>
-        <Button onClick={() => setAdding((value) => !value)} aria-expanded={adding}>{adding ? 'Close' : 'Add walk-in'}</Button>
-      </div>
-    </div>
+    <PageHeader
+      title="Walk-in queue"
+      tone={live.refreshing ? 'wait' : 'live'}
+      meta={<>{counts.waiting || 0} waiting{longest ? <> · longest <span className="font-mono tabular-nums">{waitAge(longest, live.now)}</span></> : null} · <span className="font-mono tabular-nums">Live {liveStamp(live.lastRefreshedAt)}</span></>}
+      actions={(
+        <Track>
+          <Pill onClick={live.refresh} disabled={live.refreshing}><RefreshCw />{live.refreshing ? 'Refreshing' : 'Refresh'}</Pill>
+          <PillLink href="/dashboard/platform/booking">Booking board</PillLink>
+          <Pill variant="primary" onClick={() => setAdding((value) => !value)} aria-expanded={adding}>{adding ? 'Close' : 'Add walk-in'}</Pill>
+        </Track>
+      )}
+    />
   );
 
   return (
     <PageContainer title="Walk-in queue" header={header} breadcrumbs={breadcrumbs}>
-      <div className="flex flex-col gap-6 px-4 pb-8 md:px-6">
-        <p className="text-xs text-muted-foreground">Last updated {live.lastRefreshedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}. Updates every minute while no form is open.</p>
-
+      <div className="flex min-w-0 flex-col gap-6 px-4 pb-8 md:px-6">
         {adding && (
-          <section className="rounded-xl border bg-card p-4 shadow-sm" aria-label="Add walk-in">
-            <h2 className="mb-3 font-semibold">Add walk-in</h2>
+          <Section id="add-walk-in" title="Add walk-in">
             <AddWalkInForm services={services} barbers={barbers} onClose={() => setAdding(false)} />
-          </section>
+          </Section>
         )}
 
-        <form action="/dashboard/platform/queue" className="flex flex-wrap items-end gap-2">
-          <label className="grid min-w-0 flex-1 gap-1 text-sm">Search active guests<input name="q" defaultValue={data.search} placeholder="Name or phone" className="h-9 w-full rounded-md border bg-background px-3" /></label>
-          <Button type="submit" variant="outline">Search</Button>
-          {data.search && <Button variant="ghost" asChild><Link href="/dashboard/platform/queue">Clear</Link></Button>}
+        <Readouts items={[
+          { label: 'Waiting', value: counts.waiting || 0, tone: counts.waiting ? 'wait' : undefined },
+          { label: 'Contacted', value: counts.texted || 0 },
+          { label: 'In chair', value: counts.in_chair || 0, tone: counts.in_chair ? 'live' : undefined },
+          { label: 'Active', value: data.activeTotal },
+        ]} />
+
+        <form action="/dashboard/platform/queue" className="flex items-end gap-2" role="search">
+          <label className="grid min-w-0 flex-1 gap-1 text-xs font-medium text-muted-foreground">Search active guests<input name="q" defaultValue={data.search} placeholder="Name or phone" className={selectClass} /></label>
+          <Track>
+            <Pill type="submit">Search</Pill>
+            {data.search && <PillLink href="/dashboard/platform/queue">Clear</PillLink>}
+          </Track>
         </form>
 
-        <div aria-live="polite">{message && <p role={message.tone} className={`rounded-md border p-3 text-sm ${message.tone === 'alert' ? 'border-destructive/40 text-destructive' : ''}`}>{message.text}</p>}</div>
-        <p role="status" className="text-sm text-muted-foreground">
-          {data.activeMatching ? `Showing ${firstShown}–${lastShown} of ${data.activeMatching} active ${data.search ? 'matching ' : ''}guests (${data.activeTotal} active in total).` : data.search ? 'No active guests match this search.' : 'No active guests.'}
+        <div aria-live="polite">{message && <Notice tone={message.tone}>{message.text}</Notice>}</div>
+        <p role="status" className="font-mono text-xs tabular-nums text-muted-foreground">
+          {data.activeMatching ? `${firstShown}–${lastShown} of ${data.activeMatching}${data.search ? ' matching' : ''}` : data.search ? 'No active guests match this search.' : 'No active guests.'}
         </p>
 
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid min-w-0 gap-4 lg:grid-cols-3">
           {(['waiting', 'texted', 'in_chair'] as QueueStatus[]).map((status) => (
-            <section key={status} className="min-w-0 rounded-xl border bg-muted/20 p-3" aria-label={queueStatusLabels[status]}>
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-semibold">{queueStatusLabels[status]}</h2>
-                <Badge variant="outline">{counts[status] || 0}</Badge>
-              </div>
-              <div className="space-y-3">
+            <section key={status} className="min-w-0 rounded-2xl bg-muted/50 p-2 ring-1 ring-inset ring-black/5 dark:ring-white/5" aria-label={queueStatusLabels[status]}>
+              <h2 className="flex items-center justify-between px-1.5 pb-2 pt-1 text-sm font-semibold">
+                <span><StatusDot tone={queueTone[status] || 'off'} />{queueStatusLabels[status]}</span>
+                <span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{counts[status] || 0}</span>
+              </h2>
+              <div className="space-y-2">
                 {(byStatus[status] || []).map((entry) => {
                   const action = actionByStatus[entry.status as QueueStatus];
                   const canSeat = entry.status !== 'in_chair' && Boolean(entry.requestedService?.id);
                   return (
-                    <Card key={entry.id} className="bg-background">
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="font-semibold">{entry.customerName}</div>
-                            <div className="text-sm text-muted-foreground">{entry.phone || 'No phone'} · party {entry.partySize || 1}</div>
-                          </div>
-                          <Badge variant="secondary">{waitAge(entry.checkedInAt, live.now)}</Badge>
+                    <article key={entry.id} className="rounded-xl border bg-background p-3 shadow-xs">
+                      <div className="flex items-start gap-3">
+                        <span className="w-[4.25rem] shrink-0 font-mono text-base font-semibold tabular-nums">{waitAge(entry.checkedInAt, live.now)}</span>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate font-semibold">{entry.customerName}</h3>
+                          <p className="truncate text-sm text-muted-foreground">{entry.appointment?.serviceTitleSnapshot || entry.requestedService?.name || 'No service yet'}</p>
                         </div>
-                        <div className="mt-3 grid gap-1 text-sm text-muted-foreground">
-                          <span>{entry.appointment?.serviceTitleSnapshot || entry.requestedService?.name || 'No service chosen yet'}</span>
-                          <span>{entry.appointment?.barberNameSnapshot || entry.requestedBarber?.displayName || 'Any barber'}</span>
-                          <span>{entry.quotedWaitMinutes == null ? 'No wait estimate' : `Quoted ${entry.quotedWaitMinutes} min`}</span>
-                        </div>
-                        {entry.notes && <p className="mt-3 rounded-md bg-muted p-2 text-xs text-muted-foreground">{entry.notes}</p>}
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          {action && <Button size="sm" disabled={pending} onClick={() => updateStatus(entry.id, action.status)}>{action.label}</Button>}
+                        <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">×{entry.partySize || 1}</span>
+                      </div>
+                      <p className="mt-2 pl-[4.75rem] text-xs text-muted-foreground">
+                        {entry.appointment?.barberNameSnapshot || entry.requestedBarber?.displayName || 'Any barber'} · {entry.quotedWaitMinutes == null ? 'no quote' : `quoted ${entry.quotedWaitMinutes} min`} · {entry.phone || 'no phone'}
+                      </p>
+                      {entry.notes && <p className="mt-2 ml-[4.75rem] rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground">{entry.notes}</p>}
+                      <div className="mt-3 pl-[4.75rem]">
+                        <Track>
+                          {entry.status !== 'in_chair' && <Pill size="sm" variant="primary" disabled={pending || !canSeat} onClick={() => convertToAppointment(entry)}>Seat</Pill>}
+                          {entry.status === 'in_chair' && entry.appointment?.id && <PillLink size="sm" variant="primary" href={`/dashboard/platform/pos?appointment=${encodeURIComponent(entry.appointment.id)}`}>Checkout</PillLink>}
+                          {action && <Pill size="sm" disabled={pending} onClick={() => updateStatus(entry.id, action.status)}>{action.label}</Pill>}
                           {entry.status !== 'in_chair' && (
-                            <Button size="sm" variant="outline" aria-expanded={assigningId === entry.id} onClick={() => setAssigningId(assigningId === entry.id ? null : entry.id)}>
-                              {entry.requestedService?.id ? 'Change service/barber' : 'Choose service'}
-                            </Button>
+                            <Pill size="sm" aria-expanded={assigningId === entry.id} onClick={() => setAssigningId(assigningId === entry.id ? null : entry.id)}>
+                              {entry.requestedService?.id ? 'Change' : 'Choose service'}
+                            </Pill>
                           )}
-                          {entry.status !== 'in_chair' && <Button size="sm" variant="outline" disabled={pending || !canSeat} onClick={() => convertToAppointment(entry)}>Seat + create appointment</Button>}
-                          {entry.status === 'in_chair'
-                            ? (entry.appointment?.id
-                              ? <Button size="sm" asChild><Link href={`/dashboard/platform/pos?appointment=${encodeURIComponent(entry.appointment.id)}`}>Checkout seated visit</Link></Button>
-                              : <span className="text-xs text-muted-foreground">No linked appointment to check out.</span>)
-                            : <Button size="sm" variant="ghost" disabled={pending} onClick={() => updateStatus(entry.id, 'left')}>Left</Button>}
-                        </div>
-                        {!entry.requestedService?.id && entry.status !== 'in_chair' && <p className="mt-2 text-xs text-muted-foreground">Choose a service before seating.</p>}
-                        {assigningId === entry.id && (
-                          <AssignQueueEntryForm
-                            queueEntryId={entry.id}
-                            currentServiceId={entry.requestedService?.id}
-                            currentBarberId={entry.requestedBarber?.id}
-                            services={services}
-                            barbers={barbers}
-                            onClose={() => setAssigningId(null)}
-                          />
-                        )}
-                      </CardContent>
-                    </Card>
+                          {entry.status !== 'in_chair' && <Pill size="sm" disabled={pending} onClick={() => updateStatus(entry.id, 'left')}>Left</Pill>}
+                        </Track>
+                        {entry.status === 'in_chair' && !entry.appointment?.id && <p className="mt-2 text-xs text-muted-foreground">No linked appointment.</p>}
+                        {!entry.requestedService?.id && entry.status !== 'in_chair' && <p className="mt-2 text-xs text-muted-foreground">Service required to seat.</p>}
+                      </div>
+                      {assigningId === entry.id && (
+                        <AssignQueueEntryForm
+                          queueEntryId={entry.id}
+                          currentServiceId={entry.requestedService?.id}
+                          currentBarberId={entry.requestedBarber?.id}
+                          services={services}
+                          barbers={barbers}
+                          onClose={() => setAssigningId(null)}
+                        />
+                      )}
+                    </article>
                   );
                 })}
-                {!byStatus[status]?.length && <div className="rounded-lg border border-dashed bg-background/50 p-4 text-sm text-muted-foreground">{(counts[status] || 0) > 0 ? 'Not on this page.' : 'No guests.'}</div>}
+                {!byStatus[status]?.length && <p className="px-1.5 py-3 text-sm text-muted-foreground">{(counts[status] || 0) > 0 ? 'Not on this page.' : 'None.'}</p>}
               </div>
             </section>
           ))}
         </div>
 
-        {totalPages > 1 && (
-          <nav className="flex items-center justify-between gap-3" aria-label="Queue pages">
-            {data.page > 1 ? <Button variant="outline" asChild><Link href={queueHref(data.search, data.page - 1)}>Previous</Link></Button> : <span />}
-            <span className="text-sm text-muted-foreground">Page {data.page} of {totalPages}</span>
-            {data.page < totalPages ? <Button variant="outline" asChild><Link href={queueHref(data.search, data.page + 1)}>Next</Link></Button> : <span />}
-          </nav>
-        )}
+        <Pager label="Queue pages" page={data.page} pages={totalPages} prev={data.page > 1 ? queueHref(data.search, data.page - 1) : null} next={data.page < totalPages ? queueHref(data.search, data.page + 1) : null} />
 
-        <section className="rounded-xl border bg-card p-4 shadow-sm">
-          <div className="mb-3 flex items-center gap-2"><UserRoundPlus className="h-4 w-4" aria-hidden /><h2 className="font-semibold">Recently served (latest 20)</h2></div>
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-            {servedEntries.map((entry) => <div key={entry.id} className="rounded-lg border p-3 text-sm"><span className="font-medium">{entry.customerName}</span><div className="text-muted-foreground">{entry.appointment?.serviceTitleSnapshot || entry.requestedService?.name || 'Walk-in'}</div></div>)}
-            {!servedEntries.length && <p className="text-sm text-muted-foreground">No recently served walk-ins.</p>}
-          </div>
-          <Link className="mt-3 inline-block text-sm underline" href="/dashboard/walk-in-queue-entries">All queue history</Link>
-        </section>
+        <Section id="served" title="Recently served" count={servedEntries.length} actions={<Link className="text-xs font-medium underline-offset-4 hover:underline" href="/dashboard/walk-in-queue-entries">All history</Link>}>
+          {servedEntries.length ? (
+            <ul className="grid gap-x-6 sm:grid-cols-2 xl:grid-cols-4">
+              {servedEntries.map((entry) => <li key={entry.id} className="flex min-w-0 items-baseline justify-between gap-2 border-b py-2 text-sm"><span className="truncate font-medium">{entry.customerName}</span><span className="truncate text-xs text-muted-foreground">{entry.appointment?.serviceTitleSnapshot || entry.requestedService?.name || 'Walk-in'}</span></li>)}
+            </ul>
+          ) : <Empty>No recently served walk-ins.</Empty>}
+        </Section>
       </div>
     </PageContainer>
   );

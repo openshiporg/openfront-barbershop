@@ -1,6 +1,7 @@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { PageContainer } from '@/features/dashboard/components/PageContainer';
 import { basePath } from '@/features/dashboard/lib/config';
+import { PageHeader } from '@/features/platform/lib/ui';
 import { getQueueData } from '../actions/queue';
 import { QueuePageClient } from './QueuePageClient';
 
@@ -21,7 +22,7 @@ export default async function QueuePage({ searchParams }: PageProps) {
   const response = await getQueueData({ search, page });
   if (!response.success) {
     return (
-      <PageContainer title="Walk-in queue" breadcrumbs={breadcrumbs} header={<div><h1 className="text-2xl font-semibold">Walk-in queue</h1><p className="text-muted-foreground">Walk-ins, quoted waits, and seating</p></div>}>
+      <PageContainer title="Walk-in queue" breadcrumbs={breadcrumbs} header={<PageHeader title="Walk-in queue" tone="alert" />}>
         <div className="px-4 md:px-6">
           <Alert variant="destructive">
             <AlertTitle>{response.kind === 'forbidden' ? 'Queue access restricted' : 'Queue unavailable'}</AlertTitle>

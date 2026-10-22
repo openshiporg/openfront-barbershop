@@ -11,44 +11,25 @@ export default async function BarbersPage() {
   return (
     <StorefrontShell>
       <main id="main-content">
-        <section className="sf-panel-inverse">
-          <div className="sf-container py-[var(--space-3xl)]">
-            <p className="sf-eyebrow text-[var(--color-accent)]">Meet the barbers</p>
-            <h1 className="sf-display mt-3 max-w-[12ch] text-[var(--text-display)] text-[var(--color-inverse-ink)]">
-              The barbers.
-            </h1>
-
-          </div>
-        </section>
-
-        <section className="sf-container py-[var(--space-3xl)]">
-          <div className="mb-[var(--space-2xl)] flex flex-col gap-4 border-b border-[var(--color-rule)] pb-[var(--space-lg)] md:flex-row md:items-end md:justify-between">
-            <div>
-              <h2 className="sf-display text-[var(--text-title)]">Choose a barber.</h2>
+        <section className="sf-container sf-page-head">
+          <p className="sf-eyebrow">{barbers.length} {barbers.length === 1 ? 'chair' : 'chairs'}</p>
+          <div className="sf-page-head-row">
+            <h1 className="sf-display">Barbers</h1>
+            <div className="sf-track">
+              <Link href="/book" className="sf-pill is-primary">First available</Link>
+              <Link href="/queue" className="sf-pill">Join walk-ins</Link>
             </div>
-            <Link href="/book" className="sf-btn sf-btn-primary shrink-0">
-              Open booking
-            </Link>
-          </div>
-
-          <div className="grid gap-[var(--space-md)] md:grid-cols-2 lg:grid-cols-3">
-            {barbers.map((barber) => (
-              <BarberCard key={barber.id} barber={barber} />
-            ))}
-            {!barbers.length && (
-              <p className="col-span-full border border-dashed border-[var(--color-rule-strong)] p-[var(--space-xl)] text-[var(--color-ink-muted)]">
-                No barber profiles are available online at the moment.
-              </p>
-            )}
           </div>
         </section>
 
-        <section className="border-t border-[var(--color-rule)] bg-[var(--color-paper-2)]">
-          <div className="sf-container-narrow py-[var(--space-2xl)] text-center">
-            <p className="text-[var(--text-small)] text-[var(--color-ink-muted)]">
-              {settings.phone ? `Walk-in enquiries · ${settings.phone}` : 'Walk-in availability varies.'}
-            </p>
-          </div>
+        <section className="sf-container sf-section pt-[var(--space-xl)]">
+          {barbers.length ? (
+            <div className="sf-chair-grid">
+              {barbers.map((barber, index) => <BarberCard key={barber.id} barber={barber} priority={index < 3} />)}
+            </div>
+          ) : (
+            <p className="sf-muted">No barbers listed online.</p>
+          )}
         </section>
       </main>
     </StorefrontShell>

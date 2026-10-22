@@ -1,12 +1,12 @@
 'use client';
 
 import { useId, useRef, useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { shopDateKey, shopWallTime } from '@/features/shared/shop-time';
 import { useCommandKey } from '../../lib/useCommandKey';
 import { receiveInventoryAction } from '../actions/inventory';
+import { Pill, selectClass as kitSelectClass, Track } from '../../lib/ui';
 
 type Named = { id: string; name: string };
 type Product = Named & { cost?: number | null; onHand: number; reorderSuggested: boolean };
@@ -94,20 +94,20 @@ export function InventoryReceiptControls({ products, suppliers, supplierTotal, t
 
   const field = (name: keyof Errors) => ({ 'aria-invalid': Boolean(errors[name]), 'aria-describedby': errors[name] ? `${id}-${name}-error` : undefined });
   const fieldError = (name: keyof Errors) => errors[name] ? <p id={`${id}-${name}-error`} className="mt-1 text-xs text-destructive">{errors[name]}</p> : null;
-  const selectClass = 'mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm';
+  const selectClass = `mt-1 ${kitSelectClass}`;
 
-  return <div ref={formRef} className="space-y-3 rounded-lg border border-dashed p-4">
-    <div><p className="font-medium">Receive inventory</p><p className="text-xs text-muted-foreground">Record a delivery as a new lot. Products at 5 or fewer units are marked reorder.</p></div>
-    <div className="grid gap-3 md:grid-cols-2">
+  return <div ref={formRef} className="min-w-0 space-y-3 rounded-2xl bg-muted/50 p-4 ring-1 ring-inset ring-black/5 dark:ring-white/5">
+    <h3 className="text-sm font-semibold">Receive delivery</h3>
+    <div className="grid gap-3 sm:grid-cols-2">
       <div><Label htmlFor={`${id}-product`}>Product</Label><select id={`${id}-product`} value={productId} onChange={(event) => chooseProduct(event.target.value)} className={selectClass} {...field('product')}><option value="">Choose a product</option>{products.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.onHand} on hand{item.reorderSuggested ? ' · reorder' : ''}</option>)}</select>{fieldError('product')}</div>
       <div><Label htmlFor={`${id}-supplier`}>Supplier</Label><select id={`${id}-supplier`} value={supplierId} onChange={(event) => setSupplierId(event.target.value)} className={selectClass}><option value="">No supplier</option>{suppliers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>{typeof supplierTotal === 'number' && supplierTotal > suppliers.length && <p className="mt-1 text-xs text-muted-foreground">Showing {suppliers.length} of {supplierTotal} suppliers.</p>}</div>
       <div><Label htmlFor={`${id}-lot`}>Lot / receipt number</Label><Input id={`${id}-lot`} value={lotNumber} onChange={(event) => setLotNumber(event.target.value)} className="mt-1" {...field('lot')} />{fieldError('lot')}</div>
       <div><Label htmlFor={`${id}-quantity`}>Quantity received</Label><Input id={`${id}-quantity`} value={quantity} onChange={(event) => setQuantity(event.target.value)} inputMode="numeric" className="mt-1" {...field('quantity')} />{fieldError('quantity')}</div>
       <div><Label htmlFor={`${id}-cost`}>Invoiced unit cost (USD)</Label><Input id={`${id}-cost`} value={unitCost} onChange={(event) => setUnitCost(event.target.value)} inputMode="decimal" className="mt-1" {...field('cost')} />{selected && typeof selected.cost === 'number' && <p className="mt-1 text-xs text-muted-foreground">Catalog cost {(selected.cost / 100).toFixed(2)}</p>}{fieldError('cost')}</div>
-      <div><Label htmlFor={`${id}-received`}>Received on{timeZone ? ` (${timeZone})` : ''}</Label><Input id={`${id}-received`} type="date" value={receivedOn} onChange={(event) => setReceivedOn(event.target.value)} className="mt-1" {...field('receivedAt')} /><p className="mt-1 text-xs text-muted-foreground">Leave empty for now.</p>{fieldError('receivedAt')}</div>
+      <div><Label htmlFor={`${id}-received`}>Received on (optional)</Label><Input id={`${id}-received`} type="date" value={receivedOn} onChange={(event) => setReceivedOn(event.target.value)} className="mt-1" {...field('receivedAt')} />{fieldError('receivedAt')}</div>
       <div><Label htmlFor={`${id}-expires`}>Expires on (optional)</Label><Input id={`${id}-expires`} type="date" value={expiresOn} onChange={(event) => setExpiresOn(event.target.value)} className="mt-1" {...field('expiresAt')} />{fieldError('expiresAt')}</div>
     </div>
-    <Button disabled={pending || !products.length} onClick={receive}>{pending ? 'Recording…' : 'Receive inventory'}</Button>
+    <Track><Pill variant="primary" disabled={pending || !products.length} onClick={receive}>{pending ? 'Recording…' : 'Receive stock'}</Pill></Track>
     <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{outcome?.kind === 'status' ? outcome.text : ''}</p>
     {outcome?.kind === 'error' && <p role="alert" className="text-xs text-destructive">{outcome.text}</p>}
   </div>;

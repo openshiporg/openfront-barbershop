@@ -5,6 +5,7 @@ import { models } from "./models";
 import { statelessSessions } from "@keystone-6/core/session";
 import { extendGraphqlSchema } from "./mutations";
 import { sendPasswordResetEmail } from "./lib/mail";
+import { s3ForcePathStyle } from "./lib/s3-storage";
 
 import { bindDomainPrisma } from './utils/domainPrisma';
 import { runtimeConfig } from './utils/runtimeConfig';
@@ -107,7 +108,7 @@ export default withAuth(
         secretAccessKey,
         endpoint,
         signed: { expiry: 5000 },
-        forcePathStyle: true,
+        forcePathStyle: s3ForcePathStyle(endpoint),
       },
     },
     ui: {

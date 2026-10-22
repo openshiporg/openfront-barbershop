@@ -1,7 +1,6 @@
 'use client';
 
 import { useId, useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatShopDateTime, shopDateKey } from '@/features/shared/shop-time';
@@ -9,12 +8,13 @@ import { StaffBookingForm } from '@/features/platform/booking/components/StaffBo
 import { parseShopDateTime } from '@/features/platform/booking/lib/shopTimeInput';
 import { useCommandKey } from '@/features/platform/lib/useCommandKey';
 import { manageWaitlistAction } from '../actions/operations';
+import { Notice, Pill, selectClass as kitSelectClass, StatusDot, Track } from '@/features/platform/lib/ui';
 
 type Named = { id: string; name: string };
 type Entry = { id: string; status: string; customerName: string; phone?: string | null; preferredAt?: string | null; requestedService?: Named | null; requestedBarber?: Named | null };
 type WaitlistInput = Parameters<typeof manageWaitlistAction>[0];
 
-const selectClass = 'h-9 rounded-md border bg-background px-3 text-sm';
+const selectClass = kitSelectClass;
 
 export function WaitlistControls({ entries, services, barbers, timeZone }: { entries: Entry[]; services: Named[]; barbers: Named[]; timeZone?: string | null }) {
   const id = useId();
@@ -63,28 +63,18 @@ export function WaitlistControls({ entries, services, barbers, timeZone }: { ent
     run({ action: 'create', customerName: name.trim(), phone: phone.trim(), requestedServiceId: serviceId || undefined, requestedBarberId: barberId || undefined, preferredAt }, 'create', 'Added to the waitlist.');
   };
 
-  return <div className="space-y-3">
-    <div className="grid gap-2 sm:grid-cols-2">
-      <div className="grid gap-1"><Label htmlFor={`${id}-name`}>Customer name</Label><Input id={`${id}-name`} value={name} onChange={(event) => setName(event.target.value)} /></div>
-      <div className="grid gap-1"><Label htmlFor={`${id}-phone`}>Phone</Label><Input id={`${id}-phone`} value={phone} inputMode="tel" onChange={(event) => setPhone(event.target.value)} /></div>
-      <div className="grid gap-1"><Label htmlFor={`${id}-date`}>Preferred date (optional)</Label><Input id={`${id}-date`} type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div>
-      <div className="grid gap-1"><Label htmlFor={`${id}-time`}>Preferred time{zone ? ` (${zone})` : ''}</Label><Input id={`${id}-time`} type="time" step={300} value={time} onChange={(event) => setTime(event.target.value)} /></div>
-      <div className="grid gap-1"><Label htmlFor={`${id}-service`}>Service</Label><select id={`${id}-service`} value={serviceId} onChange={(event) => setServiceId(event.target.value)} className={selectClass}><option value="">Any service</option>{services.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
-      <div className="grid gap-1"><Label htmlFor={`${id}-barber`}>Barber</Label><select id={`${id}-barber`} value={barberId} onChange={(event) => setBarberId(event.target.value)} className={selectClass}><option value="">Any barber</option>{barbers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
-      <Button className="sm:col-span-2 sm:justify-self-start" disabled={pendingTarget === 'create'} onClick={add}>{pendingTarget === 'create' ? 'Adding…' : 'Add to waitlist'}</Button>
-    </div>
-    <div aria-live="polite">{result && <p role={result.tone} className={`text-sm ${result.tone === 'alert' ? 'text-destructive' : 'text-muted-foreground'}`}>{result.text}</p>}</div>
-    <div className="space-y-2">{entries.map((entry) => {
+  return <div className="space-y-4">
+    <div className="space-y-0">{entries.map((entry) => {
       const busy = pendingTarget === entry.id;
       const [firstName, ...rest] = entry.customerName.split(/\s+/);
-      return <div key={entry.id} className="rounded-md border p-3 text-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div><strong>{entry.customerName}</strong><p className="text-xs text-muted-foreground">{entry.requestedService?.name || 'Any service'} · {entry.requestedBarber?.name || 'Any barber'} · {entry.status}{entry.preferredAt ? ` · ${zone ? `${formatShopDateTime(entry.preferredAt, zone)} (${zone})` : new Date(entry.preferredAt).toISOString()}` : ''}</p></div>
-          <div className="flex flex-wrap gap-1">
-            {['waiting', 'notified'].includes(entry.status) && zone && <Button size="sm" variant="outline" disabled={busy} aria-expanded={promotingId === entry.id} onClick={() => setPromotingId(promotingId === entry.id ? null : entry.id)}>Book appointment</Button>}
-            {entry.status === 'waiting' && <Button size="sm" variant="outline" disabled={busy} onClick={() => run({ action: 'notify', waitlistEntryId: entry.id }, entry.id, 'Marked as notified. No message was sent.')}>Mark notified</Button>}
-            {['waiting', 'notified'].includes(entry.status) && <Button size="sm" variant="ghost" disabled={busy} onClick={() => run({ action: 'expire', waitlistEntryId: entry.id }, entry.id, 'Waitlist entry expired.')}>Expire</Button>}
-          </div>
+      return <div key={entry.id} className="border-b py-2.5 text-sm last:border-b-0">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0"><p className="font-medium"><StatusDot tone={entry.status === 'notified' ? 'info' : 'wait'} />{entry.customerName}</p><p className="text-xs text-muted-foreground">{entry.requestedService?.name || 'Any service'} · {entry.requestedBarber?.name || 'Any barber'} · {entry.status}{entry.preferredAt ? ` · ${zone ? `${formatShopDateTime(entry.preferredAt, zone)} (${zone})` : new Date(entry.preferredAt).toISOString()}` : ''}</p></div>
+          {['waiting', 'notified'].includes(entry.status) && <Track>
+            {zone && <Pill size="sm" variant="primary" disabled={busy} aria-expanded={promotingId === entry.id} onClick={() => setPromotingId(promotingId === entry.id ? null : entry.id)}>Book</Pill>}
+            {entry.status === 'waiting' && <Pill size="sm" disabled={busy} onClick={() => run({ action: 'notify', waitlistEntryId: entry.id }, entry.id, 'Marked notified. No message was sent.')}>Notified</Pill>}
+            <Pill size="sm" disabled={busy} onClick={() => run({ action: 'expire', waitlistEntryId: entry.id }, entry.id, 'Waitlist entry expired.')}>Expire</Pill>
+          </Track>}
         </div>
         {promotingId === entry.id && zone && (
           <div className="mt-3 border-t pt-3">
@@ -97,12 +87,23 @@ export function WaitlistControls({ entries, services, barbers, timeZone }: { ent
               defaultBarberId={entry.requestedBarber?.id}
               prefill={{ firstName: firstName || entry.customerName, lastName: rest.join(' '), phone: entry.phone || '' }}
               waitlistEntryId={entry.id}
-              submitLabel="Book and mark waitlist booked"
+              submitLabel="Book and close request"
               onCancel={() => setPromotingId(null)}
             />
           </div>
         )}
       </div>;
-    })}{!entries.length && <p className="text-sm text-muted-foreground">No one is waiting.</p>}</div>
+    })}{!entries.length && <p className="py-2 text-sm text-muted-foreground">No one is waiting.</p>}</div>
+    <h3 className="border-b pb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Add to waitlist</h3>
+    <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-1"><Label htmlFor={`${id}-name`}>Customer name</Label><Input id={`${id}-name`} value={name} onChange={(event) => setName(event.target.value)} /></div>
+      <div className="grid gap-1"><Label htmlFor={`${id}-phone`}>Phone</Label><Input id={`${id}-phone`} value={phone} inputMode="tel" onChange={(event) => setPhone(event.target.value)} /></div>
+      <div className="grid gap-1"><Label htmlFor={`${id}-date`}>Preferred date (optional)</Label><Input id={`${id}-date`} type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div>
+      <div className="grid gap-1"><Label htmlFor={`${id}-time`}>Preferred time{zone ? ` (${zone})` : ''}</Label><Input id={`${id}-time`} type="time" step={300} value={time} onChange={(event) => setTime(event.target.value)} /></div>
+      <div className="grid gap-1"><Label htmlFor={`${id}-service`}>Service</Label><select id={`${id}-service`} value={serviceId} onChange={(event) => setServiceId(event.target.value)} className={selectClass}><option value="">Any service</option>{services.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
+      <div className="grid gap-1"><Label htmlFor={`${id}-barber`}>Barber</Label><select id={`${id}-barber`} value={barberId} onChange={(event) => setBarberId(event.target.value)} className={selectClass}><option value="">Any barber</option>{barbers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
+      <Track className="sm:col-span-2 sm:justify-self-start"><Pill variant="primary" disabled={pendingTarget === 'create'} onClick={add}>{pendingTarget === 'create' ? 'Adding…' : 'Add to waitlist'}</Pill></Track>
+    </div>
+    <div aria-live="polite">{result && <Notice tone={result.tone}>{result.text}</Notice>}</div>
   </div>;
 }

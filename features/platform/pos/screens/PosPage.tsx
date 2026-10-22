@@ -1,6 +1,7 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PageContainer } from '@/features/dashboard/components/PageContainer';
 import { basePath } from '@/features/dashboard/lib/config';
+import { PageHeader, PillLink, Track } from '@/features/platform/lib/ui';
 import { getPosCheckoutData } from '../actions/checkout';
 import { PosPageClient } from './PosPageClient';
 
@@ -15,10 +16,7 @@ const breadcrumbs = [
 ];
 
 const header = (
-  <div>
-    <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">POS checkout</h1>
-    <p className="text-muted-foreground">Take payment for visits, sell and return retail products, and review receipts</p>
-  </div>
+  <PageHeader title="Checkout" actions={<Track><PillLink href="/dashboard/platform/booking">Booking board</PillLink><PillLink href="/dashboard/platform/queue">Walk-ins</PillLink></Track>} />
 );
 
 function param(value: string | string[] | undefined) {

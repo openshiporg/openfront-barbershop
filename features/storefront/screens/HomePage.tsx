@@ -1,28 +1,98 @@
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
+import { phoneHref } from '@/features/shared/storefront-settings';
 import { BarberCard } from '../components/BarberCard';
+import { MenuList } from '../components/MenuList';
 import { StorefrontImage } from '../components/StorefrontImage';
 import { getAllBarbers, getServiceCategories } from '../lib/data/services';
-import { formatDuration, formatMoney } from '../lib/format';
 import { getPublicStorefrontSettings } from '../lib/data/settings';
+import { shopHours } from '../lib/hours';
 import { StorefrontShell } from './StorefrontShell';
-
-const photos = ['/images/barbershop/photo/scissor-cut.webp', '/images/barbershop/photo/clipper-fade.webp', '/images/barbershop/photo/beard-detail.webp'];
 
 export default async function HomePage() {
   const [categories, barbers, settings] = await Promise.all([getServiceCategories(), getAllBarbers(), getPublicStorefrontSettings()]);
   if (!settings) return <StorefrontShell><></></StorefrontShell>;
-  const featured = categories.flatMap(category => category.services).slice(0, 3);
-  return <StorefrontShell><main id="main-content">
-    <section className="sf-photo-hero">
-      <StorefrontImage src="/images/barbershop/photo/shop-floor.webp" fallbackSrc="/images/barbershop/photo/shop-floor.webp" alt="Barber chairs and workstations" className="sf-photo-hero-media" imageClassName="sf-photo-hero-image" priority sizes="100vw" />
-      <div className="sf-photo-hero-shade" aria-hidden="true" />
-      <div className="sf-container sf-photo-hero-content"><div className="sf-photo-hero-copy"><p className="sf-photo-caption">{settings.address}</p><h1 className="sf-display">{settings.name}</h1><div className="sf-photo-hero-actions"><Link href="/book" className="sf-btn sf-btn-accent">Book a chair</Link><Link href="/services" className="sf-text-link sf-text-link-inverse">Services <ArrowUpRight aria-hidden="true" /></Link></div></div></div>
-    </section>
-    <section className="sf-container sf-service-index">
-      <div className="sf-section-heading"><h2 className="sf-display">Services</h2><Link href="/services" className="sf-text-link">All services <ArrowUpRight aria-hidden="true" /></Link></div>
-      <div className="sf-service-photo-grid">{featured.map((service, index) => <Link href={`/services/${service.id}`} className="sf-service-photo-card" key={service.id}><StorefrontImage src={service.imagePath?.endsWith('.svg') ? photos[index] : service.imagePath || photos[index]} fallbackSrc={photos[index]} alt={service.name} className="sf-service-photo" sizes="(max-width: 640px) 100vw, 33vw" /><div className="sf-service-photo-meta"><div><h3>{service.name}</h3><p>{formatDuration(service.durationMinutes)}</p></div><strong>{formatMoney(service.price)}</strong></div></Link>)}{!featured.length ? <p className="sf-empty">Service menu unavailable.</p> : null}</div>
-    </section>
-    <section className="sf-container sf-barber-roster"><div className="sf-section-heading"><h2 className="sf-display">Barbers</h2><Link href="/barbers" className="sf-text-link">All barbers <ArrowUpRight aria-hidden="true" /></Link></div><div className="sf-barber-grid">{barbers.map(barber => <BarberCard key={barber.id} barber={barber} />)}{!barbers.length ? <p className="sf-empty">No barbers available.</p> : null}</div></section>
-  </main></StorefrontShell>;
+  const { days, state } = shopHours(settings.hours, settings.timezone);
+  const telephoneHref = phoneHref(settings.phone);
+  const serviceCount = categories.reduce((total, category) => total + category.services.length, 0);
+
+  return (
+    <StorefrontShell>
+      <main id="main-content">
+        <section className="sf-container sf-hero">
+          <div className="sf-hero-copy">
+            {state ? <p className="sf-eyebrow"><span className={`sf-dot ${state.open ? 'is-live' : ''}`} aria-hidden="true" />{state.label}</p> : null}
+            <h1 className="sf-display">{settings.name}</h1>
+            {settings.tagline ? <p className="sf-lead">{settings.tagline}</p> : null}
+            <div className="sf-track">
+              <Link href="/book" className="sf-pill is-primary">Book a chair</Link>
+              <Link href="/queue" className="sf-pill">Join walk-ins</Link>
+            </div>
+            <div className="sf-hero-meta">
+              {settings.address ? <span>{settings.address}</span> : null}
+              {telephoneHref && settings.phone ? <a href={`tel:${telephoneHref}`} className="sf-mono"><strong>{settings.phone}</strong></a> : null}
+            </div>
+          </div>
+          <div className="sf-hero-media">
+            <StorefrontImage src="/images/barbershop/photo/shop-floor.webp" fallbackSrc="/images/barbershop/photo/shop-floor.webp" alt={`${settings.name} shop floor`} priority sizes="(max-width: 1024px) 100vw, 48vw" />
+            {barbers.length ? (
+              <div className="sf-hero-board">
+                <p className="sf-eyebrow mb-1">On the floor</p>
+                <ul>
+                  {barbers.slice(0, 4).map((barber) => (
+                    <li key={barber.id}>
+                      <span className="sf-mono">{barber.chairNumber ? `CH ${barber.chairNumber.padStart(2, '0')}` : 'CH --'}</span>
+                      <span className="truncate">{barber.displayName}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        <section className="sf-board sf-on-dark sf-section" aria-labelledby="home-services">
+          <div className="sf-container">
+            <div className="sf-board-head">
+              <h2 id="home-services" className="sf-title">Services</h2>
+              {serviceCount > 8 ? <Link href="/services" className="sf-arrow-link">All {serviceCount} services <ArrowUpRight aria-hidden="true" /></Link> : <Link href="/services" className="sf-arrow-link">Service details <ArrowUpRight aria-hidden="true" /></Link>}
+            </div>
+            {serviceCount ? <MenuList categories={categories} barberCount={barbers.length} limit={8} /> : <p className="sf-muted">No services listed online.</p>}
+          </div>
+        </section>
+
+        <section className="sf-container sf-section" aria-labelledby="home-barbers">
+          <div className="sf-section-head">
+            <h2 id="home-barbers" className="sf-title">The chairs</h2>
+            {barbers.length > 3 ? <Link href="/barbers" className="sf-arrow-link">All barbers <ArrowUpRight aria-hidden="true" /></Link> : null}
+          </div>
+          {barbers.length ? <div className="sf-chair-grid">{barbers.slice(0, 3).map((barber) => <BarberCard key={barber.id} barber={barber} />)}</div> : <p className="sf-muted">No barbers listed online.</p>}
+        </section>
+
+        <section className="sf-container sf-section pt-0" aria-labelledby="home-visit">
+          <div className="sf-visit">
+            <div className="grid content-start gap-6">
+              <h2 id="home-visit" className="sf-title">Visit</h2>
+              <dl className="sf-facts">
+                {settings.address ? <div><dt className="sf-eyebrow">Address</dt><dd>{settings.address}</dd></div> : null}
+                {telephoneHref && settings.phone ? <div><dt className="sf-eyebrow">Phone</dt><dd><a href={`tel:${telephoneHref}`} className="sf-mono">{settings.phone}</a></dd></div> : null}
+              </dl>
+              <div className="sf-track">
+                <Link href="/book" className="sf-pill is-primary">Book a chair</Link>
+                <Link href="/appointment" className="sf-pill">My appointment</Link>
+              </div>
+            </div>
+            {days.length ? (
+              <div>
+                <h3 className="sf-eyebrow mb-2">{state ? <><span className={`sf-dot ${state.open ? 'is-live' : ''}`} aria-hidden="true" />Hours · {state.label}</> : 'Hours'}</h3>
+                <ul className="sf-hours">
+                  {days.map((day) => <li key={day.key} className={day.today ? 'is-today' : undefined}><span>{day.label}</span><span className="sf-mono">{day.text}</span></li>)}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        </section>
+      </main>
+    </StorefrontShell>
+  );
 }

@@ -2,13 +2,11 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CreditCard, ReceiptText, ShoppingBag } from 'lucide-react';
 import { useCommandKey } from '@/features/platform/lib/useCommandKey';
+import { Empty, Notice, Pager as KitPager, Pill, PillLink, Section, selectClass, StatusDot, Track } from '@/features/platform/lib/ui';
 import { checkoutAppointmentAction, recordProductSaleAction, refundCashCheckoutAction, returnProductSaleAction, type PosQuery } from '../actions/checkout';
 import type { Paging, PosAppointment, PosCustomerSummary, PosProjectionData, PosReceipt, ProductLineSummary } from '../lib/posTypes';
 
@@ -51,11 +49,7 @@ function parseCents(value: string) {
 }
 
 function FeedbackMessage({ feedback }: { feedback: Feedback }) {
-  return (
-    <div aria-live="polite">
-      {feedback && <p role={feedback.tone} className={`rounded-md p-3 text-sm ${feedback.tone === 'alert' ? 'bg-destructive/10 text-destructive' : 'bg-muted'}`}>{feedback.text}</p>}
-    </div>
-  );
+  return <div aria-live="polite">{feedback && <Notice tone={feedback.tone}>{feedback.text}</Notice>}</div>;
 }
 
 function hrefWith(query: PosQuery, changes: Partial<Record<'appointment' | 'tickets' | 'ticketQ' | 'sales' | 'saleQ' | 'receipts' | 'receipt', string | number | null>>) {
@@ -75,13 +69,7 @@ function hrefWith(query: PosQuery, changes: Partial<Record<'appointment' | 'tick
 function Pager({ paging, label, href }: { paging: Paging; label: string; href: (page: number) => string }) {
   if (paging.total <= paging.pageSize) return null;
   const pages = Math.ceil(paging.total / paging.pageSize);
-  return (
-    <nav aria-label={label} className="mt-4 flex items-center justify-between gap-2">
-      {paging.page > 1 ? <Button asChild size="sm" variant="outline"><Link href={href(paging.page - 1)}>Previous</Link></Button> : <span />}
-      <span className="text-xs text-muted-foreground">Page {paging.page} of {pages} · {paging.total} total</span>
-      {paging.page < pages ? <Button asChild size="sm" variant="outline"><Link href={href(paging.page + 1)}>Next</Link></Button> : <span />}
-    </nav>
-  );
+  return <KitPager label={label} page={paging.page} pages={pages} prev={paging.page > 1 ? href(paging.page - 1) : null} next={paging.page < pages ? href(paging.page + 1) : null} />;
 }
 
 export function PosPageClient({ data, query }: { data: PosProjectionData; query: PosQuery }) {
@@ -94,70 +82,52 @@ export function PosPageClient({ data, query }: { data: PosProjectionData; query:
   const requestedClosed = Boolean(requestedAppointment && (['paid', 'refunded'].includes(String(requestedAppointment.paymentStatus)) || !checkoutStatuses.includes(String(requestedAppointment.status))));
 
   return (
-    <div className="flex flex-col gap-6 px-4 pb-8 md:px-6">
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" asChild><Link href="/dashboard/platform/booking">Booking board</Link></Button>
-        <Button variant="outline" asChild><Link href="/dashboard/platform/queue">Walk-in queue</Link></Button>
-      </div>
+    <div className="flex min-w-0 flex-col gap-8 px-4 pb-8 md:px-6">
 
       {requestedAppointmentId && !requestedAppointment && (
-        <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">The appointment sent to checkout was not found in this shop. Select a ticket below.</p>
+        <Notice tone="alert">The appointment sent to checkout was not found in this shop.</Notice>
       )}
       {requestedAppointment && requestedClosed && selected?.id === requestedAppointment.id && (
-        <p role="status" className="rounded-md border p-3 text-sm">This appointment is {statusLabel(requestedAppointment.status)} with payment {statusLabel(requestedAppointment.paymentStatus)}. It cannot be checked out again; look up its receipt below.</p>
+        <Notice>This appointment is {statusLabel(requestedAppointment.status)}, payment {statusLabel(requestedAppointment.paymentStatus)}. Already closed; see receipts below.</Notice>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-        <section aria-labelledby="pos-queue-heading" className="min-w-0 rounded-xl border bg-card p-4 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <h2 id="pos-queue-heading" className="font-semibold">Checkout queue</h2>
-            <Badge variant="secondary">{data.tickets.total} open</Badge>
-          </div>
-          <form action="/dashboard/platform/pos" role="search" className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end">
-            <div className="grid flex-1 gap-1">
-              <Label htmlFor="ticket-search">Find a ticket</Label>
+      <div className="grid min-w-0 gap-8 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <Section id="pos-queue-heading" title="Open tickets" tone={data.tickets.total ? 'wait' : undefined} count={data.tickets.total}>
+          <form action="/dashboard/platform/pos" role="search" className="mb-3 flex items-end gap-2">
+            <div className="grid min-w-0 flex-1 gap-1">
+              <Label htmlFor="ticket-search" className="sr-only">Find a ticket</Label>
               <Input id="ticket-search" name="ticketQ" defaultValue={data.tickets.search} placeholder="Customer, phone, service or barber" />
             </div>
-            <Button type="submit" variant="outline">Search</Button>
+            <Track><Pill type="submit">Search</Pill></Track>
           </form>
-          <div className="space-y-3">
-            {appointments.map((appointment) => {
-              const isSelected = selected?.id === appointment.id;
-              return (
-                <button
-                  key={appointment.id}
-                  type="button"
-                  aria-pressed={isSelected}
-                  aria-controls="pos-tender"
-                  onClick={() => setSelectedId(appointment.id)}
-                  className={`w-full rounded-xl border p-4 text-left transition ${isSelected ? 'border-primary bg-primary text-primary-foreground' : 'bg-background hover:bg-muted/50'}`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="font-semibold">{customerName(appointment.customer)}</div>
-                      <div className="text-sm opacity-75">{serviceLabel(appointment)} · {barberLabel(appointment)}</div>
-                      <div className="text-xs opacity-75">{formatDateTime(appointment.startsAt, timeZone)}</div>
-                    </div>
-                    <span className="font-semibold">{formatMoney(appointment.price)}</span>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                    <span className="rounded-full bg-black/10 px-2 py-1 dark:bg-white/10">{statusLabel(appointment.status)}</span>
-                    <span className="rounded-full bg-black/10 px-2 py-1 dark:bg-white/10">payment {statusLabel(appointment.paymentStatus)}</span>
-                    {(appointment.customer?.packageBalances?.length ?? 0) > 0 && <span className="rounded-full bg-black/10 px-2 py-1 dark:bg-white/10">package balance</span>}
-                  </div>
-                </button>
-              );
-            })}
-            {!appointments.length && <div className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">{data.tickets.search ? `No open tickets match “${data.tickets.search}”.` : 'No checked-in or in-chair appointments need checkout.'}</div>}
+          <div className="space-y-1 rounded-2xl bg-muted/50 p-1 ring-1 ring-inset ring-black/5 dark:ring-white/5">
+            {appointments.map((appointment) => (
+              <button
+                key={appointment.id}
+                type="button"
+                aria-pressed={selected?.id === appointment.id}
+                aria-controls="pos-tender"
+                onClick={() => setSelectedId(appointment.id)}
+                className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 rounded-xl px-3 py-2.5 text-left transition aria-pressed:bg-background aria-pressed:shadow-sm aria-pressed:ring-1 aria-pressed:ring-black/5 hover:bg-background/60 dark:aria-pressed:bg-zinc-800"
+              >
+                <span className="min-w-0 truncate font-medium"><StatusDot tone={appointment.status === 'in_chair' ? 'live' : appointment.status === 'checked_in' ? 'wait' : 'off'} />{customerName(appointment.customer)}</span>
+                <span className="font-mono text-sm tabular-nums">{formatMoney(appointment.price)}</span>
+                <span className="col-span-2 truncate pl-4 text-xs text-muted-foreground">{serviceLabel(appointment)} · {barberLabel(appointment)} · {formatDateTime(appointment.startsAt, timeZone)}</span>
+                <span className="col-span-2 pl-4 text-xs text-muted-foreground">{statusLabel(appointment.status)} · payment {statusLabel(appointment.paymentStatus)}{(appointment.customer?.packageBalances?.length ?? 0) > 0 ? ' · package balance' : ''}</span>
+              </button>
+            ))}
+            {!appointments.length && <p className="px-3 py-4 text-sm text-muted-foreground">{data.tickets.search ? `No open tickets match “${data.tickets.search}”.` : 'No checked-in or in-chair visits.'}</p>}
           </div>
           <Pager paging={data.tickets} label="Ticket pages" href={(page) => hrefWith(query, { tickets: page, appointment: null })} />
-        </section>
+        </Section>
 
-        <section id="pos-tender" aria-labelledby="pos-tender-heading" className="min-w-0 rounded-xl border bg-card p-4 shadow-sm">
-          <h2 id="pos-tender-heading" className="mb-4 flex items-center gap-2 font-semibold"><CreditCard className="h-5 w-5" /> Take payment</h2>
-          {selected
-            ? <TenderPanel key={selected.id} appointment={selected} closed={requestedClosed && selected.id === requestedAppointment?.id} timeZone={timeZone} />
-            : <div className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">Select a ticket to take payment.</div>}
+        <section id="pos-tender" aria-labelledby="pos-tender-heading" className="min-w-0">
+          <h2 id="pos-tender-heading" className="border-b pb-2 text-sm font-semibold">Take payment</h2>
+          <div className="pt-3">
+            {selected
+              ? <TenderPanel key={selected.id} appointment={selected} closed={requestedClosed && selected.id === requestedAppointment?.id} timeZone={timeZone} />
+              : <Empty>Select a ticket.</Empty>}
+          </div>
         </section>
       </div>
 
@@ -214,29 +184,37 @@ function TenderPanel({ appointment, closed, timeZone }: { appointment: PosAppoin
 
   return (
     <div className="space-y-5">
-      <div className="rounded-xl bg-muted/40 p-4">
-        <div className="text-lg font-semibold">{customerName(appointment.customer)}</div>
-        <div className="text-sm text-muted-foreground">{serviceLabel(appointment)} with {barberLabel(appointment)} · {formatDateTime(appointment.startsAt, timeZone)}</div>
-        <div className="mt-3 text-3xl font-semibold">{formatMoney(total)}</div>
-        <p className="mt-1 text-xs text-muted-foreground">Service {formatMoney(subtotal)} + tip {formatMoney(tip || 0)} + tax {formatMoney(tax || 0)} − discount {formatMoney(appliedDiscount)}</p>
-        {appointment.status !== 'in_chair' && !closed && <p role="status" className="mt-2 text-sm">Seat this visit from the booking board before checkout.</p>}
-        {paymentMethod === 'package' && total > 0 && <p role="alert" className="mt-2 text-sm text-destructive">A prepaid visit cannot include tips or tax on this ticket. Mixed tender is not supported.</p>}
-        {!amountsValid && <p role="alert" className="mt-2 text-sm text-destructive">Tip, discount and tax must be zero or positive dollar amounts.</p>}
+      <div className="rounded-2xl bg-zinc-950 p-5 text-zinc-50 shadow-[inset_0_1px_3px_rgb(0_0_0/0.6)] dark:bg-black">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className="font-semibold">{customerName(appointment.customer)}</p>
+          <p className="text-xs text-zinc-400">{formatDateTime(appointment.startsAt, timeZone)}</p>
+        </div>
+        <p className="text-sm text-zinc-400">{serviceLabel(appointment)} · {barberLabel(appointment)}</p>
+        <p className="mt-4 font-mono text-4xl font-semibold tabular-nums sm:text-5xl">{formatMoney(total)}</p>
+        <dl className="mt-3 grid grid-cols-4 gap-2 border-t border-zinc-800 pt-3 font-mono text-xs tabular-nums">
+          <div><dt className="text-zinc-500">Service</dt><dd>{formatMoney(subtotal)}</dd></div>
+          <div><dt className="text-zinc-500">Tip</dt><dd>{formatMoney(tip || 0)}</dd></div>
+          <div><dt className="text-zinc-500">Tax</dt><dd>{formatMoney(tax || 0)}</dd></div>
+          <div><dt className="text-zinc-500">Discount</dt><dd>−{formatMoney(appliedDiscount)}</dd></div>
+        </dl>
+      </div>
+      {appointment.status !== 'in_chair' && !closed && <Notice>Seat this visit on the booking board before checkout.</Notice>}
+      {paymentMethod === 'package' && total > 0 && <Notice tone="alert">A prepaid visit can’t include tip or tax. Mixed tender isn’t supported.</Notice>}
+      {!amountsValid && <Notice tone="alert">Tip, discount and tax must be zero or positive amounts.</Notice>}
+
+      <div className="grid gap-1">
+        <span className="text-xs text-muted-foreground">Tender</span>
+        <Track label="Payment method">
+          <Pill size="sm" variant="flat" aria-pressed={paymentMethod === 'cash'} onClick={() => { setPaymentMethod('cash'); setPackageBalanceId(''); }}>Cash</Pill>
+          {packageBalances.length > 0 && <Pill size="sm" variant="flat" aria-pressed={paymentMethod === 'package'} onClick={() => setPaymentMethod('package')}>Package visit</Pill>}
+        </Track>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="grid gap-1">
-          <Label htmlFor={`tender-${id}`}>Payment method</Label>
-          <select id={`tender-${id}`} value={paymentMethod} onChange={(event) => { setPaymentMethod(event.target.value); if (event.target.value !== 'package') setPackageBalanceId(''); }} className="rounded-md border bg-background px-3 py-2 text-sm">
-            <option value="cash">Cash</option>
-            {packageBalances.length > 0 && <option value="package">Package or membership visit</option>}
-          </select>
-          <p className="text-xs text-muted-foreground">Card and gift card are not available at this register.</p>
-        </div>
+      <div className="grid gap-3 sm:grid-cols-3">
         {paymentMethod === 'package' && (
-          <div className="grid gap-1">
-            <Label htmlFor={`balance-${id}`}>Balance</Label>
-            <select id={`balance-${id}`} value={packageBalanceId} onChange={(event) => setPackageBalanceId(event.target.value)} className="rounded-md border bg-background px-3 py-2 text-sm">
+          <div className="grid gap-1 sm:col-span-3">
+            <Label htmlFor={`balance-${id}`} className="text-xs text-muted-foreground">Balance</Label>
+            <select id={`balance-${id}`} value={packageBalanceId} onChange={(event) => setPackageBalanceId(event.target.value)} className={selectClass}>
               <option value="">Select balance</option>
               {packageBalances.map((balance) => (
                 <option key={balance.id} value={balance.id}>
@@ -247,28 +225,30 @@ function TenderPanel({ appointment, closed, timeZone }: { appointment: PosAppoin
           </div>
         )}
         <div className="grid gap-1">
-          <Label htmlFor={`tip-${id}`}>Tip ($)</Label>
-          <Input id={`tip-${id}`} value={tipAmount} onChange={(event) => setTipAmount(event.target.value)} inputMode="decimal" />
+          <Label htmlFor={`tip-${id}`} className="text-xs text-muted-foreground">Tip ($)</Label>
+          <Input id={`tip-${id}`} className="font-mono" value={tipAmount} onChange={(event) => setTipAmount(event.target.value)} inputMode="decimal" />
         </div>
         <div className="grid gap-1">
-          <Label htmlFor={`discount-${id}`}>Discount ($)</Label>
-          <Input id={`discount-${id}`} value={discountAmount} onChange={(event) => setDiscountAmount(event.target.value)} inputMode="decimal" />
+          <Label htmlFor={`discount-${id}`} className="text-xs text-muted-foreground">Discount ($)</Label>
+          <Input id={`discount-${id}`} className="font-mono" value={discountAmount} onChange={(event) => setDiscountAmount(event.target.value)} inputMode="decimal" />
         </div>
         <div className="grid gap-1">
-          <Label htmlFor={`tax-${id}`}>Tax ($)</Label>
-          <Input id={`tax-${id}`} value={taxAmount} onChange={(event) => setTaxAmount(event.target.value)} inputMode="decimal" />
+          <Label htmlFor={`tax-${id}`} className="text-xs text-muted-foreground">Tax ($)</Label>
+          <Input id={`tax-${id}`} className="font-mono" value={taxAmount} onChange={(event) => setTaxAmount(event.target.value)} inputMode="decimal" />
         </div>
       </div>
 
       <div className="grid gap-1">
-        <Label htmlFor={`notes-${id}`}>Checkout notes</Label>
-        <textarea id={`notes-${id}`} value={notes} onChange={(event) => setNotes(event.target.value)} className="min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm" />
+        <Label htmlFor={`notes-${id}`} className="text-xs text-muted-foreground">Checkout notes</Label>
+        <textarea id={`notes-${id}`} value={notes} onChange={(event) => setNotes(event.target.value)} className="min-h-20 w-full rounded-md border bg-background px-3 py-2 text-sm" />
       </div>
 
       <FeedbackMessage feedback={feedback} />
-      <Button className="w-full" disabled={pending || !eligible} onClick={submitCheckout}>
-        {pending ? 'Processing…' : paymentMethod === 'package' ? `Redeem visit for ${customerName(appointment.customer)}` : `Take ${formatMoney(total)} cash from ${customerName(appointment.customer)}`}
-      </Button>
+      <Track block>
+        <Pill variant="primary" disabled={pending || !eligible} onClick={submitCheckout}>
+          {pending ? 'Processing…' : paymentMethod === 'package' ? 'Redeem visit' : `Take ${formatMoney(total)} cash`}
+        </Pill>
+      </Track>
     </div>
   );
 }
@@ -311,14 +291,13 @@ function RetailSale({ data }: { data: PosProjectionData }) {
   };
 
   return (
-    <section aria-labelledby="retail-sale-heading" className="rounded-xl border bg-card p-4 shadow-sm">
-      <h2 id="retail-sale-heading" className="mb-4 flex items-center gap-2 font-semibold"><ShoppingBag className="h-4 w-4" /> Retail sale</h2>
+    <Section id="retail-sale-heading" title="Retail sale">
       {products.length ? (
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-3">
             <div className="grid gap-1">
               <Label htmlFor="retail-product">Product</Label>
-              <select id="retail-product" className="rounded-md border bg-background px-3 py-2 text-sm" value={productId} onChange={(event) => setProductId(event.target.value)}>
+              <select id="retail-product" className={selectClass} value={productId} onChange={(event) => setProductId(event.target.value)}>
                 {products.map((item) => <option key={item.id} value={item.id}>{item.name} · {formatMoney(item.price)} · {item.availableQuantity} available</option>)}
               </select>
             </div>
@@ -330,49 +309,48 @@ function RetailSale({ data }: { data: PosProjectionData }) {
             <div className="grid gap-1">
               <Label htmlFor="retail-tax-rate">Tax rate (%)</Label>
               <Input id="retail-tax-rate" inputMode="decimal" value={taxRate} aria-invalid={!rateValid} aria-describedby="retail-tax-help" onChange={(event) => setTaxRate(event.target.value)} />
-              <p id="retail-tax-help" className={`text-xs ${rateValid ? 'text-muted-foreground' : 'text-destructive'}`}>{rateValid ? 'Enter the rate that applies to this sale; 0 records no tax.' : 'Enter a rate from 0 to 100.'}</p>
+              <p id="retail-tax-help" className={`text-xs ${rateValid ? 'text-muted-foreground' : 'text-destructive'}`}>{rateValid ? '' : 'Enter a rate from 0 to 100.'}</p>
             </div>
           </div>
-          <dl className="grid gap-1 rounded-md bg-muted/40 p-3 text-sm sm:grid-cols-4">
-            <div><dt className="text-muted-foreground">Unit price</dt><dd>{formatMoney(unitPrice)}</dd></div>
-            <div><dt className="text-muted-foreground">Subtotal</dt><dd>{formatMoney(subtotal)}</dd></div>
-            <div><dt className="text-muted-foreground">Tax ({rateValid ? parsedRate : 0}%)</dt><dd>{formatMoney(taxAmount)}</dd></div>
-            <div><dt className="text-muted-foreground">Total</dt><dd className="font-semibold">{formatMoney(total)}</dd></div>
+          <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-border font-mono text-sm tabular-nums ring-1 ring-border sm:grid-cols-4">
+            <div className="bg-background px-3 py-2"><dt className="font-sans text-[11px] uppercase tracking-wider text-muted-foreground">Unit</dt><dd>{formatMoney(unitPrice)}</dd></div>
+            <div className="bg-background px-3 py-2"><dt className="font-sans text-[11px] uppercase tracking-wider text-muted-foreground">Subtotal</dt><dd>{formatMoney(subtotal)}</dd></div>
+            <div className="bg-background px-3 py-2"><dt className="font-sans text-[11px] uppercase tracking-wider text-muted-foreground">Tax {rateValid ? parsedRate : 0}%</dt><dd>{formatMoney(taxAmount)}</dd></div>
+            <div className="bg-background px-3 py-2"><dt className="font-sans text-[11px] uppercase tracking-wider text-muted-foreground">Total</dt><dd className="font-semibold">{formatMoney(total)}</dd></div>
           </dl>
-          <Button disabled={pending || !enough || !rateValid} onClick={submit}>Take {formatMoney(total)} cash</Button>
+          <Track><Pill variant="primary" disabled={pending || !enough || !rateValid} onClick={submit}>Take {formatMoney(total)} cash</Pill></Track>
         </div>
-      ) : <p className="text-sm text-muted-foreground">No active products. <Link className="underline" href="/dashboard/products/create">Add a product</Link></p>}
+      ) : <Empty>No active products. <Link className="underline" href="/dashboard/products/create">Add a product</Link></Empty>}
       <div className="mt-3"><FeedbackMessage feedback={feedback} /></div>
-    </section>
+    </Section>
   );
 }
 
 function RetailReturns({ data, query }: { data: PosProjectionData; query: PosQuery }) {
   const [openId, setOpenId] = useState('');
   return (
-    <section aria-labelledby="retail-return-heading" className="rounded-xl border bg-card p-4 shadow-sm">
-      <h2 id="retail-return-heading" className="mb-4 font-semibold">Retail returns</h2>
-      <form action="/dashboard/platform/pos" role="search" className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end">
-        <div className="grid flex-1 gap-1">
-          <Label htmlFor="sale-search">Find the original sale</Label>
+    <Section id="retail-return-heading" title="Retail returns" count={data.sales.total}>
+      <form action="/dashboard/platform/pos" role="search" className="mb-3 flex items-end gap-2">
+        <div className="grid min-w-0 flex-1 gap-1">
+          <Label htmlFor="sale-search" className="sr-only">Find the original sale</Label>
           <Input id="sale-search" name="saleQ" defaultValue={data.sales.search} placeholder="Product, SKU or receipt number" />
         </div>
-        <Button type="submit" variant="outline">Search</Button>
+        <Track><Pill type="submit">Search</Pill></Track>
       </form>
-      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-x-8 md:grid-cols-2 xl:grid-cols-3">
         {data.productLines.map((line) => (
-          <div key={line.id} className="rounded-lg border p-3 text-sm">
-            <div className="flex justify-between gap-2"><strong>{line.productNameSnapshot}</strong><span>{formatMoney(line.total)}</span></div>
-            <p className="text-muted-foreground">Qty {line.quantity}{line.returnedQuantity ? ` · ${line.returnedQuantity} returned` : ''} · {statusLabel(line.paymentMethod)} · {formatDateTime(line.occurredAt, data.timeZone)}</p>
+          <div key={line.id} className="border-b py-2.5 text-sm">
+            <div className="flex items-baseline justify-between gap-2"><strong className="min-w-0 truncate font-medium">{line.productNameSnapshot}</strong><span className="font-mono tabular-nums">{formatMoney(line.total)}</span></div>
+            <p className="text-xs text-muted-foreground">Qty {line.quantity}{line.returnedQuantity ? ` · ${line.returnedQuantity} returned` : ''} · {statusLabel(line.paymentMethod)} · {formatDateTime(line.occurredAt, data.timeZone)}</p>
             {(line.returnedQuantity || 0) < line.quantity && (openId === line.id
               ? <ReturnForm line={line} onClose={() => setOpenId('')} />
-              : <Button className="mt-2" size="sm" variant="outline" aria-expanded={false} onClick={() => setOpenId(line.id)}>Review return</Button>)}
+              : <Track className="mt-2"><Pill size="sm" aria-expanded={false} onClick={() => setOpenId(line.id)}>Return</Pill></Track>)}
           </div>
         ))}
-        {!data.productLines.length && <p className="text-sm text-muted-foreground">{data.sales.search ? `No sales match “${data.sales.search}”.` : 'No retail sales recorded.'}</p>}
+        {!data.productLines.length && <Empty>{data.sales.search ? `No sales match “${data.sales.search}”.` : 'No retail sales recorded.'}</Empty>}
       </div>
       <Pager paging={data.sales} label="Sale pages" href={(page) => hrefWith(query, { sales: page })} />
-    </section>
+    </Section>
   );
 }
 
@@ -423,13 +401,12 @@ function ReturnForm({ line, onClose }: { line: ProductLineSummary; onClose: () =
       </div>
       <div className="flex items-start gap-2">
         <Checkbox id={`return-restock-${line.id}`} checked={restock} onCheckedChange={(value) => setRestock(value === true)} />
-        <Label htmlFor={`return-restock-${line.id}`} className="text-xs font-normal">Put the returned units back into sellable stock (only if the product is unopened and undamaged).</Label>
+        <Label htmlFor={`return-restock-${line.id}`} className="text-xs font-normal">Restock to the original lot (unopened, undamaged)</Label>
       </div>
-      <p className="text-xs text-muted-foreground">{restock ? 'Returned units go back to the original stock lot.' : 'Returned units are not added back to stock.'}</p>
-      <div className="flex gap-2">
-        <Button size="sm" disabled={pending || !valid} onClick={submit}>Record return</Button>
-        <Button size="sm" variant="ghost" onClick={onClose}>Close</Button>
-      </div>
+      <Track>
+        <Pill size="sm" variant="primary" disabled={pending || !valid} onClick={submit}>Record return</Pill>
+        <Pill size="sm" onClick={onClose}>Close</Pill>
+      </Track>
       <FeedbackMessage feedback={feedback} />
     </div>
   );
@@ -438,36 +415,37 @@ function ReturnForm({ line, onClose }: { line: ProductLineSummary; onClose: () =
 function Receipts({ data, query }: { data: PosProjectionData; query: PosQuery }) {
   const [openId, setOpenId] = useState(data.receiptPaging.receiptId || '');
   return (
-    <section aria-labelledby="receipts-heading" className="rounded-xl border bg-card p-4 shadow-sm">
-      <h2 id="receipts-heading" className="mb-4 flex items-center gap-2 font-semibold"><ReceiptText className="h-4 w-4" /> Appointment receipts</h2>
-      <form action="/dashboard/platform/pos" role="search" className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end">
-        <div className="grid flex-1 gap-1">
-          <Label htmlFor="receipt-lookup">Receipt number</Label>
-          <Input id="receipt-lookup" name="receipt" defaultValue={data.receiptPaging.receiptId} placeholder="Receipt ID" />
+    <Section id="receipts-heading" title="Receipts" count={data.receiptPaging.total}>
+      <form action="/dashboard/platform/pos" role="search" className="mb-3 flex items-end gap-2">
+        <div className="grid min-w-0 flex-1 gap-1">
+          <Label htmlFor="receipt-lookup" className="sr-only">Receipt number</Label>
+          <Input id="receipt-lookup" name="receipt" className="font-mono" defaultValue={data.receiptPaging.receiptId} placeholder="Receipt ID" />
         </div>
-        <Button type="submit" variant="outline">Look up</Button>
-        {data.receiptPaging.receiptId && <Button asChild variant="ghost"><Link href={hrefWith(query, { receipt: null, receipts: null })}>Show all</Link></Button>}
+        <Track>
+          <Pill type="submit">Look up</Pill>
+          {data.receiptPaging.receiptId && <PillLink href={hrefWith(query, { receipt: null, receipts: null })}>All</PillLink>}
+        </Track>
       </form>
-      <div className="space-y-2">
+      <div>
         {data.receipts.map((receipt) => (
-          <div key={receipt.id} className="rounded-lg border p-3 text-sm">
+          <div key={receipt.id} className="border-b py-2.5 text-sm last:border-b-0">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <strong>{customerName(receipt.customer)}</strong>
+                <strong className="font-medium"><StatusDot tone={receipt.status === 'paid' ? 'live' : receipt.status === 'voided' ? 'off' : 'wait'} />{customerName(receipt.customer)}</strong>
                 <p className="text-xs text-muted-foreground">{formatDateTime(receipt.completedAt, data.timeZone)} · {statusLabel(receipt.paymentMethod)} · {statusLabel(receipt.status)}</p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="font-semibold">{formatMoney(receipt.total)}</span>
-                <Button size="sm" variant="outline" aria-expanded={openId === receipt.id} aria-controls={`receipt-${receipt.id}`} onClick={() => setOpenId(openId === receipt.id ? '' : receipt.id)}>{openId === receipt.id ? 'Hide' : 'Details'}</Button>
+                <span className="font-mono font-semibold tabular-nums">{formatMoney(receipt.total)}</span>
+                <Track><Pill size="sm" aria-expanded={openId === receipt.id} aria-controls={`receipt-${receipt.id}`} onClick={() => setOpenId(openId === receipt.id ? '' : receipt.id)}>{openId === receipt.id ? 'Hide' : 'Details'}</Pill></Track>
               </div>
             </div>
             {openId === receipt.id && <ReceiptDetail receipt={receipt} timeZone={data.timeZone} />}
           </div>
         ))}
-        {!data.receipts.length && <p className="text-sm text-muted-foreground">{data.receiptPaging.receiptId ? 'No appointment receipt with that number in this shop.' : 'No appointment receipts yet.'}</p>}
+        {!data.receipts.length && <Empty>{data.receiptPaging.receiptId ? 'No receipt with that number in this shop.' : 'No appointment receipts yet.'}</Empty>}
       </div>
       <Pager paging={data.receiptPaging} label="Receipt pages" href={(page) => hrefWith(query, { receipts: page })} />
-    </section>
+    </Section>
   );
 }
 
@@ -521,14 +499,14 @@ function ReceiptDetail({ receipt, timeZone }: { receipt: PosReceipt; timeZone: s
         <div><dt className="text-muted-foreground">Total</dt><dd className="font-semibold">{formatMoney(receipt.total)}</dd></div>
       </dl>
       {receipt.cashRefund && <p className="text-xs">Cash refund {formatMoney(receipt.cashRefund.amount)} on {formatDateTime(receipt.cashRefund.refundedAt, timeZone)} · {receipt.cashRefund.reason}</p>}
-      <div className="flex flex-wrap gap-2">
-        <Button asChild size="sm" variant="outline"><Link href={`/dashboard/checkout-transactions/${receipt.id}`}>Open receipt record</Link></Button>
-        <Button size="sm" variant="outline" onClick={() => window.print()}>Print</Button>
-      </div>
+      <Track>
+        <PillLink size="sm" href={`/dashboard/checkout-transactions/${receipt.id}`}>Receipt record</PillLink>
+        <Pill size="sm" onClick={() => window.print()}>Print</Pill>
+      </Track>
       {refundable && (
-        <div className="space-y-2 rounded-md border border-dashed p-3">
-          <p className="text-xs font-medium">Cash refund (shop owner only)</p>
-          <p className="text-xs text-muted-foreground">Refunds the full {formatMoney(receipt.total)} including tax {formatMoney(receipt.taxAmount)} and tip {formatMoney(receipt.tipAmount)}. Unpaid commissions on this receipt are voided; if a commission was already paid, the refund is refused until it is reconciled.</p>
+        <div className="space-y-2 rounded-2xl bg-muted/50 p-3 ring-1 ring-inset ring-black/5 dark:ring-white/5">
+          <p className="text-xs font-medium">Cash refund · owner only</p>
+          <p className="font-mono text-xs text-muted-foreground">Full {formatMoney(receipt.total)} · tax {formatMoney(receipt.taxAmount)} · tip {formatMoney(receipt.tipAmount)} · voids unpaid commissions</p>
           <div className="grid gap-1">
             <Label htmlFor={`refund-reason-${receipt.id}`}>Reason</Label>
             <Input id={`refund-reason-${receipt.id}`} value={reason} maxLength={1000} onChange={(event) => setReason(event.target.value)} />
@@ -537,7 +515,7 @@ function ReceiptDetail({ receipt, timeZone }: { receipt: PosReceipt; timeZone: s
             <Checkbox id={`refund-cash-${receipt.id}`} checked={cashReturned} onCheckedChange={(value) => setCashReturned(value === true)} />
             <Label htmlFor={`refund-cash-${receipt.id}`} className="text-xs font-normal">I returned {formatMoney(receipt.total)} in cash to the customer.</Label>
           </div>
-          <Button size="sm" variant="destructive" disabled={pending || !valid} onClick={submitRefund}>Record cash refund</Button>
+          <Track><Pill size="sm" variant="danger" disabled={pending || !valid} onClick={submitRefund}>Record cash refund</Pill></Track>
         </div>
       )}
       <FeedbackMessage feedback={feedback} />

@@ -1,11 +1,11 @@
 'use client';
 
 import { useId, useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { shopWallTime, formatShopDateTime } from '../../../shared/shop-time';
 import { useCommandKey } from '../../lib/useCommandKey';
+import { Notice, Pill, StatusDot, Track } from '../../lib/ui';
 import { cancelScheduleExceptionAction, createScheduleExceptionAction, scheduleShiftAction, transitionShiftAction } from '../actions/workforce';
 
 type Shift = { id: string; status: string; scheduledStart: string; scheduledEnd: string; clockedInAt?: string | null };
@@ -80,11 +80,10 @@ export function WorkforceControls({ barberId, chairId, shifts, exceptions, timeZ
   const windowBody = (type: string) => ({ type, barberId, chairId, start: startTime.iso, end: endTime.iso, reason: reason.trim() });
 
   if (!timeZone) {
-    return <p role="status" className="mt-4 border-t pt-4 text-sm text-muted-foreground">Set the shop timezone in Store Settings before scheduling shifts or time off.</p>;
+    return <p role="status" className="mt-4 border-t pt-4 text-sm text-muted-foreground"><StatusDot tone="off" />Shop timezone not set. Scheduling unavailable.</p>;
   }
 
   return <div className="mt-4 space-y-3 border-t pt-4">
-    <p className="text-xs text-muted-foreground">All times are {timeZone}.</p>
     <div className="grid gap-2 sm:grid-cols-2">
       <div>
         <Label htmlFor={`${id}-start`} className="text-xs text-muted-foreground">Start ({timeZone})</Label>
@@ -98,35 +97,34 @@ export function WorkforceControls({ barberId, chairId, shifts, exceptions, timeZ
       </div>
     </div>
     <div>
-      <Label htmlFor={`${id}-reason`} className="text-xs text-muted-foreground">Reason (required for time off, overrides and closures)</Label>
+      <Label htmlFor={`${id}-reason`} className="text-xs text-muted-foreground">Reason</Label>
       <Input id={`${id}-reason`} value={reason} onChange={(event) => setReason(event.target.value)} className="mt-1" />
     </div>
-    <div className="flex flex-wrap gap-2">
-      {barberId && <Button size="sm" variant="outline" disabled={busy || !validWindow} onClick={() => execute('window', windowBody('shift'), (key) => scheduleShiftAction({ barberId, scheduledStart: startTime.iso!, scheduledEnd: endTime.iso! }, key), 'Shift scheduled.')}>Schedule shift</Button>}
-      {barberId && <Button size="sm" variant="outline" disabled={busy || !validWindow || !reason.trim()} onClick={() => execute('window', windowBody('time_off'), (key) => createScheduleExceptionAction({ barberId, exceptionType: 'time_off', startsAt: startTime.iso!, endsAt: endTime.iso!, reason: reason.trim() }, key), 'Time off added.')}>Add time off</Button>}
-      {barberId && <Button size="sm" variant="outline" disabled={busy || !validWindow || !reason.trim()} onClick={() => execute('window', windowBody('working_override'), (key) => createScheduleExceptionAction({ barberId, exceptionType: 'working_override', startsAt: startTime.iso!, endsAt: endTime.iso!, reason: reason.trim() }, key), 'Working hours override added.')}>Working override</Button>}
-      {chairId && <Button size="sm" variant="outline" disabled={busy || !validWindow || !reason.trim()} onClick={() => execute('window', windowBody('chair_unavailable'), (key) => createScheduleExceptionAction({ chairId, exceptionType: 'chair_unavailable', startsAt: startTime.iso!, endsAt: endTime.iso!, reason: reason.trim() }, key), 'Chair blocked.')}>Block chair</Button>}
-      {!barberId && <Button size="sm" variant="destructive" disabled={busy || !validWindow || !reason.trim()} onClick={() => execute('window', windowBody('shop_closure'), (key) => createScheduleExceptionAction({ exceptionType: 'shop_closure', startsAt: startTime.iso!, endsAt: endTime.iso!, reason: reason.trim() }, key), 'Shop closure added.')}>Close shop window</Button>}
-    </div>
+    <Track>
+      {barberId && <Pill size="sm" disabled={busy || !validWindow} onClick={() => execute('window', windowBody('shift'), (key) => scheduleShiftAction({ barberId, scheduledStart: startTime.iso!, scheduledEnd: endTime.iso! }, key), 'Shift scheduled.')}>Schedule shift</Pill>}
+      {barberId && <Pill size="sm" disabled={busy || !validWindow || !reason.trim()} onClick={() => execute('window', windowBody('time_off'), (key) => createScheduleExceptionAction({ barberId, exceptionType: 'time_off', startsAt: startTime.iso!, endsAt: endTime.iso!, reason: reason.trim() }, key), 'Time off added.')}>Time off</Pill>}
+      {barberId && <Pill size="sm" disabled={busy || !validWindow || !reason.trim()} onClick={() => execute('window', windowBody('working_override'), (key) => createScheduleExceptionAction({ barberId, exceptionType: 'working_override', startsAt: startTime.iso!, endsAt: endTime.iso!, reason: reason.trim() }, key), 'Working hours override added.')}>Override</Pill>}
+      {chairId && <Pill size="sm" disabled={busy || !validWindow || !reason.trim()} onClick={() => execute('window', windowBody('chair_unavailable'), (key) => createScheduleExceptionAction({ chairId, exceptionType: 'chair_unavailable', startsAt: startTime.iso!, endsAt: endTime.iso!, reason: reason.trim() }, key), 'Chair blocked.')}>Block chair</Pill>}
+      {!barberId && <Pill size="sm" variant="danger" disabled={busy || !validWindow || !reason.trim()} onClick={() => execute('window', windowBody('shop_closure'), (key) => createScheduleExceptionAction({ exceptionType: 'shop_closure', startsAt: startTime.iso!, endsAt: endTime.iso!, reason: reason.trim() }, key), 'Shop closure added.')}>Close shop</Pill>}
+    </Track>
     {shifts.map((shift) => {
       const overdue = shift.status === 'clocked_in' && new Date(shift.scheduledEnd).getTime() < Date.now();
       const disabled = busy;
-      return <div key={shift.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted p-2 text-xs">
-        <span>
+      return <div key={shift.id} className="flex flex-wrap items-center justify-between gap-2 border-b py-2 text-xs last:border-b-0">
+        <span className="min-w-0"><StatusDot tone={overdue ? 'alert' : shift.status === 'clocked_in' ? 'live' : 'info'} />
           {formatShopDateTime(shift.scheduledStart, timeZone)} – {formatShopDateTime(shift.scheduledEnd, timeZone)} · {shift.status.replaceAll('_', ' ')}
           {shift.clockedInAt && ` · in at ${formatShopDateTime(shift.clockedInAt, timeZone)}`}
           {overdue && <strong className="ml-1 text-destructive">· past scheduled end</strong>}
           {pendingTarget === shift.id && ' · saving…'}
         </span>
-        <span className="flex gap-1">
-          {shift.status === 'scheduled' && <Button size="sm" disabled={disabled} onClick={() => execute(shift.id, { shift: shift.id, action: 'clock_in' }, (key) => transitionShiftAction(shift.id, 'clock_in', key), 'Clocked in.')}>Clock in</Button>}
-          {shift.status === 'clocked_in' && <Button size="sm" disabled={disabled} onClick={() => execute(shift.id, { shift: shift.id, action: 'clock_out' }, (key) => transitionShiftAction(shift.id, 'clock_out', key), 'Clocked out.')}>Clock out</Button>}
-          {['scheduled', 'clocked_in'].includes(shift.status) && <Button size="sm" variant="ghost" disabled={disabled} onClick={() => execute(shift.id, { shift: shift.id, action: 'cancel' }, (key) => transitionShiftAction(shift.id, 'cancel', key), 'Shift cancelled.')}>Cancel shift</Button>}
-        </span>
+        <Track>
+          {shift.status === 'scheduled' && <Pill size="sm" variant="primary" disabled={disabled} onClick={() => execute(shift.id, { shift: shift.id, action: 'clock_in' }, (key) => transitionShiftAction(shift.id, 'clock_in', key), 'Clocked in.')}>Clock in</Pill>}
+          {shift.status === 'clocked_in' && <Pill size="sm" variant="primary" disabled={disabled} onClick={() => execute(shift.id, { shift: shift.id, action: 'clock_out' }, (key) => transitionShiftAction(shift.id, 'clock_out', key), 'Clocked out.')}>Clock out</Pill>}
+          {['scheduled', 'clocked_in'].includes(shift.status) && <Pill size="sm" disabled={disabled} onClick={() => execute(shift.id, { shift: shift.id, action: 'cancel' }, (key) => transitionShiftAction(shift.id, 'cancel', key), 'Shift cancelled.')}>Cancel</Pill>}
+        </Track>
       </div>;
     })}
-    {exceptions.map((item) => <div key={item.id} className="flex items-center justify-between gap-2 rounded-md bg-muted p-2 text-xs"><span>{item.exceptionType.replaceAll('_', ' ')} · {formatShopDateTime(item.startsAt, timeZone)} – {formatShopDateTime(item.endsAt, timeZone)} · {item.reason}{pendingTarget === item.id && ' · saving…'}</span><Button size="sm" variant="ghost" disabled={busy} onClick={() => execute(item.id, { exception: item.id, action: 'cancel' }, (key) => cancelScheduleExceptionAction(item.id, key), 'Exception cancelled.')}>Cancel</Button></div>)}
-    <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{message?.kind === 'status' ? message.text : ''}</p>
-    {message?.kind === 'error' && <p role="alert" className="text-xs text-destructive">{message.text}</p>}
+    {exceptions.map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 border-b py-2 text-xs last:border-b-0"><span className="min-w-0"><StatusDot tone="wait" />{item.exceptionType.replaceAll('_', ' ')} · {formatShopDateTime(item.startsAt, timeZone)} – {formatShopDateTime(item.endsAt, timeZone)} · {item.reason}{pendingTarget === item.id && ' · saving…'}</span><Track><Pill size="sm" disabled={busy} onClick={() => execute(item.id, { exception: item.id, action: 'cancel' }, (key) => cancelScheduleExceptionAction(item.id, key), 'Exception cancelled.')}>Cancel</Pill></Track></div>)}
+    <div aria-live="polite">{message && <Notice tone={message.kind === 'error' ? 'alert' : 'status'}>{message.text}</Notice>}</div>
   </div>;
 }

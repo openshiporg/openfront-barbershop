@@ -24,7 +24,7 @@ export function StorefrontImage({
   const safeSrc = src && SAFE_IMAGE_PATH.test(src) ? src : fallbackSrc;
 
   return (
-    <div className={['relative overflow-hidden bg-[var(--color-paper-2)]', className].filter(Boolean).join(' ')}>
+    <div className={['sf-image', className].filter(Boolean).join(' ')}>
       <Image
         src={safeSrc}
         alt={alt}

@@ -1,13 +1,13 @@
 'use client';
 
 import { useId, useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { shopDateKey, shopMinute } from '@/features/shared/shop-time';
 import { useCommandKey } from '@/features/platform/lib/useCommandKey';
 import { manageStaffAppointmentAction } from '../actions/appointments';
 import { parseShopDateTime } from '../lib/shopTimeInput';
+import { Pill, selectClass, Track } from '@/features/platform/lib/ui';
 
 type BarberOption = { id: string; displayName?: string | null; bookingEnabled?: boolean | null };
 
@@ -69,30 +69,29 @@ export function AppointmentChangeForm({ appointmentId, startsAt, barberId, barbe
   };
 
   return (
-    <div className="mt-3 space-y-3 rounded-md border p-3">
-      <div className="flex gap-2" role="group" aria-label="Change type">
-        <Button type="button" size="sm" variant={action === 'reschedule' ? 'default' : 'outline'} aria-pressed={action === 'reschedule'} onClick={() => setAction('reschedule')}>Reschedule / reassign</Button>
-        <Button type="button" size="sm" variant={action === 'cancel' ? 'default' : 'outline'} aria-pressed={action === 'cancel'} onClick={() => setAction('cancel')}>Cancel</Button>
-      </div>
+    <div className="mt-3 space-y-3 border-t pt-3">
+      <Track label="Change type">
+        <Pill size="sm" variant="flat" aria-pressed={action === 'reschedule'} onClick={() => setAction('reschedule')}>Reschedule</Pill>
+        <Pill size="sm" variant="flat" aria-pressed={action === 'cancel'} onClick={() => setAction('cancel')}>Cancel</Pill>
+      </Track>
       {action === 'reschedule' && (
         <div className="grid gap-2 sm:grid-cols-3">
           <div className="grid gap-1"><Label htmlFor={`${id}-date`}>Date</Label><Input id={`${id}-date`} type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div>
           <div className="grid gap-1"><Label htmlFor={`${id}-time`}>Time ({timeZone})</Label><Input id={`${id}-time`} type="time" step={300} value={time} onChange={(event) => setTime(event.target.value)} /></div>
           <div className="grid gap-1">
             <Label htmlFor={`${id}-barber`}>Barber</Label>
-            <select id={`${id}-barber`} value={nextBarberId} onChange={(event) => setNextBarberId(event.target.value)} className="h-9 rounded-md border bg-background px-2 text-sm">
+            <select id={`${id}-barber`} value={nextBarberId} onChange={(event) => setNextBarberId(event.target.value)} className={selectClass}>
               {eligibleBarbers.map((barber) => <option key={barber.id} value={barber.id}>{barber.displayName || 'Barber'}</option>)}
               {barberId && !eligibleBarbers.some((barber) => barber.id === barberId) && <option value={barberId}>Current barber</option>}
             </select>
           </div>
         </div>
       )}
-      <div className="grid gap-1"><Label htmlFor={`${id}-reason`}>Reason</Label><Input id={`${id}-reason`} value={reason} maxLength={1000} onChange={(event) => setReason(event.target.value)} placeholder={action === 'cancel' ? 'e.g. Customer called to cancel' : 'e.g. Barber out sick'} /></div>
-      <p className="text-xs text-muted-foreground">Cancellation and reschedule terms come from the policy accepted at booking. Any fee is recorded for follow-up, not charged.</p>
-      <div className="flex gap-2">
-        <Button type="button" size="sm" variant={action === 'cancel' ? 'destructive' : 'default'} disabled={pending} onClick={submit}>{pending ? 'Saving…' : action === 'cancel' ? 'Cancel appointment' : 'Save change'}</Button>
-        <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={onClose}>Close</Button>
-      </div>
+      <div className="grid gap-1"><Label htmlFor={`${id}-reason`}>Reason</Label><Input id={`${id}-reason`} value={reason} maxLength={1000} onChange={(event) => setReason(event.target.value)} /></div>
+      <Track>
+        <Pill size="sm" variant={action === 'cancel' ? 'danger' : 'primary'} disabled={pending} onClick={submit}>{pending ? 'Saving…' : action === 'cancel' ? 'Cancel appointment' : 'Save change'}</Pill>
+        <Pill size="sm" disabled={pending} onClick={onClose}>Close</Pill>
+      </Track>
       <div aria-live="polite">
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         {status && <p role="status" className="text-sm">{status}</p>}

@@ -19,8 +19,8 @@ export function AccountDataExport() {
     } catch { setMessage('Your data couldn’t be exported right now. Try again later.'); }
     finally { setPending(false); }
   }
-  return <div>
-    <button type="button" className="sf-btn sf-btn-ghost" disabled={pending} onClick={download}>{pending ? 'Preparing…' : 'Download my data'}</button>
-    {message ? <p role="status" className="mt-2 text-[var(--text-small)]">{message}</p> : null}
+  return <div className="grid gap-2">
+    <div className="sf-track"><button type="button" className="sf-pill" disabled={pending} onClick={download}>{pending ? 'Preparing…' : 'Download my data'}</button></div>
+    {message ? <p role="status" className="sf-small">{message}</p> : null}
   </div>;
 }

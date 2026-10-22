@@ -5,7 +5,7 @@ import { StorefrontImage } from './StorefrontImage';
 
 type BarberCardProps = {
   barber: StorefrontBarber;
-  variant?: 'light' | 'dark';
+  priority?: boolean;
 };
 
 const barberFallbacks: Record<string, string> = {
@@ -14,30 +14,34 @@ const barberFallbacks: Record<string, string> = {
   'Leo Chen': '/images/barbershop/photo/barber-at-work.webp',
 };
 
-export function BarberCard({ barber, variant = 'light' }: BarberCardProps) {
-  const image = barber.imagePath?.endsWith('.svg') ? barberFallbacks[barber.displayName] : barber.imagePath;
+export function barberPhoto(barber: Pick<StorefrontBarber, 'displayName' | 'imagePath'>) {
+  const fallback = barberFallbacks[barber.displayName] || '/images/barbershop/photo/barber-at-work.webp';
+  return { src: barber.imagePath?.endsWith('.svg') ? fallback : barber.imagePath, fallback };
+}
+
+/** A chair on the floor: photo, chair number, barber, what they cut. */
+export function BarberCard({ barber, priority = false }: BarberCardProps) {
+  const photo = barberPhoto(barber);
+  const specialties = (barber.specialties || []).slice(0, 3);
 
   return (
-    <Link href={`/book?barber=${barber.id}`} className={`sf-barber-card ${variant === 'dark' ? 'is-dark' : ''}`}>
-      <StorefrontImage
-        src={image}
-        fallbackSrc={barberFallbacks[barber.displayName] || '/images/barbershop/photo/barber-at-work.webp'}
-        alt={`${barber.displayName} working at ${barber.chairNumber ? `chair ${barber.chairNumber}` : 'the shop'}`}
-        className="sf-barber-photo"
-        priority
-        sizes="(max-width: 640px) 100vw, 33vw"
-      />
-      <div className="sf-barber-meta">
-        <div className="sf-barber-name-row">
-          <div>
-            <p>{barber.chairNumber ? `Chair ${barber.chairNumber}` : 'Bookable barber'}</p>
-            <h3>{barber.displayName}</h3>
-          </div>
-          <ArrowUpRight aria-hidden="true" />
-        </div>
-        <p className="sf-barber-bio">{barber.bio || 'Choose this barber to view live service times.'}</p>
-        <p className="sf-barber-specialties">{(barber.specialties || []).slice(0, 3).map((service) => service.name).join(' · ') || 'General barbering'}</p>
+    <Link href={`/book?barber=${encodeURIComponent(barber.id)}`} className="sf-chair">
+      <div className="sf-chair-photo">
+        <StorefrontImage
+          src={photo.src}
+          fallbackSrc={photo.fallback}
+          alt={`${barber.displayName} at ${barber.chairNumber ? `chair ${barber.chairNumber}` : 'the shop'}`}
+          priority={priority}
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+        />
+        {barber.chairNumber ? <span className="sf-chair-no">Chair {barber.chairNumber}</span> : null}
       </div>
+      <div className="sf-chair-name">
+        <h3 className="sf-subtitle">{barber.displayName}</h3>
+        <ArrowUpRight aria-hidden="true" />
+      </div>
+      {barber.bio ? <p className="sf-small sf-muted">{barber.bio}</p> : null}
+      {specialties.length ? <ul className="sf-chair-tags" aria-label={`${barber.displayName} services`}>{specialties.map((service) => <li key={service.id} className="sf-tag">{service.name}</li>)}</ul> : null}
     </Link>
   );
 }

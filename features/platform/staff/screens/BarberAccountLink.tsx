@@ -1,9 +1,9 @@
 'use client';
 
 import { useId, useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useCommandKey } from '../../lib/useCommandKey';
+import { Pill, selectClass, Track } from '../../lib/ui';
 import { linkBarberAccountAction } from '../actions/workforce';
 
 type Member = { id: string; name: string; email: string | null };
@@ -35,14 +35,13 @@ export function BarberAccountLink({ barberId, linkedUserId, members }: { barberI
   return (
     <div className="mt-3 grid gap-1">
       <Label htmlFor={`${id}-account`} className="text-xs text-muted-foreground">Sign-in account</Label>
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <select id={`${id}-account`} value={userId} onChange={(event) => setUserId(event.target.value)} disabled={pending} className="min-w-0 flex-1 rounded-md border bg-background px-3 py-2 text-sm">
+      <div className="flex items-center gap-2">
+        <select id={`${id}-account`} value={userId} onChange={(event) => setUserId(event.target.value)} disabled={pending} className={`${selectClass} flex-1`}>
           <option value="">Not linked</option>
           {members.map((member) => <option key={member.id} value={member.id}>{member.name}{member.email && member.email !== member.name ? ` · ${member.email}` : ''}</option>)}
         </select>
-        <Button size="sm" variant="outline" disabled={pending || !changed} onClick={save}>{pending ? 'Saving…' : 'Save account'}</Button>
+        <Track><Pill size="sm" disabled={pending || !changed} onClick={save}>{pending ? 'Saving…' : 'Save'}</Pill></Track>
       </div>
-      <p className="text-xs text-muted-foreground">Only active shop members are listed. Invite someone to the shop before linking them.</p>
       <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{outcome?.kind === 'status' ? outcome.text : ''}</p>
       {outcome?.kind === 'error' && <p role="alert" className="text-xs text-destructive">{outcome.text}</p>}
     </div>
