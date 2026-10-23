@@ -9,7 +9,7 @@ import { formatMoney, formatDuration } from '../lib/format';
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const service = (await getAllServices().catch(() => [])).find(item => item.id === id);
-  return { title: service?.name || 'Service', description: service?.description || undefined };
+  return service ? { title: service.name, description: service.description || undefined } : { title: 'Page not found' };
 }
 
 export default async function ServiceDetailPage({ params }: { params: Promise<{ id: string }> }) {

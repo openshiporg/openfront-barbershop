@@ -45,6 +45,25 @@ function defaultBookingDate(timeZone: string) {
 // Deposits can't be taken online, so deposit services are booked by phone.
 const bookableOnline = (service: StorefrontService | undefined) => Boolean(service && !service.depositRequired);
 
+// Online bookings open up to 90 days ahead (enforced again on the server).
+const BOOKING_HORIZON_DAYS = 90;
+
+function bookingDateBounds(timeZone: string) {
+  try {
+    const today = shopDateKey(new Date(), timeZone);
+    const last = new Date(`${today}T12:00:00Z`);
+    last.setUTCDate(last.getUTCDate() + BOOKING_HORIZON_DAYS);
+    return { min: today, max: last.toISOString().slice(0, 10) };
+  } catch { return { min: undefined, max: undefined }; }
+}
+
+// The account stores no phone, so this browser remembers the last one used.
+const phoneKey = (accountId: string) => `sf-booking-phone:${accountId}`;
+function rememberedPhone(accountId: string) {
+  if (!accountId) return '';
+  try { return window.localStorage.getItem(phoneKey(accountId)) || ''; } catch { return ''; }
+}
+
 function barbersForService(service: StorefrontService | undefined, barbers: StorefrontBarber[]) {
   const specialists = service?.specialists || [];
   return specialists.length ? specialists : barbers;
@@ -91,6 +110,12 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
   // A definite outcome clears the saved request; an unknown one keeps it for an exact retry.
   const receiveOutcome = useCallback((command: GuestBookingCommand, result: BookingOutcome) => {
     if (result.success) {
+      if (accountId) {
+        try {
+          const phone = (JSON.parse(command.requestBody) as { customerPhone?: string }).customerPhone;
+          if (phone) window.localStorage.setItem(phoneKey(accountId), phone);
+        } catch { /* storage unavailable */ }
+      }
       clearResolvedGuestBooking(actorStorage(accountId), command);
       setSavedCommand(null);
       setCreatedAppointment(result.appointment);
@@ -107,6 +132,11 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
     }
     setSavedCommand(command);
     setError(result.error);
+  }, [accountId]);
+
+  useEffect(() => {
+    const phone = rememberedPhone(accountId);
+    if (phone) Promise.resolve().then(() => setCustomer((current) => current.phone ? current : { ...current, phone }));
   }, [accountId]);
 
   useEffect(() => {
@@ -382,6 +412,7 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
                   id="booking-date"
                   name="date"
                   type="date"
+                  {...bookingDateBounds(settings.timezone)}
                   value={selectedDate}
                   onChange={(event) => { setSelectedDate(event.target.value); setSelectedStartsAt(''); }}
                   className="sf-input sf-mono"

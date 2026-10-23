@@ -6,7 +6,7 @@ import { AccountForms } from '../components/AccountForms';
 import { AccountDataExport } from '../components/AccountDataExport';
 import { getStorefrontAccountState, getStorefrontBookingHistory, signOutAccount } from '../lib/data/account';
 import { getPublicStorefrontSettings } from '../lib/data/settings';
-import { formatMoney, statusLabel } from '../lib/format';
+import { formatMoney, paymentLabel, statusLabel } from '../lib/format';
 
 function bookingTime(startsAt: string, timeZone: string | null) {
   return new Date(startsAt).toLocaleString('en-US', { ...(timeZone ? { timeZone } : {}), dateStyle: 'medium', timeStyle: 'short' }) + (timeZone ? ` (${timeZone})` : '');
@@ -56,7 +56,7 @@ export default async function AccountPage({ searchParams }: { searchParams?: Pro
                           </span>
                           <span className="grid justify-items-end gap-1 text-end">
                             <span className="sf-mono font-semibold">{formatMoney(booking.price)}</span>
-                            <span className="sf-small sf-muted capitalize">{statusLabel(booking.status)} · {statusLabel(booking.paymentStatus)}</span>
+                            <span className="sf-small sf-muted"><span className="capitalize">{statusLabel(booking.status)}</span> · {paymentLabel(booking.paymentStatus)}</span>
                           </span>
                         </Link>
                       </li>

@@ -420,6 +420,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
           logoColor: String
           isPublic: Boolean!
           isDemo: Boolean!
+          hours: JSON
           expectedShopId: ID
           expectedVersion: String
         ): DomainCommandResult!

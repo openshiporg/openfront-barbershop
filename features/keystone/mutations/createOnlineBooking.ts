@@ -1,7 +1,9 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 
-import { shopMinute } from '../../shared/shop-time';
+import { formatShopDateTime, shopMinute } from '../../shared/shop-time';
 import { dayKeyForDate, dayRange, isSlotAvailable, occupiedBufferMinutes } from '../utils/availability';
+import { clipToPostedHours } from '../../shared/shop-hours';
+import { sendAppointmentEmail } from '../lib/mail';
 import {
   assertAppointmentCandidateSetComplete,
   lockBookingResources,
@@ -127,7 +129,7 @@ export async function createLockedAppointment({
     transaction.service.findUnique({
       where: { id: serviceId },
       include: {
-        shop: { select: { id: true, status: true, isPublic: true, timezone: true } },
+        shop: { select: { id: true, status: true, isPublic: true, timezone: true, hours: true } },
         category: { select: { id: true, shopId: true, status: true } },
         specialists: { select: { id: true } },
       },
@@ -215,7 +217,7 @@ export async function createLockedAppointment({
     breakStartMinute: null, breakEndMinute: null, notes: override.reason, createdAt: override.createdAt, updatedAt: override.updatedAt,
   } : weeklySchedule;
   if (shifts.length && !shifts.some((shift) => startsAt >= shift.scheduledStart && occupiedEndsAt <= shift.scheduledEnd)) throw new BookingRejected('That time is outside the barber’s scheduled shift.');
-  const schedule = baseSchedule;
+  const schedule = clipToPostedHours(baseSchedule, service.shop.hours, dayKeyForDate(startsAt, timeZone));
   const appointments = await transaction.appointment.findMany({
     where: {
       shopId: service.shopId, status: { in: [...ACTIVE_APPOINTMENT_STATUSES] },
@@ -336,6 +338,22 @@ export async function createLockedAppointment({
   return { ...appointment, bookingEligibility: publicBookingEligibilityView(bookingPolicy), bookingTimezone: timeZone };
 }
 
+function sendBookingReceived(notice: { to: string; shopName: string; timeZone: string; receipt: { id: string; startsAt: string; service: { name: string | null }; barber: { displayName: string | null } } }, accessToken: string) {
+  const path = `/appointment?id=${encodeURIComponent(notice.receipt.id)}&token=${encodeURIComponent(accessToken)}`;
+  sendAppointmentEmail({
+    to: notice.to,
+    subject: `Booking request received · ${notice.shopName}`,
+    heading: 'Booking request received',
+    lines: [
+      `${notice.receipt.service.name || 'Appointment'} with ${notice.receipt.barber.displayName || 'first available'}`,
+      formatShopDateTime(notice.receipt.startsAt, notice.timeZone),
+      `${notice.shopName} confirms it shortly.`,
+    ],
+    path,
+    action: 'View or change booking',
+  }).catch(() => undefined);
+}
+
 export default async function createOnlineBooking(
   _root: unknown,
   args: GuestBookingCommand,
@@ -354,9 +372,11 @@ export async function createAccountBooking(_root: unknown, args: GuestBookingCom
 
 async function createBookingForActor(args: GuestBookingCommand, context: BookingContext, accountId?: string): Promise<GuestCommandResult> {
   const actor = accountId ? `account:${accountId}` : 'guest';
+  // Set only for a newly accepted request, so a replayed command never re-sends mail.
+  let notice: { to: string; shopName: string; timeZone: string; receipt: { id: string; startsAt: string; service: { name: string | null }; barber: { displayName: string | null } } } | null = null;
   try {
     const body = validateGuestBookingCommand(args);
-    return await runGuestCommand(async (transaction) => {
+    const result = await runGuestCommand(async (transaction) => {
       await lockGuestCommand(transaction, args.requestKey);
       if (accountId && !(await transaction.user.findUnique({ where: { id: accountId }, select: { id: true } }))) throw new Error('Account unavailable.');
       const original = await readGuestCommand(transaction, args, actor);
@@ -370,7 +390,7 @@ async function createBookingForActor(args: GuestBookingCommand, context: Booking
           where: { id: body.serviceId },
           query: 'id name imagePath durationMinutes price depositRequired depositAmount status shop { id status isPublic } category { id status shop { id } } specialists(where: { status: { equals: active }, bookingEnabled: { equals: true } }) { id displayName }',
         }),
-        resolvePublishedShop(transaction, { id: true }),
+        resolvePublishedShop(transaction, { id: true, name: true }),
       ]);
       if (!service || !publishedShop || publishedShop.id !== body.shopId
         || service.status !== 'active' || service.shop?.id !== publishedShop.id
@@ -426,8 +446,11 @@ async function createBookingForActor(args: GuestBookingCommand, context: Booking
         barber: { id: appointment.barberId, displayName: appointment.barberNameSnapshot, chairNumber: appointment.barberChairNumberSnapshot },
       };
       await persistGuestCommand(transaction, args, { version: 1, disposition: 'accepted', appointment: receipt }, actor);
-      return { success: true, disposition: 'accepted', error: null, appointment: receipt, accessToken: args.guestProof };
+      if (body.customerEmail) notice = { to: body.customerEmail, shopName: publishedShop.name || 'the shop', timeZone: appointment.bookingTimezone, receipt };
+      return { success: true, disposition: 'accepted' as const, error: null, appointment: receipt, accessToken: args.guestProof };
     });
+    if (notice) sendBookingReceived(notice, args.guestProof);
+    return result;
   } catch (error) {
     // Our own refusals happen before any write, so nothing was booked.
     if (error instanceof BookingRejected) return { success: false, disposition: 'rejected', error: error.message, appointment: null, accessToken: null };

@@ -36,9 +36,10 @@ export type StorefrontSettingsInput = {
   logoColor: string;
   isPublic: boolean;
   isDemo: boolean;
+  hours: Record<string, string>;
 };
 
-const EDITABLE_FIELDS = ['name', 'tagline', 'address', 'phone', 'timezone', 'currencyCode', 'brandColor', 'logoIcon', 'logoColor', 'isPublic', 'isDemo'] as const;
+const EDITABLE_FIELDS = ['name', 'tagline', 'address', 'phone', 'timezone', 'currencyCode', 'brandColor', 'logoIcon', 'logoColor', 'isPublic', 'isDemo', 'hours'] as const;
 
 function editableSnapshot(settings: Partial<ActiveShopStorefrontSettings> | null | undefined) {
   return JSON.stringify(EDITABLE_FIELDS.map((field) => settings?.[field] ?? null));
@@ -82,6 +83,7 @@ export async function updateActiveShopStorefrontSettingsAction(
       $logoColor: String
       $isPublic: Boolean!
       $isDemo: Boolean!
+      $hours: JSON
       $expectedShopId: ID
       $expectedVersion: String
     ) {
@@ -97,6 +99,7 @@ export async function updateActiveShopStorefrontSettingsAction(
         logoColor: $logoColor
         isPublic: $isPublic
         isDemo: $isDemo
+        hours: $hours
         expectedShopId: $expectedShopId
         expectedVersion: $expectedVersion
       ) { success error data }

@@ -2,6 +2,7 @@
 import { createTransport } from "nodemailer";
 
 import { domainPrisma } from "../utils/domainPrisma";
+import { trustedOrigin } from "../../shared/trusted-origin";
 
 // Reset links must be absolute and point at this application. A missing or
 // malformed origin never produces a relative or attacker-shaped link.
@@ -90,4 +91,35 @@ export async function sendPasswordResetEmail(resetToken: string, to: string, bas
   if ((info.rejected || []).length || !accepted.includes(to.toLowerCase())) {
     throw new Error("The mail server did not accept the password reset email.");
   }
+}
+
+function escapeHtml(value: string) {
+  return escapeHtmlAttribute(value).replace(/'/g, "&#39;");
+}
+
+function appointmentEmail({ heading, lines, url, action }: { heading: string; lines: string[]; url: string; action: string }) {
+  const rows = lines.map((line) => `<tr><td style="padding: 2px 24px; font-size: 15px; font-family: Helvetica, Arial, sans-serif; color: #444444;">${escapeHtml(line)}</td></tr>`).join("");
+  return `
+    <body style="background: #f6f3ee;">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background: #ffffff; max-width: 560px; margin: 24px auto; border-radius: 10px;">
+        <tr><td style="padding: 24px 24px 8px; font-size: 20px; font-weight: bold; font-family: Helvetica, Arial, sans-serif; color: #111a33;">${escapeHtml(heading)}</td></tr>
+        ${rows}
+        <tr><td style="padding: 20px 24px 24px;"><a href="${escapeHtmlAttribute(url)}" target="_blank" style="font-size: 15px; font-family: Helvetica, Arial, sans-serif; color: #ffffff; background: #111a33; text-decoration: none; border-radius: 999px; padding: 10px 20px; display: inline-block; font-weight: bold;">${escapeHtml(action)}</a></td></tr>
+      </table>
+    </body>
+  `;
+}
+
+/**
+ * Appointment notices go to the email the customer gave. Delivery is best
+ * effort: callers never fail a booking because mail is unavailable.
+ */
+export async function sendAppointmentEmail(input: { to: string; subject: string; heading: string; lines: string[]; path: string; action: string }): Promise<void> {
+  const url = new URL(input.path, resetLinkOrigin(trustedOrigin()));
+  await mailTransport().sendMail({
+    to: input.to,
+    from: process.env.SMTP_FROM,
+    subject: input.subject,
+    html: appointmentEmail({ heading: input.heading, lines: input.lines, url: url.toString(), action: input.action }),
+  });
 }

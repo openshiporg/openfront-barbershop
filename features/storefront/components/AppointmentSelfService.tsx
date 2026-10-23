@@ -133,7 +133,7 @@ export function AppointmentSelfService(props: { timeZone: string; appointmentId:
     <section className="sf-block" aria-labelledby="change-heading">
       <h2 id="change-heading" className="sf-eyebrow">Change this visit</h2>
       <label className="sf-field"><span>New time ({props.timeZone})</span><input className="sf-input sf-mono" type="datetime-local" value={startsAt} onChange={(event) => { setStartsAt(event.target.value); setReview(null); }} /></label>
-      <label className="sf-field"><span>Reason</span><input className="sf-input" value={reason} maxLength={1000} onChange={(event) => { setReason(event.target.value); setReview(null); }} /></label>
+      <label className="sf-field"><span>Reason (required)</span><input className="sf-input" value={reason} required minLength={2} maxLength={1000} onChange={(event) => { setReason(event.target.value); setReview(null); }} /></label>
       {!review ? (
         <div className="sf-track">
           <button type="button" className="sf-pill is-primary" disabled={pending || !startsAt || reason.trim().length < 2} onClick={() => startReview('reschedule')}>Review new time</button>

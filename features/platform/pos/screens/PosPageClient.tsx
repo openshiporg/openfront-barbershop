@@ -74,7 +74,7 @@ function Pager({ paging, label, href }: { paging: Paging; label: string; href: (
 
 export function PosPageClient({ data, query }: { data: PosProjectionData; query: PosQuery }) {
   const { appointments, requestedAppointment, requestedAppointmentId, timeZone } = data;
-  const [selectedId, setSelectedId] = useState(requestedAppointmentId || appointments[0]?.id || '');
+  const [selectedId, setSelectedId] = useState(requestedAppointmentId || (appointments.find((appointment) => appointment.status === 'in_chair') || appointments[0])?.id || '');
   // The selected ticket is resolved by id only; a missing ticket is never replaced by another.
   const selected = (requestedAppointment && requestedAppointment.id === selectedId ? requestedAppointment : null)
     || appointments.find((appointment) => appointment.id === selectedId)
@@ -198,7 +198,7 @@ function TenderPanel({ appointment, closed, timeZone }: { appointment: PosAppoin
           <div><dt className="text-zinc-500">Discount</dt><dd>−{formatMoney(appliedDiscount)}</dd></div>
         </dl>
       </div>
-      {appointment.status !== 'in_chair' && !closed && <Notice>Seat this visit on the booking board before checkout.</Notice>}
+      {appointment.status === 'checked_in' && !closed && <Notice>Seat this visit on the booking board before checkout.</Notice>}
       {paymentMethod === 'package' && total > 0 && <Notice tone="alert">A prepaid visit can’t include tip or tax. Mixed tender isn’t supported.</Notice>}
       {!amountsValid && <Notice tone="alert">Tip, discount and tax must be zero or positive amounts.</Notice>}
 
@@ -206,6 +206,7 @@ function TenderPanel({ appointment, closed, timeZone }: { appointment: PosAppoin
         <span className="text-xs text-muted-foreground">Tender</span>
         <Track label="Payment method">
           <Pill size="sm" variant="flat" aria-pressed={paymentMethod === 'cash'} onClick={() => { setPaymentMethod('cash'); setPackageBalanceId(''); }}>Cash</Pill>
+          <Pill size="sm" variant="flat" aria-pressed={paymentMethod === 'card'} onClick={() => { setPaymentMethod('card'); setPackageBalanceId(''); }}>Card terminal</Pill>
           {packageBalances.length > 0 && <Pill size="sm" variant="flat" aria-pressed={paymentMethod === 'package'} onClick={() => setPaymentMethod('package')}>Package visit</Pill>}
         </Track>
       </div>
@@ -246,7 +247,7 @@ function TenderPanel({ appointment, closed, timeZone }: { appointment: PosAppoin
       <FeedbackMessage feedback={feedback} />
       <Track block>
         <Pill variant="primary" disabled={pending || !eligible} onClick={submitCheckout}>
-          {pending ? 'Processing…' : paymentMethod === 'package' ? 'Redeem visit' : `Take ${formatMoney(total)} cash`}
+          {pending ? 'Processing…' : paymentMethod === 'package' ? 'Redeem visit' : paymentMethod === 'card' ? `Record ${formatMoney(total)} card` : `Take ${formatMoney(total)} cash`}
         </Pill>
       </Track>
     </div>
@@ -255,7 +256,7 @@ function TenderPanel({ appointment, closed, timeZone }: { appointment: PosAppoin
 
 function RetailSale({ data }: { data: PosProjectionData }) {
   const { products } = data;
-  const [productId, setProductId] = useState(products[0]?.id || '');
+  const [productId, setProductId] = useState((products.find((item) => item.availableQuantity > 0) || products[0])?.id || '');
   const [quantity, setQuantity] = useState('1');
   const [taxRate, setTaxRate] = useState('0');
   const [feedback, setFeedback] = useState<Feedback>(null);
@@ -320,7 +321,7 @@ function RetailSale({ data }: { data: PosProjectionData }) {
           </dl>
           <Track><Pill variant="primary" disabled={pending || !enough || !rateValid} onClick={submit}>Take {formatMoney(total)} cash</Pill></Track>
         </div>
-      ) : <Empty>No active products. <Link className="underline" href="/dashboard/products/create">Add a product</Link></Empty>}
+      ) : <Empty>No active products. <Link className="underline" href="/dashboard/platform/services/new-product">Add a product</Link></Empty>}
       <div className="mt-3"><FeedbackMessage feedback={feedback} /></div>
     </Section>
   );

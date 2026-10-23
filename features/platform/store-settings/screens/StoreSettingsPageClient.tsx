@@ -15,6 +15,7 @@ import type { ShopChoice } from '@/features/platform/barbershop/actions/shop';
 import { LogoPicker } from '../components/LogoPicker';
 import { DEFAULT_STORE_LOGO_ICON } from '../lib/store-logo';
 import { StoreLogo } from '@/features/storefront/components/StoreLogo';
+import { hoursTextToTimes, SHOP_HOURS_DAYS, timesToHoursText } from '@/features/shared/shop-hours';
 import { Notice, PageHeader, Pill, PillLink, StatusDot, Track } from '@/features/platform/lib/ui';
 import {
   updateActiveShopStorefrontSettingsAction,
@@ -41,7 +42,17 @@ type FormState = {
   logoColor: string;
   isPublic: boolean;
   isDemo: boolean;
+  hours: Record<string, string>;
 };
+
+const DAY_LABELS: Record<string, string> = { monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' };
+
+function toHours(hours: Record<string, unknown> | null | undefined) {
+  return Object.fromEntries(SHOP_HOURS_DAYS.map((day) => {
+    const value = hours?.[day];
+    return [day, typeof value === 'string' && hoursTextToTimes(value) ? value.trim() : 'Closed'];
+  }));
+}
 
 function toForm(settings: ActiveShopStorefrontSettings): FormState {
   return {
@@ -56,6 +67,7 @@ function toForm(settings: ActiveShopStorefrontSettings): FormState {
     logoColor: settings.logoColor || '0',
     isPublic: settings.isPublic,
     isDemo: settings.isDemo,
+    hours: toHours(settings.hours),
   };
 }
 
@@ -204,6 +216,27 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
             </div>
           </section>
 
+          <section aria-labelledby="settings-hours" className="space-y-1">
+            <h2 id="settings-hours" className="border-b pb-2 text-sm font-semibold">Hours</h2>
+            {SHOP_HOURS_DAYS.map((day) => {
+              const times = hoursTextToTimes(form.hours[day]);
+              const setDay = (text: string) => update({ hours: { ...form.hours, [day]: text } });
+              return (
+                <div key={day} className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b py-2.5 last:border-b-0">
+                  <Label htmlFor={`hours-${day}`} className="w-12 shrink-0"><StatusDot tone={times ? 'live' : 'off'} />{DAY_LABELS[day]}</Label>
+                  <Switch id={`hours-${day}`} aria-label={`Open ${DAY_LABELS[day]}`} checked={Boolean(times)} disabled={isLoading} onCheckedChange={(open) => setDay(open ? '9:00 AM - 7:00 PM' : 'Closed')} />
+                  {times ? (
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Input type="time" aria-label={`${DAY_LABELS[day]} opens`} value={times.open} step={900} disabled={isLoading} onChange={(e) => e.target.value && setDay(timesToHoursText(e.target.value, times.close))} className="w-32 font-mono" />
+                      <span className="text-muted-foreground">–</span>
+                      <Input type="time" aria-label={`${DAY_LABELS[day]} closes`} value={times.close} step={900} disabled={isLoading} onChange={(e) => e.target.value && setDay(timesToHoursText(times.open, e.target.value))} className="w-32 font-mono" />
+                    </span>
+                  ) : <span className="text-sm text-muted-foreground">Closed</span>}
+                </div>
+              );
+            })}
+          </section>
+
           <section aria-labelledby="settings-publish" className="space-y-1">
             <h2 id="settings-publish" className="border-b pb-2 text-sm font-semibold">Publication</h2>
             <div className="flex items-center justify-between gap-4 border-b py-3">
@@ -211,7 +244,7 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
               <Switch id="published" checked={form.isPublic} disabled={isLoading} onCheckedChange={(isPublic) => update({ isPublic })} />
             </div>
             <div className="flex items-center justify-between gap-4 py-3">
-              <Label htmlFor="demo"><StatusDot tone={form.isDemo ? 'wait' : 'off'} />Sample Shop</Label>
+              <Label htmlFor="demo" className="grid gap-0.5"><span><StatusDot tone={form.isDemo ? 'wait' : 'off'} />Sample Shop</span><span className="text-xs font-normal text-muted-foreground">{form.isDemo ? 'Hidden from search engines' : 'Listed for search engines'}</span></Label>
               <Switch id="demo" checked={form.isDemo} disabled={isLoading} onCheckedChange={(isDemo) => update({ isDemo })} />
             </div>
           </section>

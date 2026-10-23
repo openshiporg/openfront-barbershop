@@ -40,7 +40,7 @@ function header(tone?: Tone) {
     <PageHeader
       title="Barbers & schedules"
       tone={tone}
-      actions={<Track><PillLink variant="primary" href={`${basePath}/barbers/create`}><Plus /> Barber</PillLink><PillLink href={`${basePath}/barber-chairs`}>Chairs</PillLink></Track>}
+      actions={<Track><PillLink variant="primary" href="/dashboard/platform/staff/new"><Plus /> Barber</PillLink><PillLink href={`${basePath}/barber-chairs`}>Chairs</PillLink></Track>}
     />
   );
 }
@@ -82,7 +82,7 @@ export default async function StaffPage() {
 
         {!data.barbers.length && (
           <Section id="staff-empty" title="Roster" count={0}>
-            <Empty>No barbers yet. <Link className="underline" href={`${basePath}/barbers/create`}>Add a barber</Link></Empty>
+            <Empty>No barbers yet. <Link className="underline" href="/dashboard/platform/staff/new">Add a barber</Link></Empty>
           </Section>
         )}
 
@@ -95,7 +95,7 @@ export default async function StaffPage() {
                 <div className="flex flex-wrap items-end justify-between gap-3 border-b pb-3">
                   <div className="min-w-0">
                     <h2 id={`barber-${barber.id}`} className="text-lg font-semibold tracking-tight"><StatusDot tone={barber.bookingEnabled ? 'live' : 'off'} />{barber.displayName}</h2>
-                    <p className="text-xs text-muted-foreground"><span className="font-mono">{chair ? `Chair ${chair}` : 'No chair'}</span>{barber.chair ? ` · ${barber.chair.status}` : ''} · {barber.status} · {barber.bookingEnabled ? 'bookable' : 'not bookable'} · {barber.accountLinked ? 'account linked' : 'no account'}</p>
+                    <p className="text-xs text-muted-foreground"><span className="font-mono">{chair ? `Chair ${chair}` : 'No chair'}</span>{barber.chair && barber.chair.status !== 'active' ? ` (${barber.chair.status})` : ''}{barber.status !== 'active' ? ` · ${barber.status}` : ''} · {barber.bookingEnabled ? 'Books online' : 'Not booking online'} · {barber.accountLinked ? 'Account linked' : 'No login'}</p>
                   </div>
                   <Track>
                     <PillLink size="sm" href={`${basePath}/barbers/${barber.id}`}>Profile</PillLink>

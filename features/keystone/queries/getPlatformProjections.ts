@@ -275,6 +275,10 @@ export async function getQueueProjection(_root: unknown, args: { search?: string
   } as const;
   const search = args.search?.trim().slice(0, 120) || '';
   const page = Math.max(1, Math.floor(Number(args.page) || 1));
+  // Day-end rule: walk-ins still waiting from an earlier shop day have left.
+  const timeZone = await shopTimeZone(context.prisma, shopId);
+  const { start: shopDayStart } = shopDayRange(new Date(), timeZone);
+  await context.prisma.walkInQueueEntry.updateMany({ where: { shopId, status: { in: ['waiting', 'texted'] }, checkedInAt: { lt: shopDayStart } }, data: { status: 'left' } });
   const activeWhere = {
     shopId, status: { in: ['waiting', 'texted', 'in_chair'] as Array<'waiting' | 'texted' | 'in_chair'> },
     ...(search ? { OR: [{ customerName: { contains: search, mode: 'insensitive' as const } }, { phone: { contains: search } }] } : {}),
@@ -290,7 +294,7 @@ export async function getQueueProjection(_root: unknown, args: { search?: string
   const counts = Object.fromEntries(grouped.map((item) => [String(item.status), item._count]));
   const activeTotal = (counts.waiting || 0) + (counts.texted || 0) + (counts.in_chair || 0);
   return {
-    active, served, counts, activeTotal, activeMatching, search, page, pageSize: QUEUE_PAGE_SIZE,
+    active, served, counts, activeTotal, activeMatching, search, page, pageSize: QUEUE_PAGE_SIZE, timeZone,
     hasMoreActive: page * QUEUE_PAGE_SIZE < activeMatching,
     services: services.map(({ specialists, ...service }) => ({ ...service, specialistIds: specialists.map((item) => item.id) })),
     barbers,
@@ -399,7 +403,8 @@ export async function getPosProjection(_root: unknown, args: PosArgs, context: C
   const ticketSearch = args?.ticketSearch?.trim().slice(0, 120) || '';
   const saleSearch = args?.saleSearch?.trim().slice(0, 120) || '';
   const receiptId = args?.receiptId?.trim().slice(0, 64) || '';
-  const openTicketWhere = { shopId, status: { in: ['checked_in', 'in_chair', 'completed'] as Array<'checked_in' | 'in_chair' | 'completed'> }, paymentStatus: { notIn: ['paid', 'refunded'] as Array<'paid' | 'refunded'> } };
+  // Completed visits were settled by checkout; only visits in the shop are open tickets.
+  const openTicketWhere = { shopId, status: { in: ['checked_in', 'in_chair'] as Array<'checked_in' | 'in_chair'> }, paymentStatus: { notIn: ['paid', 'refunded'] as Array<'paid' | 'refunded'> } };
   const ticketWhere = { ...openTicketWhere, ...(ticketSearch ? { OR: [
     { customer: { firstName: { contains: ticketSearch, mode: 'insensitive' as const } } },
     { customer: { lastName: { contains: ticketSearch, mode: 'insensitive' as const } } },
@@ -422,7 +427,7 @@ export async function getPosProjection(_root: unknown, args: PosArgs, context: C
   ] } : {}) };
   const receiptWhere = { shopId, appointments: { some: {} }, status: { in: ['paid', 'refunded', 'partially_refunded'] as Array<'paid' | 'refunded' | 'partially_refunded'> }, ...(receiptId ? { id: receiptId } : {}) };
   const [appointments, ticketTotal, outstanding, packageHolders, requested, products, productLines, saleTotal, receipts, receiptTotal, paidToday] = await Promise.all([
-    context.prisma.appointment.findMany({ where: ticketWhere, orderBy: [{ startsAt: 'asc' }, { id: 'asc' }], take: POS_PAGE_SIZE, skip: (ticketPage - 1) * POS_PAGE_SIZE, select: ticketSelect }),
+    context.prisma.appointment.findMany({ where: ticketWhere, orderBy: [{ status: 'desc' }, { startsAt: 'desc' }, { id: 'asc' }], take: POS_PAGE_SIZE, skip: (ticketPage - 1) * POS_PAGE_SIZE, select: ticketSelect }),
     context.prisma.appointment.count({ where: ticketWhere }),
     context.prisma.appointment.aggregate({ where: openTicketWhere, _sum: { price: true } }),
     context.prisma.appointment.count({ where: { ...openTicketWhere, customer: { packageBalances: { some: usableBalances } } } }),
@@ -490,7 +495,8 @@ export async function getReportsProjection(_root: unknown, args: { startDate?: s
     context.prisma.walkInQueueEntry.groupBy({ by: ['status'], where: { shopId, checkedInAt: { gte: start, lt: end } }, _count: true }),
     context.prisma.commissionPayout.aggregate({ where: { shopId, paidAt: { gte: start, lt: end } }, _sum: { totalAmount: true }, _count: true }),
     context.prisma.productSaleLine.findMany({ take: 5001, where: { shopId, occurredAt: { gte: start, lt: end } }, select: { lineType: true, total: true } }),
-    context.prisma.appointment.findMany({ take: 5001, where: { shopId, status: 'completed', startsAt: { gte: start, lt: end } }, select: { durationMinutes: true, barber: { select: { displayName: true } } } }),
+    // Completions count when the service finished, the same clock receipts use.
+    context.prisma.appointment.findMany({ take: 5001, where: { shopId, status: 'completed', OR: [{ serviceCompletedAt: { gte: start, lt: end } }, { serviceCompletedAt: null, startsAt: { gte: start, lt: end } }] }, select: { durationMinutes: true, barber: { select: { displayName: true } } } }),
     context.prisma.barberSchedule.findMany({ take: 5001, where: { barber: { shopId, status: 'active' }, isWorking: true }, select: { startMinute: true, endMinute: true, breakStartMinute: true, breakEndMinute: true } }),
     context.prisma.scheduleException.findMany({ take: 5001, where: { shopId, status: 'active', exceptionType: { in: ['time_off', 'shop_closure', 'chair_unavailable'] }, startsAt: { lt: end }, endsAt: { gt: start } }, select: { startsAt: true, endsAt: true } }),
     context.prisma.customerPackage.findMany({ take: 5001, where: { shopId, status: { in: ['active', 'paused'] } }, select: { id: true, remainingVisits: true, membershipPlan: { select: { price: true, includedVisits: true } }, servicePackage: { select: { price: true, items: { select: { quantity: true } } } } } }),
@@ -500,7 +506,7 @@ export async function getReportsProjection(_root: unknown, args: { startDate?: s
   for (const rows of [settledTransactions, productLines, completedAppointments, schedules, blockingExceptions, membershipBalances, membershipEvents]) {
     if (rows.length > 5000) throw new Error('Report range exceeds the supported record limit.');
   }
-  const appointmentCounts = Object.fromEntries(appointments.map((item) => [String(item.status), item._count]));
+  const appointmentCounts: Record<string, number> = { ...Object.fromEntries(appointments.map((item) => [String(item.status), item._count])), completed: completedAppointments.length };
   const queueCounts = Object.fromEntries(queue.map((item) => [String(item.status), item._count]));
   const appointmentTotal = appointments.reduce((sum, item) => sum + item._count, 0);
   const queueClosed = (queueCounts.served || 0) + (queueCounts.left || 0);
@@ -544,7 +550,7 @@ export async function getReportsProjection(_root: unknown, args: { startDate?: s
   }, 0);
   const netPaidTotal = settledTransactions.reduce((sum, transaction) => { const total = transaction.total || 0; return sum + (total < 0 ? total : Math.max(0, total - (transaction.paymentSession?.refundedAmount || 0) - (transaction.cashRefund?.amount || 0))); }, 0);
   const netTips = settledTransactions.reduce((sum, transaction) => sum + (transaction.status === 'refunded' ? 0 : transaction.tipAmount || 0), 0);
-  return { range: { start, end, startDate, endDate, days, timeZone, currencyCode: shopRow?.currencyCode || 'USD' }, appointments: { total: appointmentTotal, ...appointmentCounts }, revenue: { paidTotal: netPaidTotal, tips: netTips, transactionCount: settledTransactions.length, productSales: productLines.reduce((sum, line) => sum + (line.total || 0), 0), productSaleCount: productLines.filter((line) => line.lineType === 'sale').length }, queue: queueCounts, payouts: { total: payouts._sum.totalAmount || 0, count: payouts._count }, rates: { completion: appointmentTotal ? Math.round(((appointmentCounts.completed || 0) / appointmentTotal) * 100) : 0, queueConversion: queueClosed ? Math.round(((queueCounts.served || 0) / queueClosed) * 100) : 0, utilization: capacityMinutes ? Math.round((completedMinutes / capacityMinutes) * 100) : 0 }, liabilities: { memberships: membershipLiability, activeBalances: membershipBalances.length }, servicePerformance, barberPerformance };
+  return { range: { start, end, startDate, endDate, days, timeZone, currencyCode: shopRow?.currencyCode || 'USD' }, appointments: { total: appointmentTotal, ...appointmentCounts }, revenue: { paidTotal: netPaidTotal, tips: netTips, transactionCount: settledTransactions.length, productSales: productLines.reduce((sum, line) => sum + (line.total || 0), 0), productSaleCount: productLines.filter((line) => line.lineType === 'sale').length }, queue: queueCounts, payouts: { total: payouts._sum.totalAmount || 0, count: payouts._count }, rates: { completion: appointmentTotal ? Math.min(100, Math.round(((appointmentCounts.completed || 0) / appointmentTotal) * 100)) : 0, queueConversion: queueClosed ? Math.round(((queueCounts.served || 0) / queueClosed) * 100) : 0, utilization: capacityMinutes ? Math.round((completedMinutes / capacityMinutes) * 100) : 0 }, liabilities: { memberships: membershipLiability, activeBalances: membershipBalances.length }, servicePerformance, barberPerformance };
 }
 
 export async function getServicesProjection(_root: unknown, _args: unknown, context: Context) {

@@ -79,7 +79,9 @@ export default async function checkoutAppointment(
 
     const paymentMethod = clean(args.paymentMethod) || 'cash';
     const packageBalanceId = clean(args.packageBalanceId);
-    if (!['cash', 'package'].includes(paymentMethod)) throw new Error('This release supports cash and prepaid visits only; online/card settlement is not connected.');
+    // Card is tender taken on the shop's own terminal and recorded here; no
+    // online card settlement is connected.
+    if (!['cash', 'card', 'package'].includes(paymentMethod)) throw new Error('Choose cash, card or a prepaid visit.');
     if (preview.shop.currencyCode !== 'USD') throw new Error('This release supports USD settlement only.');
     if (preview.price == null) throw new Error('This legacy appointment has no agreed price. Resolve its commercial evidence before checkout.');
     const subtotal = paymentMethod === 'package' ? 0 : money(preview.price);

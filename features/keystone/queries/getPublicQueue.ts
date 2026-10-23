@@ -1,5 +1,6 @@
 import { publicAccessTokenMatches } from '../utils/publicAccessToken';
 import { resolvePublishedShop } from '../utils/publicShop';
+import { shopDayRange } from '../../shared/shop-time';
 
 type QueueArgs = {
   queueEntryId?: string | null;
@@ -42,10 +43,12 @@ export async function getPublicQueue(
   context: PublicQueueContext
 ) {
   const prisma = context.sudo().prisma;
-  const shop = await resolvePublishedShop(prisma, { id: true });
+  const shop = await resolvePublishedShop(prisma, { id: true, timezone: true });
   if (!shop) return [];
+  // Only today's line counts; earlier days' unserved walk-ins have gone home.
+  const { start } = shopDayRange(new Date(), shop.timezone || 'UTC');
   const items = await prisma.walkInQueueEntry.findMany({
-    where: { shopId: shop.id, status: { in: ['waiting', 'texted', 'in_chair'] } },
+    where: { shopId: shop.id, status: { in: ['waiting', 'texted', 'in_chair'] }, checkedInAt: { gte: start } },
     orderBy: { checkedInAt: 'asc' },
     take: 100,
     select: {

@@ -4,6 +4,10 @@ import { requireEffectivePractitionerAuthority } from '../utils/practitionerAuth
 import { displayTimeToMinutes } from '../utils/availability';
 import { shopWallTime, shopMinute } from '../../shared/shop-time';
 import { resolvePublishedShop } from '../utils/publicShop';
+import { clipToPostedHours } from '../../shared/shop-hours';
+
+// Matches the online booking window enforced in createOnlineBooking.
+const BOOKING_HORIZON_MS = 90 * 86400_000;
 
 type Args = { barberId: string; serviceId?: string; date: string; serviceDuration: number; includeUnavailable?: boolean | null };
 type ScheduleRecord = { id: string; dayOfWeek: string; isWorking?: boolean | null; startMinute?: number | null; endMinute?: number | null; breakStartMinute?: number | null; breakEndMinute?: number | null; barber?: { id: string; displayName?: string | null } | null };
@@ -13,7 +17,7 @@ type AvailabilitySudoContext = {
     $queryRawUnsafe<T = unknown>(query: string, ...values: unknown[]): Promise<T>;
     service: { findFirst(args: Record<string, unknown>): Promise<{ id: string; durationMinutes: number; depositRequired: boolean; bookingBufferMinutes?: number | null; specialists: Array<{ id: string }> } | null> };
     shop: { findMany(args: Record<string, unknown>): Promise<Array<{ id: string }>> };
-    barber: { findUnique(args: Record<string, unknown>): Promise<{ id: string; status: string; bookingEnabled: boolean; bufferMinutes?: number | null; chairId?: string | null; chair?: { id: string; status: string } | null; shop?: { id: string; status?: string; isPublic?: boolean; timezone?: string } | null } | null> };
+    barber: { findUnique(args: Record<string, unknown>): Promise<{ id: string; status: string; bookingEnabled: boolean; bufferMinutes?: number | null; chairId?: string | null; chair?: { id: string; status: string } | null; shop?: { id: string; status?: string; isPublic?: boolean; timezone?: string; hours?: unknown } | null } | null> };
     scheduleException: { findMany(args: Record<string, unknown>): Promise<Array<{ exceptionType: string; startsAt: Date; endsAt: Date; reason: string | null }>> };
     staffShift: { findMany(args: Record<string, unknown>): Promise<Array<{ scheduledStart: Date; scheduledEnd: Date }>> };
     appointment: { findMany(args: Record<string, unknown>): Promise<Array<{ id: string; startsAt: Date; endsAt: Date | null; durationMinutes: number | null; barberId: string | null; status?: string | null }>> };
@@ -27,7 +31,7 @@ export default async function checkBarberAvailability(_root: unknown, args: Args
   if (!barberId || !args.serviceId || !/^\d{4}-\d{2}-\d{2}$/.test(args.date || '')) return [];
   const sudo = context.sudo();
   const [barber, publishedShop] = await Promise.all([
-    sudo.prisma.barber.findUnique({ where: { id: barberId }, select: { id: true, status: true, bookingEnabled: true, bufferMinutes: true, chairId: true, chair: { select: { id: true, status: true } }, shop: { select: { id: true, status: true, isPublic: true, timezone: true } } } }),
+    sudo.prisma.barber.findUnique({ where: { id: barberId }, select: { id: true, status: true, bookingEnabled: true, bufferMinutes: true, chairId: true, chair: { select: { id: true, status: true } }, shop: { select: { id: true, status: true, isPublic: true, timezone: true, hours: true } } } }),
     resolvePublishedShop(sudo.prisma, { id: true }),
   ]);
   const shop = barber?.shop;
@@ -37,7 +41,7 @@ export default async function checkBarberAvailability(_root: unknown, args: Args
   if (!service || service.depositRequired || service.durationMinutes !== serviceDuration || (service.specialists.length && !service.specialists.some(item => item.id === barberId))) return [];
   const timeZone = shop.timezone || 'UTC';
   const dayOfWeek = dayKeyForDate(args.date, timeZone); const { start, end } = dayRange(args.date, timeZone);
-  if (Number.isNaN(start.getTime()) || end <= new Date()) return [];
+  if (Number.isNaN(start.getTime()) || end <= new Date() || start.getTime() > Date.now() + BOOKING_HORIZON_MS) return [];
   const minute = (value: Date) => value <= start ? 0 : value >= end ? 1440 : shopMinute(value, timeZone);
   const bufferMinutes = occupiedBufferMinutes(barber.bufferMinutes, service.bookingBufferMinutes);
 
@@ -51,7 +55,8 @@ export default async function checkBarberAvailability(_root: unknown, args: Args
 
   const weekly = schedules.find((candidate) => candidate.dayOfWeek === dayOfWeek);
   const override = exceptions.find((item) => item.exceptionType === 'working_override');
-  const schedule = override ? { id: `override-${barberId}`, dayOfWeek, isWorking: true, startMinute: minute(override.startsAt), endMinute: minute(override.endsAt), barber: { id: barberId, displayName: '' } } : weekly;
+  // Online times stay inside the shop's posted hours as well as the barber's own.
+  const schedule = clipToPostedHours(override ? { id: `override-${barberId}`, dayOfWeek, isWorking: true, startMinute: minute(override.startsAt), endMinute: minute(override.endsAt), barber: { id: barberId, displayName: '' } } : weekly, shop.hours, dayOfWeek);
   if (!schedule) return [];
   const orderedShifts = [...shifts].sort((left, right) => left.scheduledStart.getTime() - right.scheduledStart.getTime());
   const effectiveSchedule = orderedShifts.length ? { ...schedule, startMinute: Math.max(schedule.startMinute ?? 0, minute(orderedShifts[0].scheduledStart)), endMinute: Math.min(schedule.endMinute ?? 1440, minute(orderedShifts[orderedShifts.length - 1].scheduledEnd)) } : schedule;

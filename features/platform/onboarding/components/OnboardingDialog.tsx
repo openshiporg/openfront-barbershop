@@ -6,8 +6,14 @@ import { ArrowUpRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Notice, Pill, StatusDot, Track } from '@/features/platform/lib/ui';
+import { Notice, Pill, selectClass, StatusDot, Track } from '@/features/platform/lib/ui';
 import { useOnboardingApi } from '../hooks/useOnboardingApi';
+
+function timeZones(current: string) {
+  let zones: string[] = [];
+  try { zones = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf?.('timeZone') || []; } catch { zones = []; }
+  return zones.includes(current) ? zones : [current, ...zones];
+}
 
 const rowClass = 'flex min-h-11 items-center justify-between gap-3 border-b text-sm font-medium last:border-b-0 hover:text-foreground';
 
@@ -29,10 +35,10 @@ export default function OnboardingDialog({ isOpen, onClose }: { isOpen: boolean;
       </DialogHeader>
       {!complete ? (
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="grid gap-1.5 sm:col-span-2"><Label htmlFor="onboarding-shopName">Shop name</Label><Input {...field('shopName')} maxLength={120} autoComplete="organization" placeholder="Stack & Fade" /></div>
+          <div className="grid gap-1.5 sm:col-span-2"><Label htmlFor="onboarding-shopName">Shop name</Label><Input {...field('shopName')} maxLength={120} autoComplete="organization" required /></div>
           <div className="grid gap-1.5 sm:col-span-2"><Label htmlFor="onboarding-shopAddress">Address</Label><Input {...field('shopAddress')} maxLength={200} autoComplete="street-address" /></div>
           <div className="grid gap-1.5"><Label htmlFor="onboarding-shopPhone">Phone</Label><Input {...field('shopPhone')} maxLength={40} type="tel" autoComplete="tel" /></div>
-          <div className="grid gap-1.5"><Label htmlFor="onboarding-shopTimezone">Timezone</Label><Input {...field('shopTimezone')} maxLength={64} className="font-mono" /></div>
+          <div className="grid gap-1.5"><Label htmlFor="onboarding-shopTimezone">Timezone</Label><select id="onboarding-shopTimezone" value={shop.shopTimezone} onChange={(event) => setShop({ ...shop, shopTimezone: event.target.value })} className={`${selectClass} font-mono`}>{timeZones(shop.shopTimezone).map((zone) => <option key={zone} value={zone}>{zone}</option>)}</select></div>
         </div>
       ) : null}
       {!complete ? (
@@ -73,7 +79,7 @@ export default function OnboardingDialog({ isOpen, onClose }: { isOpen: boolean;
       <div className="flex justify-end">
         <Track>
           <Pill onClick={onClose}>Close</Pill>
-          {!complete ? <Pill variant="primary" disabled={pending} onClick={run}>{pending ? 'Saving…' : `Run ${mode} setup`}</Pill> : null}
+          {!complete ? <Pill variant="primary" disabled={pending || !shop.shopName.trim()} onClick={run}>{pending ? 'Saving…' : `Run ${mode} setup`}</Pill> : null}
         </Track>
       </div>
     </DialogContent>

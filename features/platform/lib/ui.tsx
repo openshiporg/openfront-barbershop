@@ -41,8 +41,9 @@ export function Track({ children, className, label, block = false }: { children:
       role={label ? 'group' : undefined}
       aria-label={label}
       className={cn(
-        'max-w-full flex-wrap items-center gap-1 rounded-full bg-muted p-1 shadow-[inset_0_1px_2px_rgb(0_0_0/0.08)] ring-1 ring-inset ring-black/5 dark:bg-zinc-900 dark:shadow-[inset_0_1px_2px_rgb(0_0_0/0.5)] dark:ring-white/5',
-        block ? 'flex w-full [&>*]:flex-1' : 'inline-flex',
+        'max-w-full items-center gap-1 rounded-full bg-muted p-1 shadow-[inset_0_1px_2px_rgb(0_0_0/0.08)] ring-1 ring-inset ring-black/5 dark:bg-zinc-900 dark:shadow-[inset_0_1px_2px_rgb(0_0_0/0.5)] dark:ring-white/5',
+        // Inline tracks never wrap into a lopsided blob: on narrow screens they scroll.
+        block ? 'flex w-full flex-wrap [&>*]:flex-1' : 'inline-flex flex-nowrap overflow-x-auto [scrollbar-width:none] [&>*]:shrink-0',
         className,
       )}
     >
@@ -130,6 +131,8 @@ export function Pager({ page, pages, prev, next, label }: { page: number; pages:
   );
 }
 
-export function liveStamp(at: Date) {
-  return at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+/** Last-refresh time in the shop's timezone (server and browser agree on it). */
+export function liveStamp(at: Date, timeZone?: string | null) {
+  try { return at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', ...(timeZone ? { timeZone } : {}) }); }
+  catch { return at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
 }

@@ -125,7 +125,7 @@ export function CustomersPageClient({ data, search, planSearch, initialCustomerI
             })}
             {!customers.length && (
               <p className="px-3 py-4 text-sm text-muted-foreground">
-                {search ? <>No customers match “{search}”.</> : <>No customers yet. <Link className="underline" href="/dashboard/customers/create">Add a customer</Link></>}
+                {search ? <>No customers match “{search}”.</> : <>No customers yet. <Link className="underline" href="/dashboard/platform/customers/new">Add a customer</Link></>}
               </p>
             )}
           </div>

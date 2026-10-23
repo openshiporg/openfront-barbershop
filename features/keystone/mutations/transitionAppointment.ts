@@ -9,6 +9,31 @@ import { hashPublicAccessToken } from '../utils/publicAccessToken';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
 import { assertAuthorityMatches, requireEffectivePractitionerAuthority, type PractitionerAuthoritySnapshot } from '../utils/practitionerAuthority';
 import { getAppointmentWaiverRequirement, requireSignedWaiver } from '../utils/waiverEvidence';
+import { formatShopDateTime, shopDateKey } from '../../shared/shop-time';
+import { sendAppointmentEmail } from '../lib/mail';
+
+/** Tells the customer the shop confirmed their visit; mail failures are ignored. */
+async function sendConfirmedNotice(prisma: PrismaClient, appointmentId: string) {
+  try {
+    const appointment = await prisma.appointment.findUnique({
+      where: { id: appointmentId },
+      select: { id: true, startsAt: true, serviceTitleSnapshot: true, barberNameSnapshot: true, customer: { select: { email: true } }, shop: { select: { name: true, timezone: true } } },
+    });
+    const to = appointment?.customer?.email?.trim();
+    if (!appointment || !to) return;
+    await sendAppointmentEmail({
+      to,
+      subject: `Booking confirmed · ${appointment.shop.name}`,
+      heading: 'Your visit is confirmed',
+      lines: [
+        `${appointment.serviceTitleSnapshot || 'Appointment'} with ${appointment.barberNameSnapshot || 'your barber'}`,
+        formatShopDateTime(appointment.startsAt, appointment.shop.timezone || 'UTC'),
+      ],
+      path: `/appointment?id=${encodeURIComponent(appointment.id)}`,
+      action: 'View booking',
+    });
+  } catch { /* best effort */ }
+}
 
 type Args = { appointmentId: string; toStatus: string; idempotencyKey: string };
 type Context = { session?: Parameters<typeof permissions.canManageAppointments>[0]['session']; prisma: PrismaClient };
@@ -30,8 +55,10 @@ export default async function transitionAppointment(_root: unknown, args: Args, 
     return { success: false, error: 'Use Mark no-show so the grace period and no-show policy are applied.', appointment: null };
   }
 
+  let confirmedNow = false;
   try {
     const appointment = await runSerializableTransaction(context.prisma, async (client) => {
+      confirmedNow = false;
       const transaction = client as Prisma.TransactionClient;
       // Authorize first; only then read the appointment, scoped to the shop.
       const shopId = await requireCurrentShopPermission(context.session, 'canManageAppointments', transaction);
@@ -65,6 +92,13 @@ export default async function transitionAppointment(_root: unknown, args: Args, 
         paymentStatus: current.paymentStatus,
         startsAt: current.startsAt,
       });
+      if (toStatus === 'checked_in' || toStatus === 'in_chair') {
+        const shop = await transaction.shop.findUnique({ where: { id: shopId }, select: { timezone: true } });
+        const timeZone = shop?.timezone || 'UTC';
+        if (current.startsAt && shopDateKey(current.startsAt, timeZone) !== shopDateKey(new Date(), timeZone)) {
+          throw new Error('Check-in and seating happen on the appointment’s day.');
+        }
+      }
       if (toStatus === 'in_chair') {
         if (!current.barberId || !current.serviceId) throw new Error('Appointment practitioner and service are required.');
         await lockBookingResources(transaction, { serviceId: current.serviceId, barberId: current.barberId, chairNumber: current.barberChairNumberSnapshot || null });
@@ -111,6 +145,7 @@ export default async function transitionAppointment(_root: unknown, args: Args, 
       });
       if (toStatus === 'confirmed') {
         await transaction.$executeRawUnsafe('UPDATE "Appointment" SET "bookingAuthoritySnapshot" = $2::jsonb WHERE id = $1', current.id, JSON.stringify(authorityEvidence));
+        confirmedNow = true;
       }
       if (toStatus === 'in_chair') {
         await transaction.$executeRawUnsafe('UPDATE "Appointment" SET "executionAuthoritySnapshot" = $2::jsonb, "serviceStartedAt" = $3 WHERE id = $1', current.id, JSON.stringify(authorityEvidence), updated.updatedAt);
@@ -133,6 +168,7 @@ export default async function transitionAppointment(_root: unknown, args: Args, 
       }));
       return updated;
     });
+    if (confirmedNow) void sendConfirmedNotice(context.prisma, appointment.id);
 
     return {
       success: true,

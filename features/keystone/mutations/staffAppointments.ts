@@ -227,7 +227,8 @@ export async function createStaffAppointment(_root: unknown, args: CreateArgs, c
           serviceModifiersSnapshot: [],
           barberNameSnapshot: slot.barber.displayName || '',
           barberChairNumberSnapshot: slot.barber.chairNumber || '',
-          status: 'requested',
+          // Staff took the booking themselves, so it is confirmed on entry.
+          status: 'confirmed',
           source: source as 'phone' | 'staff' | 'walk_in',
           paymentStatus: slot.service.depositRequired ? 'deposit_due' : 'not_required',
           price: slot.service.price || 0,

@@ -36,6 +36,7 @@ export type QueueProjectionData = {
   served: QueueEntry[];
   counts: Record<string, number>;
   activeTotal: number;
+  timeZone?: string | null;
   activeMatching: number;
   search: string;
   page: number;

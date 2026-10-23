@@ -16,7 +16,7 @@ const breadcrumbs = [
 ];
 
 const customersHeader = (
-  <PageHeader title="Customers" actions={<Track><PillLink variant="primary" href="/dashboard/customers/create">New customer</PillLink></Track>} />
+  <PageHeader title="Customers" actions={<Track><PillLink variant="primary" href="/dashboard/platform/customers/new">New customer</PillLink></Track>} />
 );
 
 function param(value: string | string[] | undefined) {

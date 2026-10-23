@@ -74,7 +74,7 @@ export function QueuePageClient({ data, breadcrumbs }: { data: QueueProjectionDa
     <PageHeader
       title="Walk-in queue"
       tone={live.refreshing ? 'wait' : 'live'}
-      meta={<>{counts.waiting || 0} waiting{longest ? <> · longest <span className="font-mono tabular-nums">{waitAge(longest, live.now)}</span></> : null} · <span className="font-mono tabular-nums">Live {liveStamp(live.lastRefreshedAt)}</span></>}
+      meta={<>{counts.waiting || 0} waiting{longest ? <> · longest <span className="font-mono tabular-nums" suppressHydrationWarning>{waitAge(longest, live.now)}</span></> : null} · <span className="font-mono tabular-nums" suppressHydrationWarning>Live {liveStamp(live.lastRefreshedAt, data.timeZone)}</span></>}
       actions={(
         <Track>
           <Pill onClick={live.refresh} disabled={live.refreshing}><RefreshCw />{live.refreshing ? 'Refreshing' : 'Refresh'}</Pill>

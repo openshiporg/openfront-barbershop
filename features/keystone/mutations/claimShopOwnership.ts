@@ -52,7 +52,12 @@ export default async function claimShopOwnership(_root: unknown, args: { shopId:
         update: { membershipRole: 'owner', status: 'active' },
         select: { id: true },
       });
-      await transaction.user.update({ where: { id: userId }, data: { activeShopId: shopId } });
+      // Joining a shop that already runs needs no setup, so the welcome card closes.
+      const [services, barbers] = await Promise.all([
+        transaction.service.count({ where: { shopId } }),
+        transaction.barber.count({ where: { shopId } }),
+      ]);
+      await transaction.user.update({ where: { id: userId }, data: { activeShopId: shopId, ...(services && barbers ? { onboardingStatus: 'completed' } : {}) } });
       await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: userId,
         eventKey: `shop:${shopId}:owner-claimed:${userId}:${randomUUID()}:v1`,
         eventType: 'shop.owner_claimed',

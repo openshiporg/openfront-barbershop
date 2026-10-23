@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { RefreshCw } from 'lucide-react';
 import { PageContainer } from '@/features/dashboard/components/PageContainer';
 import { useLiveRefresh } from '@/features/platform/lib/useLiveRefresh';
+import { shopDateKey } from '@/features/shared/shop-time';
 import { Empty, liveStamp, Notice, PageHeader, Pager, Pill, PillLink, Readouts, Section, selectClass, StatusDot, Track, type Tone } from '@/features/platform/lib/ui';
 import { markAppointmentNoShowAction, updateAppointmentStatus, type BookingProjectionData, type ForwardAppointmentStatus } from '../actions/appointments';
 import { AppointmentChangeForm } from '../components/AppointmentChangeForm';
@@ -118,7 +119,7 @@ export function BookingBoardPageClient({ data, breadcrumbs }: { data: BookingPro
     <PageHeader
       title="Booking board"
       tone={live.refreshing ? 'wait' : 'live'}
-      meta={<>{shopDayLabel(selectedDate)} · {timeZone} · <span className="font-mono tabular-nums">Live {liveStamp(live.lastRefreshedAt)}</span></>}
+      meta={<>{shopDayLabel(selectedDate)} · {timeZone} · <span className="font-mono tabular-nums" suppressHydrationWarning>Live {liveStamp(live.lastRefreshedAt, timeZone)}</span></>}
       actions={(
         <Track>
           <Pill onClick={live.refresh} disabled={live.refreshing}><RefreshCw />{live.refreshing ? 'Refreshing' : 'Refresh'}</Pill>
@@ -129,8 +130,13 @@ export function BookingBoardPageClient({ data, breadcrumbs }: { data: BookingPro
     />
   );
 
+  const shopToday = shopDateKey(new Date(live.now), timeZone);
   const renderAppointment = (appointment: AppointmentBoardItem, compact = false) => {
-    const action = nextStatus[appointment.status as AppointmentStatus];
+    const onShopDay = !appointment.startsAt || shopDateKey(new Date(appointment.startsAt), timeZone) === shopToday;
+    const started = Boolean(appointment.startsAt) && new Date(appointment.startsAt as string).getTime() <= live.now;
+    // Check-in and seat happen on the visit's own shop day.
+    const rawAction = nextStatus[appointment.status as AppointmentStatus];
+    const action = rawAction && (rawAction.value === 'confirmed' || onShopDay) ? rawAction : undefined;
     const currentBarber = appointment.barber?.displayName;
     const bookedBarber = appointment.barberNameSnapshot;
     const closedVisit = hasStatus(closedStatuses, appointment.status);
@@ -146,17 +152,16 @@ export function BookingBoardPageClient({ data, breadcrumbs }: { data: BookingPro
         </div>
         <p className="mt-2 pl-[4.75rem] text-xs text-muted-foreground">
           {currentBarber || bookedBarber || 'No barber'}{bookedBarber && currentBarber && bookedBarber !== currentBarber ? ` (booked with ${bookedBarber})` : ''}
-          {' · '}{appointment.durationMinutes || appointment.service?.durationMinutes || 30} min · {statusLabel(appointment.paymentStatus)}{appointment.source ? ` · ${statusLabel(appointment.source)}` : ''}
+          {' · '}{appointment.durationMinutes || appointment.service?.durationMinutes || 30} min{appointment.paymentStatus && appointment.paymentStatus !== 'not_required' ? ` · ${statusLabel(appointment.paymentStatus)}` : ''}{appointment.source ? ` · ${statusLabel(appointment.source)}` : ''}
           {compact ? ` · ${appointmentStatusLabels[appointment.status as AppointmentStatus] || statusLabel(appointment.status)}` : ''}
         </p>
-        {appointment.bookingEligibility && !compact && <p className="mt-1 pl-[4.75rem] text-xs text-muted-foreground">Policy v{appointment.bookingEligibility.version} · {appointment.bookingEligibility.publicServiceEligibility}</p>}
         {appointment.customerNotes && <p className="mt-2 ml-[4.75rem] rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground">{appointment.customerNotes}</p>}
         {!closedVisit && (
           <div className="mt-3 pl-[4.75rem]">
             <Track>
               {action && <Pill size="sm" variant="primary" disabled={pending} onClick={() => moveAppointment(appointment.id, action.value)}>{action.label}</Pill>}
               {appointment.status === 'in_chair' && <PillLink size="sm" variant="primary" href={`/dashboard/platform/pos?appointment=${encodeURIComponent(appointment.id)}`}>Checkout</PillLink>}
-              {appointment.status !== 'in_chair' && <Pill size="sm" disabled={pending} onClick={() => markNoShow(appointment.id)}>No-show</Pill>}
+              {appointment.status !== 'in_chair' && started && <Pill size="sm" disabled={pending} onClick={() => markNoShow(appointment.id)}>No-show</Pill>}
               {hasStatus(changeableStatuses, appointment.status) && (
                 <Pill size="sm" aria-expanded={changingId === appointment.id} onClick={() => setChangingId(changingId === appointment.id ? null : appointment.id)}>Change</Pill>
               )}
@@ -194,7 +199,7 @@ export function BookingBoardPageClient({ data, breadcrumbs }: { data: BookingPro
             <Track><Pill type="submit">Show</Pill></Track>
           </form>
           <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
-            <Track label="Status filter" className="flex-nowrap">
+            <Track label="Status filter" className="w-max flex-nowrap [&>*]:shrink-0">
               <PillLink size="sm" variant={data.status ? 'flat' : 'raised'} href={boardHref({ date: selectedDate })}>All <span className="font-mono tabular-nums">{Object.values(statusCounts).reduce((sum, count) => sum + (count || 0), 0)}</span></PillLink>
               {statusOrder.map((status) => (
                 <PillLink key={status} size="sm" variant={data.status === status ? 'raised' : 'flat'} href={boardHref({ date: selectedDate, status })}>

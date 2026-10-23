@@ -7106,7 +7106,7 @@ type Mutation {
   managePublicAppointment(appointmentId: ID!, accessToken: String, action: String!, startsAt: String, reason: String!, idempotencyKey: String!, preview: Boolean, acceptedFeeAmount: Int): DomainCommandResult!
   signPublicWaiver(appointmentId: ID!, accessToken: String, signerName: String!, signerRole: String!, guardianName: String, affirmation: Boolean!, idempotencyKey: String!): DomainCommandResult!
   setPractitionerCredentialStatus(credentialId: ID!, status: String!, reason: String!, idempotencyKey: String!): DomainCommandResult!
-  updateActiveShopStorefrontSettings(name: String!, tagline: String, address: String, phone: String, timezone: String!, currencyCode: String!, brandColor: String!, logoIcon: String, logoColor: String, isPublic: Boolean!, isDemo: Boolean!, expectedShopId: ID, expectedVersion: String): DomainCommandResult!
+  updateActiveShopStorefrontSettings(name: String!, tagline: String, address: String, phone: String, timezone: String!, currencyCode: String!, brandColor: String!, logoIcon: String, logoColor: String, isPublic: Boolean!, isDemo: Boolean!, hours: JSON, expectedShopId: ID, expectedVersion: String): DomainCommandResult!
   createPublicQueueEntry(customerName: String!, phone: String!, partySize: Int, requestedServiceId: ID, requestedBarberId: ID, accessToken: String): CreatePublicQueueEntryResult!
   initiateAppointmentPaymentSession(appointmentId: ID!, amount: Int, currencyCode: String, idempotencyKey: String!): AppointmentPaymentSessionResult!
   captureAppointmentPaymentSession(paymentSessionId: ID!): AppointmentPaymentSessionResult!

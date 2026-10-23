@@ -1,6 +1,8 @@
 'use client';
 
-import { useId, useMemo, useState, useTransition } from 'react';
+import { useEffect, useId, useMemo, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import { getAvailableTimeSlots, type StorefrontTimeSlot } from '@/features/storefront/lib/data/availability';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -57,7 +59,20 @@ export function StaffBookingForm(props: StaffBookingFormProps) {
   const [pending, startTransition] = useTransition();
   const [searching, startSearch] = useTransition();
 
+  const router = useRouter();
+  const [openTimes, setOpenTimes] = useState<StorefrontTimeSlot[] | null>(null);
   const service = props.services.find((item) => item.id === serviceId);
+
+  // Open times for the chosen barber and day; staff can still enter any time.
+  useEffect(() => {
+    let cancelled = false;
+    if (!service?.durationMinutes || !barberId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { Promise.resolve().then(() => { if (!cancelled) setOpenTimes(null); }); return () => { cancelled = true; }; }
+    getAvailableTimeSlots(barberId, date, service.durationMinutes, service.id)
+      .then((result) => { if (!cancelled) setOpenTimes(result.error ? null : result.slots); })
+      .catch(() => { if (!cancelled) setOpenTimes(null); });
+    return () => { cancelled = true; };
+  }, [barberId, date, service]);
+  const shopClock = (iso: string) => new Intl.DateTimeFormat('en-GB', { timeZone: props.timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(iso));
   const barbers = useMemo(() => props.barbers.filter((barber) => barber.bookingEnabled !== false && (!service?.specialistIds?.length || service.specialistIds.includes(barber.id))), [props.barbers, service]);
 
   const runSearch = () => startSearch(async () => {
@@ -96,10 +111,12 @@ export function StaffBookingForm(props: StaffBookingFormProps) {
           tone: 'status',
           message: response.data?.replayed
             ? 'This booking was already recorded; no duplicate was created.'
-            : `Appointment booked as Requested.${response.data?.waiverRequired ? ' Signed waiver required before it starts.' : ''}`,
+            : `Appointment booked and confirmed.${response.data?.waiverRequired ? ' Signed waiver required before it starts.' : ''}`,
           link: token ? `/appointment?id=${encodeURIComponent(appointmentId)}&token=${encodeURIComponent(token)}` : undefined,
         });
         props.onDone?.(appointmentId);
+        // Show the board for the day just booked.
+        if (!props.onDone) router.push(`/dashboard/platform/booking?date=${encodeURIComponent(date)}`);
       } catch {
         setResult({ tone: 'alert', message: 'Connection interrupted. The booking may have been recorded. Submit again without changes to check; the same request will not create a duplicate.' });
       }
@@ -167,6 +184,16 @@ export function StaffBookingForm(props: StaffBookingFormProps) {
           <Label htmlFor={`${id}-time`}>Time ({props.timeZone})</Label>
           <Input id={`${id}-time`} type="time" step={300} value={time} onChange={(event) => setTime(event.target.value)} aria-describedby={described('time')} />
           {errorFor('time')}
+          {openTimes ? (
+            openTimes.length ? (
+              <div role="group" aria-label="Open times" className="flex flex-wrap gap-1 pt-1">
+                {openTimes.map((slot) => {
+                  const value = shopClock(slot.startsAt);
+                  return <Pill key={slot.startsAt} size="sm" variant="flat" aria-pressed={time === value} onClick={() => setTime(value)} className="font-mono">{slot.label}</Pill>;
+                })}
+              </div>
+            ) : <p className="text-xs text-muted-foreground">No open online times this day</p>
+          ) : null}
         </div>
         <div className="grid gap-1">
           <Label htmlFor={`${id}-source`}>Booked via</Label>

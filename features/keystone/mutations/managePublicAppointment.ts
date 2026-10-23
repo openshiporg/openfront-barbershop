@@ -3,6 +3,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 
 import { shopMinute } from '../../shared/shop-time';
 import { dayKeyForDate, dayRange, isSlotAvailable, occupiedBufferMinutes } from '../utils/availability';
+import { clipToPostedHours } from '../../shared/shop-hours';
 import {
   assertAppointmentCandidateSetComplete,
   lockBookingResources,
@@ -43,7 +44,7 @@ async function assertRescheduleSlot(transaction: Prisma.TransactionClient, appoi
   // Cleanup is part of the occupied interval for every capacity check below.
   const bufferMinutes = occupiedBufferMinutes(barber.bufferMinutes, service.bookingBufferMinutes);
   const occupiedEndsAt = new Date(endsAt.getTime() + bufferMinutes * 60_000);
-  const shop = await transaction.shop.findUnique({ where: { id: appointment.shopId }, select: { timezone: true } });
+  const shop = await transaction.shop.findUnique({ where: { id: appointment.shopId }, select: { timezone: true, hours: true } });
   const timeZone = shop?.timezone || 'UTC';
   const { start, end } = dayRange(startsAt, timeZone);
   const minute = (value: Date) => value <= start ? 0 : value >= end ? 1440 : shopMinute(value, timeZone);
@@ -58,7 +59,7 @@ async function assertRescheduleSlot(transaction: Prisma.TransactionClient, appoi
   if (blocking.length) throw new Error(blocking[0].reason || 'That time is blocked.');
   if (shifts.length && !shifts.some((shift) => startsAt >= shift.scheduledStart && occupiedEndsAt <= shift.scheduledEnd)) throw new Error('That time is outside the barber’s shift.');
   const override = exceptions.find((item) => item.exceptionType === 'working_override');
-  const effectiveSchedule = override ? { ...schedule, id: override.id, barberId: appointment.barberId, dayOfWeek: dayKeyForDate(startsAt, timeZone), isWorking: true, startMinute: minute(override.startsAt), endMinute: minute(override.endsAt), breakStartMinute: null, breakEndMinute: null, notes: override.reason, createdAt: override.createdAt, updatedAt: override.updatedAt } : schedule;
+  const effectiveSchedule = clipToPostedHours(override ? { ...schedule, id: override.id, barberId: appointment.barberId, dayOfWeek: dayKeyForDate(startsAt, timeZone), isWorking: true, startMinute: minute(override.startsAt), endMinute: minute(override.endsAt), breakStartMinute: null, breakEndMinute: null, notes: override.reason, createdAt: override.createdAt, updatedAt: override.updatedAt } : schedule, shop?.hours, dayKeyForDate(startsAt, timeZone));
   if (!isSlotAvailable({
     startsAt,
     timeZone,

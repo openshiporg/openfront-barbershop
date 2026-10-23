@@ -3,6 +3,7 @@
 import { storefrontClient } from '../config';
 import { rememberAccess } from '../access-cookies';
 import { readAccess } from '../access-cookie-read';
+import { getAllBarbers } from './services';
 
 type QueueEntry = { id: string; status: string; quotedWaitMinutes: number | null; requestedBarber?: { displayName: string } | null };
 export type QueueStatusLookup = { status: 'found'; entry: QueueEntry } | { status: 'not_found' } | { status: 'unavailable' };
@@ -32,24 +33,27 @@ export async function joinStorefrontQueue(input: { customerName: string; phone: 
   }
 }
 
-type PublicQueueRow = { id: string; status: string; quotedWaitMinutes: number | null; checkedInAt: string | null };
-export type QueueSummary = { waiting: number; inChair: number; waitMinutes: number | null; order: string[] };
+type PublicQueueRow = { id: string; status: string; requestedService?: { durationMinutes?: number | null } | null };
+export type QueueSummary = { waiting: number; inChair: number; waitMinutes: number; order: string[] };
 
-/** Public line summary: who is waiting, and the longest remaining quoted wait. */
+const DEFAULT_VISIT_MINUTES = 30;
+
+/**
+ * Public line summary for today. The wait for someone joining now is the
+ * chair time of everyone ahead, shared across the barbers taking walk-ins.
+ */
 export async function getStorefrontQueueSummary(): Promise<QueueSummary | null> {
   try {
-    const result = await storefrontClient.request<{ getPublicQueue: PublicQueueRow[] }>('query{getPublicQueue{id status quotedWaitMinutes checkedInAt}}');
-    const now = Date.now();
+    const [result, barbers] = await Promise.all([
+      storefrontClient.request<{ getPublicQueue: PublicQueueRow[] }>('query{getPublicQueue{id status requestedService{durationMinutes}}}'),
+      getAllBarbers().catch(() => []),
+    ]);
     const waiting = result.getPublicQueue.filter((entry) => entry.status === 'waiting' || entry.status === 'texted');
-    const remaining = waiting.flatMap((entry) => {
-      if (entry.quotedWaitMinutes == null) return [];
-      const elapsed = entry.checkedInAt ? Math.floor((now - new Date(entry.checkedInAt).getTime()) / 60000) : 0;
-      return [Math.max(0, entry.quotedWaitMinutes - Math.max(0, elapsed))];
-    });
+    const chairMinutes = waiting.reduce((total, entry) => total + (entry.requestedService?.durationMinutes || DEFAULT_VISIT_MINUTES), 0);
     return {
       waiting: waiting.length,
       inChair: result.getPublicQueue.filter((entry) => entry.status === 'in_chair').length,
-      waitMinutes: remaining.length ? Math.max(...remaining) : waiting.length ? null : 0,
+      waitMinutes: Math.ceil(chairMinutes / Math.max(1, barbers.length) / 5) * 5,
       order: waiting.map((entry) => entry.id),
     };
   } catch { return null; }

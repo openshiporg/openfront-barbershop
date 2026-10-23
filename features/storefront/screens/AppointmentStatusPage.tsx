@@ -5,7 +5,7 @@ import { getPublicAppointment, type PublicAppointmentCustomer } from '../lib/dat
 import { getPublicStorefrontSettings } from '../lib/data/settings';
 import { getStorefrontAccount, getStorefrontBookingHistory, type AccountBooking } from '../lib/data/account';
 import { formatShopDateTime } from '../../shared/shop-time';
-import { formatMoney, statusLabel } from '../lib/format';
+import { formatMoney, paymentLabel, statusLabel } from '../lib/format';
 import { StorefrontShell } from './StorefrontShell';
 
 function customerName(customer?: PublicAppointmentCustomer | null) {
@@ -114,7 +114,7 @@ export default async function AppointmentStatusPage({
               <section className="sf-card-dark sf-on-dark content-start" aria-label="Appointment">
                 <div className="flex flex-wrap items-baseline justify-between gap-3">
                   <p className="sf-eyebrow capitalize">{statusLabel(appointment.status)}</p>
-                  <span className="sf-tag capitalize">{statusLabel(appointment.paymentStatus)}</span>
+                  <span className="sf-tag">{paymentLabel(appointment.paymentStatus)}</span>
                 </div>
                 {isTerminal(appointment.status) ? (
                   <p className="sf-notice is-error">{appointment.status === 'cancelled' ? 'Visit cancelled' : 'Marked no-show'}</p>

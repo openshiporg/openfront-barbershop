@@ -2,6 +2,7 @@ import { sanitizeStoreLogoSvg } from '../../shared/sanitize-store-logo';
 import { normalizeStoreLogoColor } from '../../platform/store-settings/lib/store-logo';
 import { requireStorefrontBrandColor } from '../../shared/storefront-settings';
 import { assertUsdSettlementCurrency } from './supportedSettlementCurrency';
+import { normalizeShopHours } from '../../shared/shop-hours';
 
 export type StorefrontSettingsInput = {
   name: string;
@@ -15,6 +16,7 @@ export type StorefrontSettingsInput = {
   logoColor?: string;
   isPublic: boolean;
   isDemo: boolean;
+  hours?: unknown;
 };
 
 function validLogo(svg: string) {
@@ -43,7 +45,15 @@ export function parseStorefrontSettingsInput(args: StorefrontSettingsInput) {
   try { new Intl.DateTimeFormat('en', { timeZone: timezone }).format(); }
   catch { throw new Error('Timezone must be a valid IANA timezone.'); }
 
+  let hours: Record<string, string> | undefined;
+  if (args.hours !== undefined && args.hours !== null) {
+    const normalized = normalizeShopHours(args.hours);
+    if ('error' in normalized) throw new Error(normalized.error);
+    hours = normalized.hours;
+  }
+
   return {
+    ...(hours ? { hours } : {}),
     name: boundedText(args.name, 'Shop name', 120, true),
     tagline: boundedText(args.tagline, 'Tagline', 240),
     address: boundedText(args.address, 'Address', 300),

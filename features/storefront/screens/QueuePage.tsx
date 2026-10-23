@@ -9,8 +9,7 @@ import { QueuePageClient } from './QueuePageClient';
 const queueTone: Record<string, string> = { waiting: 'is-wait', texted: 'is-accent', in_chair: 'is-live' };
 
 function waitLabel(summary: QueueSummary) {
-  if (!summary.waiting) return 'No wait';
-  return summary.waitMinutes == null ? 'Ask the shop' : `About ${summary.waitMinutes} min`;
+  return summary.waiting ? `About ${summary.waitMinutes} min` : 'No wait';
 }
 
 export default async function QueuePage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {

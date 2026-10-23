@@ -31,7 +31,7 @@ export function publicBookingEligibilityView(policy: { policyId: string; version
     version: policy.version,
     publicServiceEligibility,
     description: publicServiceEligibility === 'active_catalog'
-      ? 'Online requests require an active service in an active category belonging to this shop.'
-      : 'The menu shows active categories only. Direct online requests may use other active shop services; staff, chair, and authority checks still apply.',
+      ? 'Open for services in an active category'
+      : 'Open for all active services',
   };
 }

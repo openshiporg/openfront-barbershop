@@ -37,7 +37,7 @@ function header(tone?: Tone) {
     <PageHeader
       title="Services & packages"
       tone={tone}
-      actions={<Track><PillLink variant="primary" href={create('services')}><Plus /> Service</PillLink><PillLink href={create('service-categories')}>Category</PillLink></Track>}
+      actions={<Track><PillLink variant="primary" href="/dashboard/platform/services/new"><Plus /> Service</PillLink><PillLink href={create('service-categories')}>Category</PillLink></Track>}
     />
   );
 }
@@ -110,13 +110,12 @@ export default async function ServicesPage() {
           actions={<Track><PillLink size="sm" href={`${basePath}/booking-policies`}>Booking policies</PillLink></Track>}
         >
           <p className="text-sm">{eligibility?.data?.description || eligibility?.error || 'Booking eligibility could not be loaded.'}</p>
-          {eligibility?.data && <p className="mt-1 font-mono text-xs text-muted-foreground">v{eligibility.data.version} · {eligibility.data.publicServiceEligibility}</p>}
           {data.uncategorizedServices.length > 0 && <p className="mt-2 text-xs text-muted-foreground"><StatusDot tone="off" />Uncategorized services: staff booking only.</p>}
         </Section>
 
         <div className="grid min-w-0 gap-8 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
           <Section id="svc-menu" title="Service menu" count={data.metrics.services}>
-            {!hasServices && !data.categories.length && <Empty>No services yet. <Link className="underline" href={create('services')}>Add a service</Link></Empty>}
+            {!hasServices && !data.categories.length && <Empty>No services yet. <Link className="underline" href="/dashboard/platform/services/new">Add a service</Link></Empty>}
             <div className="space-y-6">
               {data.categories.map((category) => (
                 <div key={category.id}>
@@ -152,7 +151,7 @@ export default async function ServicesPage() {
                       {memberships.map((plan) => <PriceRow key={plan.id} href={item('membership-plans', plan.id)} name={plan.name} sub={`Membership · ${plan.includedVisits ?? 0} visits · ${plan.status}`} price={plan.price} status={plan.status} />)}
                     </ul>}
             </Section>
-            <Section id="svc-retail" title="Retail" count={data.products.length} actions={<Track><PillLink size="sm" href={create('products')}><ShoppingBag /> Product</PillLink></Track>}>
+            <Section id="svc-retail" title="Retail" count={data.products.length} actions={<Track><PillLink size="sm" href="/dashboard/platform/services/new-product"><ShoppingBag /> Product</PillLink></Track>}>
               {!data.products.length && <Empty>No retail products.</Empty>}
               <ul>{data.products.map((product) => <PriceRow key={product.id} href={item('products', product.id)} name={product.name} sub={`${product.sku} · ${product.status}`} price={product.price} status={product.status} />)}</ul>
             </Section>

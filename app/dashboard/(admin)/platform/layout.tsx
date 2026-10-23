@@ -5,6 +5,7 @@ import { ShopAccessPanel } from '@/features/platform/barbershop/screens/ShopAcce
 // instead of a page of access errors.
 export default async function PlatformLayout({ children }: { children: React.ReactNode }) {
   const choices = await getActiveShopChoicesAction();
-  if (!choices.success || choices.total > 0) return children;
+  // Bottom room on phones so the floating assistant button never covers actions.
+  if (!choices.success || choices.total > 0) return <div className="pb-20 md:pb-0">{children}</div>;
   return <ShopAccessPanel shops={await getClaimableShopsAction()} />;
 }

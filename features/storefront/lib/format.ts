@@ -19,6 +19,15 @@ export function formatDateTime(value?: string | null) {
   }).format(new Date(value));
 }
 
+const PAYMENT_LABELS: Record<string, string> = {
+  not_required: 'Pay in shop', deposit_due: 'Deposit due', deposit_paid: 'Deposit paid', paid: 'Paid', refunded: 'Refunded',
+};
+
+/** Customer wording for an appointment's payment status. */
+export function paymentLabel(status?: string | null) {
+  return PAYMENT_LABELS[status || ''] || statusLabel(status);
+}
+
 export function statusLabel(status?: string | null) {
   return status?.replace(/_/g, ' ') || 'unknown';
 }
