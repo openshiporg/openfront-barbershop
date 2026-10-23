@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { StorefrontService } from '../lib/data/services';
 import { joinStorefrontQueue } from '../lib/data/queue';
 
@@ -16,6 +17,10 @@ export function QueuePageClient({ services }: { services: StorefrontService[] })
   const [result, setResult] = useState<Awaited<ReturnType<typeof joinStorefrontQueue>> | null>(null);
   // Same details retried reuse the same token, so a lost response can't create a duplicate.
   const intent = useRef<{ signature: string; token: string } | null>(null);
+  const router = useRouter();
+  const joinedId = result?.success ? result.queueEntry?.id : undefined;
+  // The server ticket shows the live place in line.
+  useEffect(() => { if (joinedId) router.replace(`/queue?id=${encodeURIComponent(joinedId)}`); }, [joinedId, router]);
 
   if (result?.success && result.queueEntry) {
     return (

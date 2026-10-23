@@ -17,6 +17,9 @@ export const ShopSettings = list({
   },
   ui: {
     isHidden: true,
+    // The dashboard derives GraphQL names from this label; "Shop Settings"
+    // would collapse to the list key and fail the whole admin meta load.
+    plural: 'Shop Settings Items',
     listView: { initialColumns: ['name', 'tagline', 'phone', 'timezone'] },
   },
   fields: {

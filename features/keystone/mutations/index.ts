@@ -24,6 +24,7 @@ import seatWalkInQueueEntry from "./seatWalkInQueueEntry";
 import transitionAppointment from "./transitionAppointment";
 import transitionQueueEntry from "./transitionQueueEntry";
 import selectActiveShop from "./selectActiveShop";
+import claimShopOwnership, { claimableShops } from "./claimShopOwnership";
 import markAppointmentNoShow from "./markAppointmentNoShow";
 import { createCommissionPayout, transitionCommission } from "./manageCommissions";
 import { recordProductSale, returnProductSaleLine } from "./manageProductSales";
@@ -309,6 +310,13 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         slug: String!
       }
 
+      type ClaimableShop {
+        id: ID!
+        name: String!
+        slug: String!
+        isPublic: Boolean!
+      }
+
       type SelectActiveShopResult {
         success: Boolean!
         error: String
@@ -379,6 +387,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
           includeUnavailable: Boolean
         ): [AvailabilitySlot!]!
         getPublicQueue: [PublicQueueEntry!]!
+        claimableShops: [ClaimableShop!]!
         getPublicQueueEntry(
           queueEntryId: ID!
           accessToken: String!
@@ -484,6 +493,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         ): TransitionQueueEntryResult!
 
         selectActiveShop(shopId: ID!): SelectActiveShopResult!
+        claimShopOwnership(shopId: ID!): SelectActiveShopResult!
 
         markAppointmentNoShow(appointmentId: ID!, policyId: ID, reason: String!, idempotencyKey: String!): DomainCommandResult!
         transitionCommission(commissionId: ID!, toStatus: String!, reason: String, idempotencyKey: String!): DomainCommandResult!
@@ -510,6 +520,10 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
 
         runBarbershopOnboarding(
           mode: String!
+          shopName: String
+          shopAddress: String
+          shopPhone: String
+          shopTimezone: String
         ): RunBarbershopOnboardingResult!
 
       }
@@ -563,6 +577,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         checkBarberAvailability,
         getPublicQueue,
         getPublicQueueEntry,
+        claimableShops,
         getPublicAppointment,
       },
       Mutation: {
@@ -588,6 +603,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         transitionAppointment,
         transitionQueueEntry,
         selectActiveShop,
+        claimShopOwnership,
         markAppointmentNoShow: async (root, args, context) => {
           const result = await markAppointmentNoShow(root, args, context); return { success: result.success, error: result.error, data: result.evidence };
         },

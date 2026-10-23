@@ -50,7 +50,9 @@ export async function updateOnboardingStatus(status: OnboardingStatus) {
   return { success: true as const, data: response.data.updateUser ?? null };
 }
 
-export async function runOnboardingSeed(mode: BarbershopSeedMode) {
+export type OnboardingShopInput = { shopName: string; shopAddress: string; shopPhone: string; shopTimezone: string };
+
+export async function runOnboardingSeed(mode: BarbershopSeedMode, shop?: OnboardingShopInput) {
   try {
     const response = await keystoneClient<{
       runBarbershopOnboarding: {
@@ -63,8 +65,8 @@ export async function runOnboardingSeed(mode: BarbershopSeedMode) {
         } | null;
       };
     }>(`
-      mutation RunBarbershopOnboarding($mode: String!) {
-        runBarbershopOnboarding(mode: $mode) {
+      mutation RunBarbershopOnboarding($mode: String!, $shopName: String, $shopAddress: String, $shopPhone: String, $shopTimezone: String) {
+        runBarbershopOnboarding(mode: $mode, shopName: $shopName, shopAddress: $shopAddress, shopPhone: $shopPhone, shopTimezone: $shopTimezone) {
           success
           error
           result {
@@ -74,7 +76,7 @@ export async function runOnboardingSeed(mode: BarbershopSeedMode) {
           }
         }
       }
-    `, { mode });
+    `, { mode, ...shop });
 
     if (!response.success) {
       return { success: false as const, error: response.error };

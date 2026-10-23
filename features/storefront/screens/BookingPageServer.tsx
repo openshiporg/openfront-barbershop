@@ -1,8 +1,8 @@
-import { keystoneClient } from '@/features/dashboard/lib/keystoneClient';
 import { Suspense } from 'react';
 import { getAllBarbers, getAllServices, type StorefrontBarber, type StorefrontService } from '../lib/data/services';
 import { getPublicStorefrontSettings } from '../lib/data/settings';
 import { getPublicBookingEligibility } from '../lib/data/booking-eligibility';
+import { getStorefrontAccount } from '../lib/data/account';
 import { BookingPage } from './BookingPage';
 import { StorefrontShell } from './StorefrontShell';
 
@@ -17,12 +17,13 @@ export default async function BookingPageServer() {
     getPublicBookingEligibility(),
   ]);
 
-  const identity = await keystoneClient<{ authenticatedItem: { id: string } | null }>('query { authenticatedItem { ... on User { id } } }');
-  const accountId = identity.success ? identity.data.authenticatedItem?.id || '' : '';
+  const account = await getStorefrontAccount();
+  const accountId = account?.id || '';
+  const accountProfile = account ? { name: account.name || '', email: account.email || '', phone: '' } : null;
   return (
     <StorefrontShell allowUnavailableChildren>
         <Suspense fallback={<div className="min-h-screen" aria-label="Loading booking" />}>
-          <BookingPage accountId={accountId} services={catalog.services} barbers={catalog.barbers} settings={settings} bookingEligibility={bookingEligibility} catalogError={catalog.error} />
+          <BookingPage accountId={accountId} accountProfile={accountProfile} services={catalog.services} barbers={catalog.barbers} settings={settings} bookingEligibility={bookingEligibility} catalogError={catalog.error} />
         </Suspense>
     </StorefrontShell>
   );

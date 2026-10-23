@@ -85,6 +85,7 @@ export const Service = list({
     price: integer({ validation: { isRequired: true, min: 0 }, ui: { description: "Base price in cents." } }),
     depositRequired: checkbox({ defaultValue: false }),
     depositAmount: integer({ defaultValue: 0, validation: { min: 0 }, ui: { description: "Deposit amount in cents." } }),
+    credentialRequired: checkbox({ defaultValue: false, ui: { description: "Only book, seat and complete this service with a barber who holds an active practitioner credential for it." } }),
     waiverRequired: checkbox({ defaultValue: false, ui: { description: "Fail-closed: public booking/start requires a complete immutable waiver template and signer evidence." } }),
     waiverTemplateKey: text({ ui: { description: "Stable merchant-controlled waiver template key." } }),
     waiverTemplateVersion: text({ ui: { description: "Immutable displayed template version." } }),

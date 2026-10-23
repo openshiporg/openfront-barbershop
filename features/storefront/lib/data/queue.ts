@@ -31,3 +31,26 @@ export async function joinStorefrontQueue(input: { customerName: string; phone: 
     return { success: false, error: 'We couldn’t confirm whether you joined the queue. Try again; you won’t be added twice.', queueEntry: null, unknown: true };
   }
 }
+
+type PublicQueueRow = { id: string; status: string; quotedWaitMinutes: number | null; checkedInAt: string | null };
+export type QueueSummary = { waiting: number; inChair: number; waitMinutes: number | null; order: string[] };
+
+/** Public line summary: who is waiting, and the longest remaining quoted wait. */
+export async function getStorefrontQueueSummary(): Promise<QueueSummary | null> {
+  try {
+    const result = await storefrontClient.request<{ getPublicQueue: PublicQueueRow[] }>('query{getPublicQueue{id status quotedWaitMinutes checkedInAt}}');
+    const now = Date.now();
+    const waiting = result.getPublicQueue.filter((entry) => entry.status === 'waiting' || entry.status === 'texted');
+    const remaining = waiting.flatMap((entry) => {
+      if (entry.quotedWaitMinutes == null) return [];
+      const elapsed = entry.checkedInAt ? Math.floor((now - new Date(entry.checkedInAt).getTime()) / 60000) : 0;
+      return [Math.max(0, entry.quotedWaitMinutes - Math.max(0, elapsed))];
+    });
+    return {
+      waiting: waiting.length,
+      inChair: result.getPublicQueue.filter((entry) => entry.status === 'in_chair').length,
+      waitMinutes: remaining.length ? Math.max(...remaining) : waiting.length ? null : 0,
+      order: waiting.map((entry) => entry.id),
+    };
+  } catch { return null; }
+}

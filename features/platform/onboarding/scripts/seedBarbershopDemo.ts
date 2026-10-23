@@ -297,8 +297,28 @@ function seedShopData(shop: SeedRecord) {
     brandColor: text(shop.brandColor, 'amber'),
     ...(logoIcon ? { logoIcon } : {}),
     ...(shop.logoColor !== undefined ? { logoColor: normalizeStoreLogoColor(shop.logoColor) } : {}),
-    isDemo: true,
+    isDemo: shop.isDemo !== false,
   }
+}
+
+export type OnboardingShopDetails = { name?: string | null; address?: string | null; phone?: string | null; timezone?: string | null }
+
+/** The merchant's own details replace the sample identity on a new shop. */
+export function applyShopDetails(shop: SeedRecord, details?: OnboardingShopDetails | null): SeedRecord {
+  const name = text(details?.name).trim()
+  const address = text(details?.address).trim()
+  const phone = text(details?.phone).trim()
+  const timezone = text(details?.timezone).trim()
+  if (name.length > 120 || address.length > 200 || phone.length > 40) throw new Error('Shop details are too long.')
+  if (timezone) {
+    try { new Intl.DateTimeFormat('en-US', { timeZone: timezone }) } catch { throw new Error('Choose a valid timezone.') }
+  }
+  if (!name) return { ...shop, ...(address ? { address } : {}), ...(phone ? { phone } : {}), ...(timezone ? { timezone } : {}) }
+  // The sample slug and tagline belong to the sample shop, not the merchant's.
+  const rest = { ...shop }
+  delete rest.slug
+  delete rest.tagline
+  return { ...rest, name, legalName: name, address, phone, ...(timezone ? { timezone } : {}), isDemo: false }
 }
 
 /**
@@ -377,11 +397,13 @@ export async function runBarbershopSeed({
   apply = false,
   context,
   requireLocalDatabase = false,
+  shopDetails = null,
 }: {
   mode?: BarbershopSeedMode
   apply?: boolean
   context: BarbershopSeedContext
   requireLocalDatabase?: boolean
+  shopDetails?: OnboardingShopDetails | null
 }): Promise<BarbershopSeedResult> {
   return seedContextStorage.run(context, async (): Promise<BarbershopSeedResult> => {
   const runtime = requireLocalDatabase ? assertSafeLocalSeedDatabase() : describeSeedDatabase()
@@ -416,7 +438,8 @@ export async function runBarbershopSeed({
   const productIdsBySku: Record<string, string> = {}
 
   const userId = getSeedSessionUserId()
-  const shop = userId ? await resolveCallerShop(stats, userId, seed.shop) : await resolveCliShop(stats, seed.shop)
+  const shopSeed = applyShopDetails(seed.shop, shopDetails)
+  const shop = userId ? await resolveCallerShop(stats, userId, shopSeed) : await resolveCliShop(stats, shopSeed)
   const shopId = shop.id
   const shopJurisdictionCode = text(shop.jurisdictionCode, text(seed.shop.jurisdictionCode, 'US-NY'))
   if (userId) await refreshSeedSession(userId)

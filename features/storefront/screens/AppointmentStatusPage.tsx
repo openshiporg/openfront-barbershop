@@ -3,6 +3,7 @@ import { phoneHref } from '@/features/shared/storefront-settings';
 import { AppointmentSelfService, AppointmentWaiver } from '../components/AppointmentSelfService';
 import { getPublicAppointment, type PublicAppointmentCustomer } from '../lib/data/public-appointments';
 import { getPublicStorefrontSettings } from '../lib/data/settings';
+import { getStorefrontAccount, getStorefrontBookingHistory, type AccountBooking } from '../lib/data/account';
 import { formatShopDateTime } from '../../shared/shop-time';
 import { formatMoney, statusLabel } from '../lib/format';
 import { StorefrontShell } from './StorefrontShell';
@@ -38,6 +39,10 @@ export default async function AppointmentStatusPage({
     getPublicStorefrontSettings(),
   ]);
   const appointment = lookup?.status === 'found' ? lookup.appointment : null;
+  // Signed-in customers get their own visits instead of a sign-in prompt.
+  const account = !appointment && lookup?.status !== 'unavailable' ? await getStorefrontAccount() : null;
+  const history = account ? await getStorefrontBookingHistory(1) : null;
+  const accountBookings: AccountBooking[] | null = history?.success && history.data.accountBookings.success ? history.data.accountBookings.data?.bookings || [] : null;
   const receiptLine = appointment?.lineItems?.[0];
   // Times are shown in the timezone the booking was made in.
   const timeZone = appointment?.bookingTimezone || settings?.timezone || null;
@@ -62,16 +67,38 @@ export default async function AppointmentStatusPage({
           <>
             <section className="sf-page-head">
               <p className="sf-eyebrow">Appointment</p>
-              <h1 className="sf-display">{lookup?.status === 'unavailable' ? 'Status couldn’t load' : appointmentId ? 'Not found here' : 'Find your visit'}</h1>
+              <h1 className="sf-display">{lookup?.status === 'unavailable' ? 'Status couldn’t load' : account && !appointmentId ? 'Your visits' : appointmentId ? 'Not found here' : 'Find your visit'}</h1>
             </section>
             <div className="sf-container-narrow !mx-0 grid gap-5 pt-8" role={lookup?.status === 'unavailable' ? 'alert' : undefined}>
-              <p className="sf-lead">
-                {lookup?.status === 'unavailable'
-                  ? 'Your booking hasn’t changed. Reload in a moment.'
-                  : 'Open the link from the browser you booked in, or sign in to the account you booked with.'}
-              </p>
+              {account ? (
+                accountBookings === null ? <p role="alert" className="sf-notice is-error">Your visits couldn’t load. Reload this page in a moment.</p>
+                  : !accountBookings.length ? <p className="sf-lead">No bookings yet</p>
+                  : (
+                    <ul aria-label="Your visits">
+                      {accountBookings.map((booking) => (
+                        <li key={booking.id}>
+                          <Link href={`/appointment?id=${encodeURIComponent(booking.id)}`} className="sf-booking-row">
+                            <span className="grid min-w-0 gap-1">
+                              <span className="sf-subtitle text-[1.35rem]"><span className={`sf-dot ${statusTone[booking.status] ?? ''}`} aria-hidden="true" />{booking.serviceTitleSnapshot}</span>
+                              <span className="sf-small sf-muted break-words">{booking.timeZone ? formatShopDateTime(booking.startsAt, booking.timeZone) : booking.startsAt} · {booking.barberNameSnapshot}</span>
+                            </span>
+                            <span className="sf-small sf-muted capitalize">{statusLabel(booking.status)}</span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )
+              ) : (
+                <p className="sf-lead">
+                  {lookup?.status === 'unavailable'
+                    ? 'Your booking hasn’t changed. Reload in a moment.'
+                    : 'Open the link from the browser you booked in, or sign in to the account you booked with.'}
+                </p>
+              )}
               <div className="sf-track">
-                <Link href="/account" className="sf-pill is-primary">Sign in</Link>
+                {account
+                  ? <><Link href="/book" className="sf-pill is-primary">Book a chair</Link><Link href="/account" className="sf-pill">All visits</Link></>
+                  : <Link href="/account" className="sf-pill is-primary">Sign in</Link>}
                 {telephoneHref && settings?.phone ? <a href={`tel:${telephoneHref}`} className="sf-pill">Call {settings.phone}</a> : null}
               </div>
             </div>

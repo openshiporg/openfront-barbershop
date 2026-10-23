@@ -18,7 +18,11 @@ export type StorefrontTimeSlot = { startsAt: string; label: string };
 export type StorefrontAvailabilityResult = {
   slots: StorefrontTimeSlot[];
   error: string | null;
+  /** Working times exist, but none can be booked for lack of a practitioner credential. */
+  credentialBlocked?: boolean;
 };
+
+const CREDENTIAL_BLOCK = 'Practitioner authority unavailable';
 
 export async function getAvailableTimeSlots(
   barberId: string,
@@ -28,10 +32,11 @@ export async function getAvailableTimeSlots(
 ): Promise<StorefrontAvailabilityResult> {
   const query = gql`
     query CheckBarberAvailability($barberId: ID!, $date: String!, $serviceDuration: Int!, $serviceId: ID) {
-      checkBarberAvailability(barberId: $barberId, date: $date, serviceDuration: $serviceDuration, serviceId: $serviceId) {
+      checkBarberAvailability(barberId: $barberId, date: $date, serviceDuration: $serviceDuration, serviceId: $serviceId, includeUnavailable: true) {
         time
         startsAt
         available
+        blockedReason
       }
     }
   `;
@@ -44,11 +49,14 @@ export async function getAvailableTimeSlots(
       serviceId,
     });
 
+    const all = data.checkBarberAvailability || [];
+    const slots = all
+      .filter((slot): slot is StorefrontAvailabilitySlot & { startsAt: string } => slot.available && typeof slot.startsAt === 'string')
+      .map((slot) => ({ startsAt: slot.startsAt, label: slot.time }));
     return {
-      slots: (data.checkBarberAvailability || [])
-        .filter((slot): slot is StorefrontAvailabilitySlot & { startsAt: string } => slot.available && typeof slot.startsAt === 'string')
-        .map((slot) => ({ startsAt: slot.startsAt, label: slot.time })),
+      slots,
       error: null,
+      credentialBlocked: !slots.length && all.some((slot) => slot.blockedReason === CREDENTIAL_BLOCK),
     };
   } catch {
     return {

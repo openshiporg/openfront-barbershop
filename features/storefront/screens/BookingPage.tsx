@@ -24,6 +24,8 @@ function actorStorage(accountId: string) {
 
 type BookingPageProps = {
   accountId?: string;
+  /** Signed-in customer's saved details, used to fill step 04. */
+  accountProfile?: { name: string; email: string; phone: string } | null;
   services: StorefrontService[];
   barbers: StorefrontBarber[];
   settings: PublicStorefrontSettings | null;
@@ -40,25 +42,31 @@ function defaultBookingDate(timeZone: string) {
   return tomorrow.toISOString().slice(0, 10);
 }
 
+// Deposits can't be taken online, so deposit services are booked by phone.
+const bookableOnline = (service: StorefrontService | undefined) => Boolean(service && !service.depositRequired);
+
 function barbersForService(service: StorefrontService | undefined, barbers: StorefrontBarber[]) {
   const specialists = service?.specialists || [];
   return specialists.length ? specialists : barbers;
 }
 
-export function BookingPage({ services, barbers, settings, bookingEligibility, accountId = '', catalogError = null }: BookingPageProps) {
+export function BookingPage({ services, barbers, settings, bookingEligibility, accountId = '', accountProfile = null, catalogError = null }: BookingPageProps) {
   const searchParams = useSearchParams();
+  const firstBookable = services.find(bookableOnline);
   const [selectedServiceId, setSelectedServiceId] = useState(() => {
     const requested = searchParams?.get('service') || '';
-    return services.some((service) => service.id === requested) ? requested : services[0]?.id || '';
+    return services.some((service) => service.id === requested && bookableOnline(service)) ? requested : firstBookable?.id || '';
   });
   const [selectedBarberId, setSelectedBarberId] = useState(() => {
     const requested = searchParams?.get('barber') || '';
-    const service = services.find((item) => item.id === (searchParams?.get('service') || '')) || services[0];
+    const service = services.find((item) => item.id === (searchParams?.get('service') || '') && bookableOnline(item)) || firstBookable;
     return barbersForService(service, barbers).some((barber) => barber.id === requested) ? requested : 'any';
   });
   const [barberNotice, setBarberNotice] = useState<string | null>(() => {
     const requested = searchParams?.get('barber') || '';
-    const service = services.find((item) => item.id === (searchParams?.get('service') || '')) || services[0];
+    const requestedService = services.find((item) => item.id === (searchParams?.get('service') || ''));
+    if (requestedService && !bookableOnline(requestedService)) return `${requestedService.name} takes a deposit, so it’s booked by phone${settings?.phone ? ` at ${settings.phone}` : ''}.`;
+    const service = requestedService || firstBookable;
     return requested && !barbersForService(service, barbers).some((barber) => barber.id === requested)
       ? 'The barber in your link isn’t available for this service, so First available is selected.'
       : null;
@@ -68,11 +76,12 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
   const [slots, setSlots] = useState<Record<string, StorefrontTimeSlot[]>>({});
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+  const [credentialBlocked, setCredentialBlocked] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [createdAppointment, setCreatedAppointment] = useState<StorefrontBookedAppointment | null>(null);
-  const [customer, setCustomer] = useState({ name: '', email: '', phone: '', notes: '' });
+  const [customer, setCustomer] = useState({ name: accountProfile?.name || '', email: accountProfile?.email || '', phone: accountProfile?.phone || '', notes: '' });
   const [savedCommand, setSavedCommand] = useState<GuestBookingCommand | null>(null);
   const [storageReady, setStorageReady] = useState(false);
   const dispatching = useRef(false);
@@ -179,10 +188,12 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
           ? 'Some times couldn’t be loaded, so this list may be incomplete. Try again or call the shop.'
           : null);
         setSlots(Object.fromEntries(entries.map(([barberId, availability]) => [barberId, availability.slots])));
+        setCredentialBlocked(entries.every(([, availability]) => availability.credentialBlocked));
       })
       .catch(() => {
         if (!cancelled) {
           setSlots({});
+          setCredentialBlocked(false);
           setAvailabilityError('Available times couldn’t be loaded. Try again or call the shop.');
         }
       })
@@ -216,7 +227,7 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
       setError(bookingEligibility.error || 'Online booking is unavailable right now. Contact the shop.');
       return;
     }
-    if (!selectedService || !selectedSlot || !customer.name.trim() || !customer.phone.trim()) {
+    if (!selectedService || !bookableOnline(selectedService) || !selectedSlot || !customer.name.trim() || !customer.phone.trim()) {
       setError('Choose a service and time, and enter your name and phone number.');
       return;
     }
@@ -291,7 +302,7 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
 
   if (!settings) return <main id="main-content" className="sf-container-narrow py-[var(--space-2xl)]">{pendingPanel}<p role="alert" className="sf-notice is-error">Online booking is unavailable right now. Try again later or contact the shop.</p></main>;
 
-  const canSubmit = !pending && storageReady && !savedCommand && bookingEligibility.success && Boolean(bookingEligibility.data);
+  const canSubmit = !pending && storageReady && !savedCommand && bookingEligibility.success && Boolean(bookingEligibility.data) && Boolean(selectedSlot);
 
   return (
     <main id="main-content">
@@ -311,7 +322,7 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
           <p className="sf-subtitle">Booking couldn’t load</p>
           <p className="sf-muted">{catalogError}</p>
         </div>
-      ) : !services.length || !barbers.length ? (
+      ) : !firstBookable || !barbers.length ? (
         <div className="sf-container sf-empty mb-[var(--space-3xl)]">
           <p className="sf-subtitle">Online booking isn’t open yet</p>
           <div className="sf-track">
@@ -326,10 +337,10 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
               <legend><span className="sf-step-no">01</span><span className="sf-step-title">Service</span></legend>
               <div className="sf-options">
                 {services.map((service) => (
-                  <button type="button" key={service.id} aria-pressed={selectedServiceId === service.id} onClick={() => chooseService(service)} className="sf-option">
+                  <button type="button" key={service.id} aria-pressed={selectedServiceId === service.id} disabled={!bookableOnline(service)} onClick={() => chooseService(service)} className="sf-option">
                     <span className="sf-option-title">{service.name}</span>
                     <span className="sf-mono">{formatMoney(service.price)}</span>
-                    <span className="sf-option-meta"><span className="sf-mono">{formatDuration(service.durationMinutes)}</span>{service.depositRequired && ` · Deposit ${formatMoney(service.depositAmount || 0)}`}</span>
+                    <span className="sf-option-meta"><span className="sf-mono">{formatDuration(service.durationMinutes)}</span>{service.depositRequired && ` · Deposit ${formatMoney(service.depositAmount || 0)} · Call to book`}</span>
                   </button>
                 ))}
               </div>
@@ -384,7 +395,9 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
                     {slot.label}
                   </button>
                 ))}
-                {!loadingSlots && !availabilityError && !mergedSlots.length && <p>No times on this date.</p>}
+                {!loadingSlots && !availabilityError && !mergedSlots.length && (credentialBlocked
+                  ? <p>No barber is cleared to book {selectedService?.name || 'this service'} online. Call the shop{settings.phone ? <> at <span className="sf-mono">{settings.phone}</span></> : null}.</p>
+                  : <p>No times on this date.</p>)}
               </div>
             </fieldset>
 
@@ -417,6 +430,7 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
             </dl>
             <div className="sf-summary-total"><span className="sf-eyebrow">Total</span><strong>{formatMoney(selectedService?.price)}</strong></div>
             {error && !savedCommand && <p role="alert" className="sf-notice is-error">{error}</p>}
+            {!selectedSlot && !savedCommand ? <p className="sf-small text-[var(--color-inverse-muted)]">Choose a time</p> : null}
             <div className="sf-track is-block">
               <button type="submit" disabled={!canSubmit} className="sf-pill is-accent">{pending ? 'Booking…' : 'Request appointment'}</button>
             </div>

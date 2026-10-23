@@ -1,20 +1,27 @@
 import { phoneHref } from '@/features/shared/storefront-settings';
 import { getAllServices, type StorefrontService } from '../lib/data/services';
 import { getPublicStorefrontSettings } from '../lib/data/settings';
-import { getStorefrontQueueStatus } from '../lib/data/queue';
+import { getStorefrontQueueStatus, getStorefrontQueueSummary, type QueueSummary } from '../lib/data/queue';
 import { statusLabel } from '../lib/format';
 import { StorefrontShell } from './StorefrontShell';
 import { QueuePageClient } from './QueuePageClient';
 
 const queueTone: Record<string, string> = { waiting: 'is-wait', texted: 'is-accent', in_chair: 'is-live' };
 
+function waitLabel(summary: QueueSummary) {
+  if (!summary.waiting) return 'No wait';
+  return summary.waitMinutes == null ? 'Ask the shop' : `About ${summary.waitMinutes} min`;
+}
+
 export default async function QueuePage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams || {};
   const entryId = typeof params.id === 'string' ? params.id : '';
-  const [settings, lookup] = await Promise.all([
+  const [settings, lookup, summary] = await Promise.all([
     getPublicStorefrontSettings(),
     entryId ? getStorefrontQueueStatus(entryId) : Promise.resolve(null),
+    getStorefrontQueueSummary(),
   ]);
+  const place = lookup?.status === 'found' && summary ? summary.order.indexOf(lookup.entry.id) + 1 : 0;
   const telephoneHref = phoneHref(settings?.phone);
   const call = telephoneHref && settings?.phone ? <a className="sf-link" href={`tel:${telephoneHref}`}>{settings.phone}</a> : null;
 
@@ -35,6 +42,7 @@ export default async function QueuePage({ searchParams }: { searchParams?: Promi
                 <span className="sf-mono text-[0.72rem] text-[var(--color-inverse-muted)]">{settings?.name}</span>
               </div>
               <dl>
+                {place > 0 ? <div><dt>Place in line</dt><dd className="sf-mono">{place} of {summary!.waiting}</dd></div> : null}
                 <div><dt>Quoted wait</dt><dd>{lookup.entry.quotedWaitMinutes != null ? `About ${lookup.entry.quotedWaitMinutes} minutes` : 'Not quoted yet'}</dd></div>
                 <div><dt>Barber</dt><dd>{lookup.entry.requestedBarber?.displayName || 'Next available'}</dd></div>
               </dl>
@@ -62,8 +70,15 @@ export default async function QueuePage({ searchParams }: { searchParams?: Promi
           <p className="sf-eyebrow mb-3">Walk-ins</p>
           <h1 className="sf-display text-[var(--text-display-s)]">Next chair</h1>
           <p className="sf-lead mt-4">Join the walk-in list. Seated between appointments; no fixed time.</p>
+          {summary ? (
+            <dl className="sf-ledger mt-8" aria-label="Walk-in line now">
+              <div><dt><span className={`sf-dot ${summary.waiting ? 'is-wait' : 'is-live'}`} aria-hidden="true" />Waiting</dt><dd className="sf-mono">{summary.waiting}</dd></div>
+              <div><dt>Wait</dt><dd className="sf-mono">{waitLabel(summary)}</dd></div>
+              <div><dt>In the chair</dt><dd className="sf-mono">{summary.inChair}</dd></div>
+            </dl>
+          ) : null}
           {catalogError ? <p role="alert" className="sf-notice is-error mt-8">The walk-in form couldn’t load. Try again in a moment.</p> : <QueuePageClient services={services} />}
-          {call ? <p className="sf-small sf-muted mt-6">Current wait: {call}</p> : null}
+          {call ? <p className="sf-small sf-muted mt-6">Call {call}</p> : null}
         </main>
       )}
     </StorefrontShell>

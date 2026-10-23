@@ -1,1 +1,1 @@
-export { default } from '@/features/storefront/screens/ServiceDetailPage';
+export { default, generateMetadata } from '@/features/storefront/screens/ServiceDetailPage';

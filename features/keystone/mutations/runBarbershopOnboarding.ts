@@ -8,6 +8,10 @@ import {
 
 type Args = {
   mode?: string | null;
+  shopName?: string | null;
+  shopAddress?: string | null;
+  shopPhone?: string | null;
+  shopTimezone?: string | null;
 };
 
 type OnboardingMutationResult = {
@@ -66,7 +70,7 @@ export default async function runBarbershopOnboarding(
       where: { id: userId },
       data: { onboardingStatus: 'in_progress' },
     });
-    const result = await runBarbershopSeed({ mode, apply: true, context });
+    const result = await runBarbershopSeed({ mode, apply: true, context, shopDetails: { name: args.shopName, address: args.shopAddress, phone: args.shopPhone, timezone: args.shopTimezone } });
     await sudo.db.User.updateOne({
       where: { id: userId },
       data: { onboardingStatus: 'completed' },

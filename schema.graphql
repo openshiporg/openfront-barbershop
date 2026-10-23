@@ -2309,6 +2309,7 @@ type Service {
   price: Int
   depositRequired: Boolean
   depositAmount: Int
+  credentialRequired: Boolean
   waiverRequired: Boolean
   waiverTemplateKey: String
   waiverTemplateVersion: String
@@ -2357,6 +2358,7 @@ input ServiceWhereInput {
   price: IntFilter
   depositRequired: BooleanFilter
   depositAmount: IntNullableFilter
+  credentialRequired: BooleanFilter
   waiverRequired: BooleanFilter
   waiverTemplateKey: StringFilter
   waiverTemplateVersion: StringFilter
@@ -2403,6 +2405,7 @@ input ServiceOrderByInput {
   price: OrderDirection
   depositRequired: OrderDirection
   depositAmount: OrderDirection
+  credentialRequired: OrderDirection
   waiverRequired: OrderDirection
   waiverTemplateKey: OrderDirection
   waiverTemplateVersion: OrderDirection
@@ -2424,6 +2427,7 @@ input ServiceUpdateInput {
   price: Int
   depositRequired: Boolean
   depositAmount: Int
+  credentialRequired: Boolean
   waiverRequired: Boolean
   waiverTemplateKey: String
   waiverTemplateVersion: String
@@ -2476,6 +2480,7 @@ input ServiceCreateInput {
   price: Int
   depositRequired: Boolean
   depositAmount: Int
+  credentialRequired: Boolean
   waiverRequired: Boolean
   waiverTemplateKey: String
   waiverTemplateVersion: String
@@ -7114,6 +7119,7 @@ type Mutation {
   transitionAppointment(appointmentId: ID!, toStatus: String!, idempotencyKey: String!): TransitionAppointmentResult!
   transitionQueueEntry(queueEntryId: ID!, toStatus: String!, idempotencyKey: String!): TransitionQueueEntryResult!
   selectActiveShop(shopId: ID!): SelectActiveShopResult!
+  claimShopOwnership(shopId: ID!): SelectActiveShopResult!
   markAppointmentNoShow(appointmentId: ID!, policyId: ID, reason: String!, idempotencyKey: String!): DomainCommandResult!
   transitionCommission(commissionId: ID!, toStatus: String!, reason: String, idempotencyKey: String!): DomainCommandResult!
   payApprovedCommissions(commissionIds: [ID!]!, notes: String, idempotencyKey: String!): DomainCommandResult!
@@ -7135,7 +7141,7 @@ type Mutation {
   assignWalkInQueueEntry(queueEntryId: ID!, requestedServiceId: ID!, requestedBarberId: ID, idempotencyKey: String!): DomainCommandResult!
   manageWaitlist(action: String!, waitlistEntryId: ID, customerName: String, phone: String, customerId: ID, requestedServiceId: ID, requestedBarberId: ID, preferredAt: String, notes: String, idempotencyKey: String!): DomainCommandResult!
   ensureDefaultPaymentProvider: EnsureDefaultPaymentProviderResult!
-  runBarbershopOnboarding(mode: String!): RunBarbershopOnboardingResult!
+  runBarbershopOnboarding(mode: String!, shopName: String, shopAddress: String, shopPhone: String, shopTimezone: String): RunBarbershopOnboardingResult!
 }
 
 union UserAuthenticationWithPasswordResult = UserAuthenticationWithPasswordSuccess | UserAuthenticationWithPasswordFailure
@@ -7330,6 +7336,7 @@ type Query {
   platformOperations: PlatformProjectionResult!
   checkBarberAvailability(barberId: ID!, serviceId: ID, date: String!, serviceDuration: Int!, includeUnavailable: Boolean): [AvailabilitySlot!]!
   getPublicQueue: [PublicQueueEntry!]!
+  claimableShops: [ClaimableShop!]!
   getPublicQueueEntry(queueEntryId: ID!, accessToken: String!): PublicQueueEntry
   getPublicAppointment(appointmentId: ID!, accessToken: String): PublicAppointment
 }
@@ -7720,6 +7727,13 @@ type SelectedActiveShop {
   id: ID!
   name: String!
   slug: String!
+}
+
+type ClaimableShop {
+  id: ID!
+  name: String!
+  slug: String!
+  isPublic: Boolean!
 }
 
 type SelectActiveShopResult {

@@ -4,6 +4,8 @@ import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Notice, Pill, StatusDot, Track } from '@/features/platform/lib/ui';
 import { useOnboardingApi } from '../hooks/useOnboardingApi';
 
@@ -15,14 +17,24 @@ export default function OnboardingDialog({ isOpen, onClose }: { isOpen: boolean;
   const [mode, setMode] = useState<'minimal' | 'full'>('full');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [shop, setShop] = useState(() => ({ shopName: '', shopAddress: '', shopPhone: '', shopTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York' }));
   const { runOnboarding } = useOnboardingApi();
-  const run = () => { setError(null); startTransition(async () => { const result = await runOnboarding(mode); if (result.success) { const credentials = result.data.stats.PractitionerCredential; setLocalFixtures(Boolean(credentials && credentials.created + credentials.reused > 0)); setComplete(true); } else setError(result.error); }); };
+  const field = (key: keyof typeof shop) => ({ id: `onboarding-${key}`, value: shop[key], onChange: (event: React.ChangeEvent<HTMLInputElement>) => setShop({ ...shop, [key]: event.target.value }) });
+  const run = () => { setError(null); startTransition(async () => { const result = await runOnboarding(mode, shop); if (result.success) { const credentials = result.data.stats.PractitionerCredential; setLocalFixtures(Boolean(credentials && credentials.created + credentials.reused > 0)); setComplete(true); } else setError(result.error); }); };
   return <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
     <DialogContent className="max-h-[90dvh] max-w-lg overflow-y-auto">
       <DialogHeader>
         <DialogTitle><StatusDot tone={complete ? (localFixtures ? 'live' : 'wait') : 'info'} />{complete ? 'Setup saved' : 'Shop setup'}</DialogTitle>
-        <DialogDescription>{complete ? localFixtures ? 'Sample local practitioner records · offline payments · no licensing claim' : 'Configuration saved · not yet ready for bookings' : 'Sample services, barbers and weekly hours · offline payments · no customers, bookings, stock or payments'}</DialogDescription>
+        <DialogDescription>{complete ? localFixtures ? 'Sample local practitioner records · offline payments · no licensing claim' : 'Configuration saved' : 'Your shop · sample services, barbers and weekly hours · offline payments'}</DialogDescription>
       </DialogHeader>
+      {!complete ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-1.5 sm:col-span-2"><Label htmlFor="onboarding-shopName">Shop name</Label><Input {...field('shopName')} maxLength={120} autoComplete="organization" placeholder="Stack & Fade" /></div>
+          <div className="grid gap-1.5 sm:col-span-2"><Label htmlFor="onboarding-shopAddress">Address</Label><Input {...field('shopAddress')} maxLength={200} autoComplete="street-address" /></div>
+          <div className="grid gap-1.5"><Label htmlFor="onboarding-shopPhone">Phone</Label><Input {...field('shopPhone')} maxLength={40} type="tel" autoComplete="tel" /></div>
+          <div className="grid gap-1.5"><Label htmlFor="onboarding-shopTimezone">Timezone</Label><Input {...field('shopTimezone')} maxLength={64} className="font-mono" /></div>
+        </div>
+      ) : null}
       {!complete ? (
         <Track block label="Setup size">
           {(['minimal', 'full'] as const).map(value => (
@@ -44,10 +56,10 @@ export default function OnboardingDialog({ isOpen, onClose }: { isOpen: boolean;
         <nav className="grid gap-4">
           {!localFixtures ? (
             <div>
-              <p className="pb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground"><StatusDot tone="wait" />Needed before confirming appointments</p>
-              <Link href="/dashboard/practitioner-credentials" className={rowClass}>Barber practitioner credentials <ArrowUpRight className="size-4" /></Link>
+              <p className="pb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground"><StatusDot tone="wait" />Review before taking bookings</p>
               <Link href="/dashboard/booking-policies" className={rowClass}>Booking policy and jurisdiction <ArrowUpRight className="size-4" /></Link>
               <Link href="/dashboard/platform/store-settings" className={rowClass}>Shop details <ArrowUpRight className="size-4" /></Link>
+              <Link href="/dashboard/practitioner-credentials" className={rowClass}>Practitioner credentials · licensed services only <ArrowUpRight className="size-4" /></Link>
             </div>
           ) : null}
           <div>

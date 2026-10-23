@@ -54,3 +54,19 @@ export async function selectActiveShopAction(shopId: string) {
   if (result.success) revalidatePath('/dashboard', 'layout');
   return { success: result.success, error: result.error || null, shop: result.shop || null };
 }
+
+export type ClaimableShop = { id: string; name: string; slug: string; isPublic: boolean };
+
+/** Shops an instance administrator can take over; empty for everyone else. */
+export async function getClaimableShopsAction() {
+  const response = await keystoneClient<{ claimableShops: ClaimableShop[] }>('query ClaimableShops { claimableShops { id name slug isPublic } }', {}, { cache: 'no-store' });
+  return response.success ? response.data.claimableShops : [];
+}
+
+export async function claimShopOwnershipAction(shopId: string) {
+  const response = await keystoneClient<{ claimShopOwnership: { success: boolean; error?: string | null; shop?: ShopChoice | null } }>(`mutation ClaimShopOwnership($shopId: ID!) { claimShopOwnership(shopId: $shopId) { success error shop { id name slug } } }`, { shopId });
+  const result = response.data?.claimShopOwnership;
+  if (!response.success || !result) return { success: false, error: response.error || 'Unable to take over this shop.' };
+  if (result.success) revalidatePath('/dashboard', 'layout');
+  return { success: result.success, error: result.error || null };
+}

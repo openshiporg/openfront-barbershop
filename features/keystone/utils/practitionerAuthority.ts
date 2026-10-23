@@ -18,6 +18,8 @@ export type PractitionerAuthoritySnapshot = {
   supervisionRequired: boolean;
   supervisorId: string | null;
   isLocalFixture?: true;
+  /** The service does not require a practitioner credential. */
+  notRequired?: true;
 };
 
 type AuthorityRow = {
@@ -82,12 +84,41 @@ export function authoritySnapshot(row: AuthorityRow): PractitionerAuthoritySnaps
   };
 }
 
+/** Evidence for a service that needs no credential: it still binds the
+ * appointment's shop, barber and service, and is effective at any time. */
+function notRequiredSnapshot(input: { shopId: string; barberId: string; serviceId: string }): PractitionerAuthoritySnapshot {
+  return {
+    credentialId: '',
+    barberId: input.barberId,
+    serviceId: input.serviceId,
+    shopId: input.shopId,
+    credentialType: 'not_required',
+    credentialNumberHash: '',
+    issuingAuthority: '',
+    jurisdictionCode: '',
+    scopeDescription: 'No practitioner credential required for this service',
+    evidenceHash: '',
+    effectiveFrom: new Date(0).toISOString(),
+    expiresAt: new Date(Date.UTC(9999, 11, 31)).toISOString(),
+    verifiedAt: new Date().toISOString(),
+    supervisionRequired: false,
+    supervisorId: null,
+    notRequired: true,
+  };
+}
+
 export async function requireEffectivePractitionerAuthority(client: RawQueryClient, input: {
   shopId: string;
   barberId: string;
   serviceId: string;
   at: Date;
 }) {
+  const [service] = await client.$queryRawUnsafe<Array<{ credentialRequired: boolean }>>(
+    'SELECT "credentialRequired" FROM "Service" WHERE id = $1 AND "shop" = $2',
+    input.serviceId, input.shopId,
+  );
+  if (!service) throw new Error('The selected service is not offered by this shop.');
+  if (!service.credentialRequired) return notRequiredSnapshot(input);
   const supervisorEvidence = `FROM "PractitionerCredential" supervisor
     WHERE supervisor."shop" = pc."shop" AND supervisor."barber" = pc."supervisor" AND supervisor."service" = pc."service"
       AND supervisor.id <> pc.id AND supervisor."barber" <> pc."barber"

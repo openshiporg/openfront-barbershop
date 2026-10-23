@@ -359,7 +359,7 @@ export function Sidebar({ adminMeta, user, onOpenDialog }: SidebarProps) {
             steps={[{
               href: '#onboarding',
               title: 'Welcome to Openfront Barbershop',
-              description: 'Your shop is empty. Click get started to configure your shop with services, barbers, chairs, and hours.',
+              description: 'Set up your shop: services, barbers, chairs and hours.',
             }]}
             onboardingStatus={user?.onboardingStatus}
             userRole={user?.role}
