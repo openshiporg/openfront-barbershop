@@ -20,6 +20,9 @@ export type AppointmentBoardCustomer = {
 
 export type AppointmentBoardBarber = {
   id: string;
+  workingDay?: boolean;
+  dayStartMinute?: number | null;
+  dayEndMinute?: number | null;
   displayName?: string | null;
   chairNumber?: string | null;
   bookingEnabled?: boolean | null;

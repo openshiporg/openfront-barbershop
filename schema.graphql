@@ -7337,6 +7337,7 @@ type Query {
   checkBarberAvailability(barberId: ID!, serviceId: ID, date: String!, serviceDuration: Int!, includeUnavailable: Boolean): [AvailabilitySlot!]!
   getPublicQueue: [PublicQueueEntry!]!
   claimableShops: [ClaimableShop!]!
+  getPublicWalkInStatus: PublicWalkInStatus!
   getPublicQueueEntry(queueEntryId: ID!, accessToken: String!): PublicQueueEntry
   getPublicAppointment(appointmentId: ID!, accessToken: String): PublicAppointment
 }
@@ -7727,6 +7728,13 @@ type SelectedActiveShop {
   id: ID!
   name: String!
   slug: String!
+}
+
+type PublicWalkInStatus {
+  open: Boolean!
+  barbersOnNow: Int!
+  opensAt: String
+  onNowIds: [ID!]!
 }
 
 type ClaimableShop {

@@ -320,6 +320,7 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
             <div><dt>When</dt><dd className="sf-mono">{createdAppointment.startsAt ? (createdAppointment.bookingTimezone ? formatShopDateTime(createdAppointment.startsAt, createdAppointment.bookingTimezone) : createdAppointment.startsAt) : 'To be confirmed'}</dd></div>
             <div><dt>Barber</dt><dd>{createdAppointment.barber?.displayName || 'First available'}</dd></div>
             <div><dt>Saved to</dt><dd>{accountId ? 'Your account' : 'This browser'}</dd></div>
+            {customer.email.trim() ? <div><dt>Confirmation by email</dt><dd className="break-all">{customer.email.trim()}</dd></div> : null}
           </dl>
           <div className="sf-track">
             <Link href={`/appointment?id=${encodeURIComponent(createdAppointment.id)}`} className="sf-pill is-primary">View status</Link>

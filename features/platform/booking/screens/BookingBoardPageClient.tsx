@@ -18,6 +18,8 @@ import {
   type AppointmentStatus,
 } from '../lib/appointmentTypes';
 
+const minuteClock = (minute: number) => `${Math.floor(minute / 60) % 12 || 12}:${String(minute % 60).padStart(2, '0')}${Math.floor(minute / 60) >= 12 ? 'p' : 'a'}`;
+
 const statusOrder: AppointmentStatus[] = ['requested', 'confirmed', 'checked_in', 'in_chair', 'completed', 'cancelled', 'no_show'];
 const closedStatuses: AppointmentStatus[] = ['completed', 'cancelled', 'no_show'];
 const changeableStatuses: AppointmentStatus[] = ['requested', 'confirmed'];
@@ -131,6 +133,9 @@ export function BookingBoardPageClient({ data, breadcrumbs }: { data: BookingPro
   );
 
   const shopToday = shopDateKey(new Date(live.now), timeZone);
+  // Older projections without schedule data count every active barber as working.
+  const floor = barbers.filter((barber) => barber.workingDay !== false);
+  const off = barbers.filter((barber) => barber.workingDay === false);
   const renderAppointment = (appointment: AppointmentBoardItem, compact = false) => {
     const onShopDay = !appointment.startsAt || shopDateKey(new Date(appointment.startsAt), timeZone) === shopToday;
     const started = Boolean(appointment.startsAt) && new Date(appointment.startsAt as string).getTime() <= live.now;
@@ -158,7 +163,7 @@ export function BookingBoardPageClient({ data, breadcrumbs }: { data: BookingPro
         {appointment.customerNotes && <p className="mt-2 ml-[4.75rem] rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground">{appointment.customerNotes}</p>}
         {!closedVisit && (
           <div className="mt-3 pl-[4.75rem]">
-            <Track>
+            <Track wrap>
               {action && <Pill size="sm" variant="primary" disabled={pending} onClick={() => moveAppointment(appointment.id, action.value)}>{action.label}</Pill>}
               {appointment.status === 'in_chair' && <PillLink size="sm" variant="primary" href={`/dashboard/platform/pos?appointment=${encodeURIComponent(appointment.id)}`}>Checkout</PillLink>}
               {appointment.status !== 'in_chair' && started && <Pill size="sm" disabled={pending} onClick={() => markNoShow(appointment.id)}>No-show</Pill>}
@@ -198,7 +203,7 @@ export function BookingBoardPageClient({ data, breadcrumbs }: { data: BookingPro
             <label className="grid gap-1 text-xs font-medium text-muted-foreground">Shop date<input type="date" name="date" defaultValue={selectedDate} className={`${selectClass} font-mono`} /></label>
             <Track><Pill type="submit">Show</Pill></Track>
           </form>
-          <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+          <div className="-mx-4 overflow-x-auto px-4 [mask-image:linear-gradient(to_right,black_88%,transparent)] md:mx-0 md:px-0 md:[mask-image:none]">
             <Track label="Status filter" className="w-max flex-nowrap [&>*]:shrink-0">
               <PillLink size="sm" variant={data.status ? 'flat' : 'raised'} href={boardHref({ date: selectedDate })}>All <span className="font-mono tabular-nums">{Object.values(statusCounts).reduce((sum, count) => sum + (count || 0), 0)}</span></PillLink>
               {statusOrder.map((status) => (
@@ -219,14 +224,15 @@ export function BookingBoardPageClient({ data, breadcrumbs }: { data: BookingPro
           { label: 'Booked value', value: formatMoney(metrics.bookedValue) },
         ]} />
 
-        <Section id="floor" title="On the floor" count={barbers.length}>
-          {barbers.length ? (
+        <Section id="floor" title="On the floor" count={floor.length}>
+          {floor.length ? (
             <ul className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
-              {barbers.map((barber) => (
-                <li key={barber.id} className="min-w-0"><StatusDot tone={barber.bookingEnabled ? 'live' : 'off'} />{barber.displayName}{barber.chairNumber ? <span className="ml-1.5 font-mono text-xs text-muted-foreground">CH {barber.chairNumber}</span> : null}{barber.bookingEnabled ? '' : <span className="ml-1.5 text-xs text-muted-foreground">booking off</span>}</li>
+              {floor.map((barber) => (
+                <li key={barber.id} className="min-w-0"><StatusDot tone={barber.bookingEnabled ? 'live' : 'wait'} />{barber.displayName}{barber.chairNumber ? <span className="ml-1.5 font-mono text-xs text-muted-foreground">CH {barber.chairNumber}</span> : null}{barber.dayStartMinute != null && barber.dayEndMinute != null ? <span className="ml-1.5 font-mono text-xs text-muted-foreground">{minuteClock(barber.dayStartMinute)}–{minuteClock(barber.dayEndMinute)}</span> : null}{barber.bookingEnabled ? '' : <span className="ml-1.5 text-xs text-muted-foreground">booking off</span>}</li>
               ))}
             </ul>
-          ) : <Empty>No active barbers. <Link className="underline" href="/dashboard/platform/staff">Barbers & schedules</Link></Empty>}
+          ) : <Empty>{barbers.length ? 'No barbers scheduled this day.' : <>No active barbers. <Link className="underline" href="/dashboard/platform/staff">Barbers & schedules</Link></>}</Empty>}
+          {off.length ? <p className="pt-2 text-xs text-muted-foreground"><StatusDot tone="off" />Off: {off.map((barber) => barber.displayName).join(', ')}</p> : null}
         </Section>
 
         <p className="font-mono text-xs tabular-nums text-muted-foreground" role="status">

@@ -15,7 +15,9 @@ export function parseHoursRange(text: string): { startMinute: number; endMinute:
   const match = RANGE.exec(text);
   if (!match) return null;
   const startMinute = toMinute(match[1], match[2], match[3]);
-  const endMinute = toMinute(match[4], match[5], match[6]);
+  const close = toMinute(match[4], match[5], match[6]);
+  // "12:00 AM" as a closing time means midnight at the end of the day.
+  const endMinute = close === 0 ? 1440 : close;
   return endMinute > startMinute ? { startMinute, endMinute } : null;
 }
 
@@ -61,7 +63,7 @@ const pad = (value: number) => String(value).padStart(2, '0');
 export function hoursTextToTimes(text: string | null | undefined): { open: string; close: string } | null {
   const window = parseHoursRange(text || '');
   if (!window || window === 'closed') return null;
-  const time = (minute: number) => `${pad(Math.floor(minute / 60))}:${pad(minute % 60)}`;
+  const time = (minute: number) => `${pad(Math.floor(minute / 60) % 24)}:${pad(minute % 60)}`;
   return { open: time(window.startMinute), close: time(window.endMinute) };
 }
 
@@ -72,4 +74,23 @@ export function timesToHoursText(open: string, close: string) {
     return `${hour % 12 || 12}:${pad(minute || 0)} ${hour >= 12 ? 'PM' : 'AM'}`;
   };
   return `${label(open)} - ${label(close)}`;
+}
+
+export const HOURS_DAY_LABELS: Record<ShopHoursDayKey, string> = { monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' };
+
+/** Next posted opening after `now`, e.g. "Sat 8:00 AM"; null when no hours are posted. */
+export function nextPostedOpening(hours: unknown, todayKey: string, nowMinute: number): string | null {
+  const order = SHOP_HOURS_DAYS as readonly string[];
+  const start = order.indexOf(todayKey);
+  if (start < 0) return null;
+  for (let offset = 0; offset < 8; offset += 1) {
+    const day = order[(start + offset) % 7] as ShopHoursDayKey;
+    const window = postedDayWindow(hours, day);
+    if (window === null) return null;
+    if (window === 'closed' || (offset === 0 && window.startMinute <= nowMinute)) continue;
+    const hour = Math.floor(window.startMinute / 60);
+    const clock = `${hour % 12 || 12}:${pad(window.startMinute % 60)} ${hour >= 12 ? 'PM' : 'AM'}`;
+    return offset === 0 ? `Opens ${clock}` : `Opens ${HOURS_DAY_LABELS[day]} ${clock}`;
+  }
+  return null;
 }

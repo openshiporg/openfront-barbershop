@@ -22,6 +22,7 @@ type Data = {
 
 const money = (value?: number | null) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((value || 0) / 100);
 const item = (slug: string, id: string) => `${basePath}/${slug}/${id}`;
+const edit = (path: string, id: string) => `/dashboard/platform/services/${path}${encodeURIComponent(id)}`;
 const create = (slug: string) => `${basePath}/${slug}/create`;
 
 const breadcrumbs = [
@@ -47,7 +48,7 @@ function ServiceRows({ services }: { services: ServiceItem[] }) {
     <ul>
       {services.map((service) => (
         <li key={service.id}>
-          <Link href={item('services', service.id)} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 border-b py-2.5 last:border-b-0 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Link href={edit('', service.id)} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 border-b py-2.5 last:border-b-0 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <span className="min-w-0 truncate font-medium"><StatusDot tone={statusTone(service.status)} />{service.name}</span>
             <span className="font-mono text-sm tabular-nums">{money(service.price)}</span>
             <span className="col-span-2 pl-4 text-xs text-muted-foreground"><span className="font-mono">{service.durationMinutes || 30} min</span> · {service.status}{service.depositAmount ? ` · deposit ${money(service.depositAmount)}` : ''}</span>
@@ -140,20 +141,20 @@ export default async function ServicesPage() {
               id="svc-plans"
               title="Packages & memberships"
               count={restrictedMemberships ? undefined : packages.length + memberships.length}
-              actions={!restrictedMemberships ? <Track><PillLink size="sm" href={create('service-packages')}>Package</PillLink><PillLink size="sm" href={create('membership-plans')}>Plan</PillLink></Track> : undefined}
+              actions={!restrictedMemberships ? <Track><PillLink size="sm" href="/dashboard/platform/services/packages/new">Package</PillLink><PillLink size="sm" href="/dashboard/platform/services/plans/new">Plan</PillLink></Track> : undefined}
             >
               {restrictedMemberships
                 ? <Restricted>Packages and memberships restricted for your role.</Restricted>
                 : !packages.length && !memberships.length
                   ? <Empty>No packages or memberships.</Empty>
                   : <ul>
-                      {packages.map((pkg) => <PriceRow key={pkg.id} href={item('service-packages', pkg.id)} name={pkg.name} sub={`Package · ${pkg.status}`} price={pkg.price} status={pkg.status} />)}
-                      {memberships.map((plan) => <PriceRow key={plan.id} href={item('membership-plans', plan.id)} name={plan.name} sub={`Membership · ${plan.includedVisits ?? 0} visits · ${plan.status}`} price={plan.price} status={plan.status} />)}
+                      {packages.map((pkg) => <PriceRow key={pkg.id} href={edit('packages/', pkg.id)} name={pkg.name} sub={`Package · ${pkg.status}`} price={pkg.price} status={pkg.status} />)}
+                      {memberships.map((plan) => <PriceRow key={plan.id} href={edit('plans/', plan.id)} name={plan.name} sub={`Membership · ${plan.includedVisits ?? 0} ${(plan.includedVisits ?? 0) === 1 ? 'visit' : 'visits'} · ${plan.status}`} price={plan.price} status={plan.status} />)}
                     </ul>}
             </Section>
             <Section id="svc-retail" title="Retail" count={data.products.length} actions={<Track><PillLink size="sm" href="/dashboard/platform/services/new-product"><ShoppingBag /> Product</PillLink></Track>}>
               {!data.products.length && <Empty>No retail products.</Empty>}
-              <ul>{data.products.map((product) => <PriceRow key={product.id} href={item('products', product.id)} name={product.name} sub={`${product.sku} · ${product.status}`} price={product.price} status={product.status} />)}</ul>
+              <ul>{data.products.map((product) => <PriceRow key={product.id} href={edit('products/', product.id)} name={product.name} sub={`${product.sku} · ${product.status}`} price={product.price} status={product.status} />)}</ul>
             </Section>
           </div>
         </div>

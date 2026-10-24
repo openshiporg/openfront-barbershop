@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 
 import { shopDayRange, shopDateKey } from '../../shared/shop-time';
+import { dayKeyForDate } from '../utils/availability';
 import { permissions, type Session } from '../access';
 // Explicitly authorized aggregate projections use the request's canonical client.
 // Cross-governed capabilities are checked below before any related-record read.
@@ -240,9 +241,20 @@ export async function getBookingProjection(_root: unknown, args: { date?: string
     context.prisma.appointment.count({ where: listWhere }),
     context.prisma.appointment.groupBy({ by: ['status'], where: dayWhere, _count: true }),
     context.prisma.appointment.aggregate({ where: { ...dayWhere, status: { notIn: ['cancelled', 'no_show'] } }, _sum: { price: true } }),
-    context.prisma.barber.findMany({ where: { shopId, status: 'active' }, orderBy: [{ displayName: 'asc' }, { id: 'asc' }], select: { id: true, displayName: true, chairNumber: true, bookingEnabled: true } }),
+    context.prisma.barber.findMany({ where: { shopId, status: 'active' }, orderBy: [{ displayName: 'asc' }, { id: 'asc' }], select: {
+      id: true, displayName: true, chairNumber: true, bookingEnabled: true,
+      schedules: { where: { dayOfWeek: dayKeyForDate(shopDateKey(start, timeZone), timeZone) as 'monday', isWorking: true }, select: { startMinute: true, endMinute: true } },
+      scheduleExceptions: { where: { status: 'active', exceptionType: 'time_off', startsAt: { lt: end }, endsAt: { gt: start } }, select: { id: true } },
+    } }),
     context.prisma.service.findMany({ where: { shopId, status: 'active' }, orderBy: [{ name: 'asc' }, { id: 'asc' }], select: { id: true, name: true, durationMinutes: true, price: true, depositRequired: true, specialists: { select: { id: true } } } }),
   ]);
+  // On the floor that day: weekly hours for the weekday, no time off.
+  const dayBarbers = barbers.map(({ schedules, scheduleExceptions, ...barber }) => ({
+    ...barber,
+    workingDay: schedules.length > 0 && scheduleExceptions.length === 0,
+    dayStartMinute: schedules[0]?.startMinute ?? null,
+    dayEndMinute: schedules[0]?.endMinute ?? null,
+  }));
   // Counts and metrics come from aggregates over the whole shop day, never from the displayed page.
   const counted = Object.fromEntries(grouped.map((item) => [String(item.status), item._count]));
   const statusCounts = Object.fromEntries(BOOKING_STATUSES.map((value) => [value, counted[value] || 0]));
@@ -250,7 +262,7 @@ export async function getBookingProjection(_root: unknown, args: { date?: string
   return {
     timeZone, date: shopDateKey(start, timeZone), status, page, pageSize: BOOKING_PAGE_SIZE, matching,
     appointments: appointments.map(({ bookingPolicySnapshot, ...appointment }) => ({ ...appointment, bookingEligibility: bookingEligibilityFromSnapshot(bookingPolicySnapshot) })),
-    barbers,
+    barbers: dayBarbers,
     services: services.map(({ specialists, ...service }) => ({ ...service, specialistIds: specialists.map((item) => item.id) })),
     statusCounts,
     metrics: {
@@ -657,7 +669,7 @@ export async function getOperationsProjection(_root: unknown, _args: unknown, co
     when(queueAccess, () => context.prisma.service.findMany({ where: { shopId, status: 'active' }, orderBy: [{ name: 'asc' }, { id: 'asc' }], select: { id: true, name: true } })),
     when(queueAccess, () => context.prisma.barber.findMany({ where: { shopId, status: 'active' }, orderBy: [{ displayName: 'asc' }, { id: 'asc' }], select: { id: true, displayName: true } })),
     // Unresolved commissions first, oldest first, so older approved work is never starved by newer rows.
-    context.prisma.commission.findMany({ where: actionableCommission, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: OPERATIONS_ROW_LIMIT, select: { id: true, commissionNumber: true, status: true, commissionAmount: true, commissionRate: true, createdAt: true, barber: { select: { id: true, displayName: true } } } }),
+    context.prisma.commission.findMany({ where: actionableCommission, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: OPERATIONS_ROW_LIMIT, select: { id: true, commissionNumber: true, status: true, commissionAmount: true, commissionRate: true, createdAt: true, barber: { select: { id: true, displayName: true } }, appointment: { select: { startsAt: true, serviceTitleSnapshot: true } }, transaction: { select: { completedAt: true } } } }),
     context.prisma.commissionPayout.findMany({ where: { shopId }, orderBy: [{ paidAt: 'desc' }, { id: 'desc' }], take: OPERATIONS_ROW_LIMIT, select: { id: true, payoutNumber: true, status: true, commissionCount: true, totalAmount: true, paidAt: true, notes: true, barber: { select: { id: true, displayName: true } } } }),
     context.prisma.tip.findMany({ where: { shopId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: OPERATIONS_ROW_LIMIT, select: { id: true, tipNumber: true, amount: true, paymentMethod: true, createdAt: true, barber: { select: { id: true, displayName: true } }, customer: { select: { id: true, firstName: true, lastName: true } } } }),
     when(policiesAccess, () => context.prisma.noShowPolicy.findMany({ where: { shopId }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: OPERATIONS_ROW_LIMIT, select: { id: true, name: true, status: true, feeAmount: true, graceMinutes: true, appliesToMemberships: true } })),

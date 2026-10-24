@@ -3,6 +3,7 @@ import { createPublicAccessToken, hashPublicAccessToken } from '../utils/publicA
 import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
 import { resolvePublishedShop } from '../utils/publicShop';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
+import { walkInStatus } from '../utils/walkInCapacity';
 
 type Args = {
   customerName: string;
@@ -64,7 +65,7 @@ export default async function createPublicQueueEntry(_root: unknown, args: Args,
   try {
     const queueEntry = await runSerializableTransaction(prisma, async (client) => {
       const transaction = client as Prisma.TransactionClient;
-      const publishedShop = await resolvePublishedShop(transaction, { id: true });
+      const publishedShop = await resolvePublishedShop(transaction, { id: true, timezone: true, hours: true });
       if (!publishedShop) throw new QueueRejected('The walk-in queue is not open online right now. Contact the shop.');
       const shopId = publishedShop.id;
       await transaction.$executeRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', 'barbershop-public-queue', `${shopId}:${phoneKey}`);
@@ -79,6 +80,12 @@ export default async function createPublicQueueEntry(_root: unknown, args: Args,
           }
           return original;
         }
+      }
+
+      // Only take walk-ins while the shop is open and a barber is on the floor.
+      if (!clientToken || !(await transaction.walkInQueueEntry.findFirst({ where: { shopId, publicAccessTokenHash: access.hash }, select: { id: true } }))) {
+        const status = await walkInStatus(transaction, publishedShop);
+        if (!status.open) throw new QueueRejected(`Walk-ins are closed right now.${status.opensAt ? ` ${status.opensAt}.` : ''}`);
       }
 
       // Eligibility is checked inside the same transaction that creates the entry.

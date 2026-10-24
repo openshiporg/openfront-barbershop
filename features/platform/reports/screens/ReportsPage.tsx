@@ -51,7 +51,7 @@ function Performance({ id, title, rows, money }: { id: string; title: string; ro
             </div>
             <div className="mt-1.5 flex items-center gap-3">
               <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-foreground/70" style={{ width: `${Math.max(2, Math.round((row.revenue / top) * 100))}%` }} /></span>
-              <span className="w-16 shrink-0 text-right font-mono text-xs tabular-nums text-muted-foreground">{row.appointments} lines</span>
+              <span className="w-20 shrink-0 text-right font-mono text-xs tabular-nums text-muted-foreground">{row.appointments} {row.appointments === 1 ? 'visit' : 'visits'}</span>
             </div>
           </li>
         ))}

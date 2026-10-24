@@ -6,11 +6,14 @@ import { MenuList } from '../components/MenuList';
 import { StorefrontImage } from '../components/StorefrontImage';
 import { getAllBarbers, getServiceCategories } from '../lib/data/services';
 import { getPublicStorefrontSettings } from '../lib/data/settings';
+import { getStorefrontOnNowBarberIds } from '../lib/data/queue';
 import { shopHours } from '../lib/hours';
 import { StorefrontShell } from './StorefrontShell';
 
 export default async function HomePage() {
-  const [categories, barbers, settings] = await Promise.all([getServiceCategories(), getAllBarbers(), getPublicStorefrontSettings()]);
+  const [categories, barbers, settings, onNowIds] = await Promise.all([getServiceCategories(), getAllBarbers(), getPublicStorefrontSettings(), getStorefrontOnNowBarberIds()]);
+  // Only barbers working right now are on the floor.
+  const onFloor = onNowIds ? barbers.filter((barber) => onNowIds.includes(barber.id)) : [];
   if (!settings) return <StorefrontShell><></></StorefrontShell>;
   const { days, state } = shopHours(settings.hours, settings.timezone);
   const telephoneHref = phoneHref(settings.phone);
@@ -35,11 +38,11 @@ export default async function HomePage() {
           </div>
           <div className="sf-hero-media">
             <StorefrontImage src="/images/barbershop/photo/shop-floor.webp" fallbackSrc="/images/barbershop/photo/shop-floor.webp" alt={`${settings.name} shop floor`} priority sizes="(max-width: 1024px) 100vw, 48vw" />
-            {barbers.length ? (
+            {onFloor.length ? (
               <div className="sf-hero-board">
                 <p className="sf-eyebrow mb-1">On the floor</p>
                 <ul>
-                  {barbers.slice(0, 4).map((barber) => (
+                  {onFloor.slice(0, 4).map((barber) => (
                     <li key={barber.id}>
                       <span className="sf-mono">{barber.chairNumber ? `CH ${barber.chairNumber.padStart(2, '0')}` : 'CH --'}</span>
                       <span className="truncate">{barber.displayName}</span>

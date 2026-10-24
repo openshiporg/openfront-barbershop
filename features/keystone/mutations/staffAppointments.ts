@@ -234,6 +234,8 @@ export async function createStaffAppointment(_root: unknown, args: CreateArgs, c
           price: slot.service.price || 0,
           depositAmount: slot.service.depositAmount || 0,
           internalNotes: notes,
+          // The customer's status link greets them by the name staff entered.
+          guestNameSnapshot: [customer.firstName, customer.lastName].filter(Boolean).join(' '),
           publicAccessTokenHash: access.hash,
           serviceId: slot.service.id,
           barberId: slot.barber.id,

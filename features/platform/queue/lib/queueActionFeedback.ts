@@ -31,7 +31,7 @@ export function queueStatusFeedback(result: QueueActionResult, queueEntryId: str
   }
 
   if (targetStatus === 'texted') return 'Manual contact marked. No SMS was sent.';
-  return `Queue status verified: ${expected}.`;
+  return `Marked ${expected}`;
 }
 
 export function queueSeatFeedback(result: QueueActionResult, queueEntryId: string) {

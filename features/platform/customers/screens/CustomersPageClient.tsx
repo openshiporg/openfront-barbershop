@@ -276,7 +276,7 @@ function CustomerDetail({ customer, data, search, planSearch }: { customer: Cust
             {(customer.appointments || []).map((appointment) => (
               <li key={appointment.id} className="border-b py-2.5 text-sm last:border-b-0">
                 <div className="flex items-baseline justify-between gap-3"><strong className="min-w-0 truncate font-medium">{appointment.serviceTitleSnapshot || 'Service label not recorded'}</strong><span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{formatDay(appointment.startsAt, timeZone)}</span></div>
-                <p className="text-xs text-muted-foreground">{appointment.barberNameSnapshot || 'Barber not recorded'} · {statusLabel(appointment.status)} · {statusLabel(appointment.paymentStatus)}</p>
+                <p className="text-xs text-muted-foreground">{appointment.barberNameSnapshot || 'Barber not recorded'} · {statusLabel(appointment.status)}{appointment.paymentStatus && appointment.paymentStatus !== 'not_required' ? ` · ${statusLabel(appointment.paymentStatus)}` : ''}</p>
                 {appointment.transaction && (
                   <p className="mt-1 text-xs">
                     <span className="font-mono tabular-nums">{appointment.transaction.formattedTotal || formatMoney(appointment.transaction.total)}</span> {statusLabel(appointment.transaction.paymentMethod)} ·{' '}

@@ -31,7 +31,7 @@ export function appointmentStatusFeedback(
     return `Appointment is currently ${statusLabel(appointment.status)}, not ${expected}. Refresh the booking board before taking another action.`;
   }
 
-  return `Appointment status verified: ${expected}.`;
+  return expected.charAt(0).toUpperCase() + expected.slice(1);
 }
 
 export function appointmentNoShowFeedback(result: AppointmentActionResult, appointmentId: string) {

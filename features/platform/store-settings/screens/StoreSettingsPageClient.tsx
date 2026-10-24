@@ -15,8 +15,8 @@ import type { ShopChoice } from '@/features/platform/barbershop/actions/shop';
 import { LogoPicker } from '../components/LogoPicker';
 import { DEFAULT_STORE_LOGO_ICON } from '../lib/store-logo';
 import { StoreLogo } from '@/features/storefront/components/StoreLogo';
-import { hoursTextToTimes, SHOP_HOURS_DAYS, timesToHoursText } from '@/features/shared/shop-hours';
-import { Notice, PageHeader, Pill, PillLink, StatusDot, Track } from '@/features/platform/lib/ui';
+import { hoursTextToTimes, parseHoursRange, SHOP_HOURS_DAYS, timesToHoursText } from '@/features/shared/shop-hours';
+import { Notice, PageHeader, Pill, PillLink, selectClass, StatusDot, Track } from '@/features/platform/lib/ui';
 import {
   updateActiveShopStorefrontSettingsAction,
   type ActiveShopStorefrontSettings,
@@ -73,12 +73,32 @@ function toForm(settings: ActiveShopStorefrontSettings): FormState {
 
 const same = (left: FormState, right: FormState) => JSON.stringify(left) === JSON.stringify(right);
 
+type DayDraft = { open: boolean; start: string; end: string };
+function draftsFrom(hours?: Record<string, string>): Record<string, DayDraft> {
+  return Object.fromEntries(SHOP_HOURS_DAYS.map((day) => {
+    const times = hoursTextToTimes(hours?.[day]);
+    return [day, times ? { open: true, start: times.open, end: times.close } : { open: false, start: '09:00', end: '19:00' }];
+  }));
+}
+const draftText = (draft: DayDraft) => (draft.open ? timesToHoursText(draft.start, draft.end) : 'Closed');
+const draftInvalid = (draft: DayDraft) => draft.open && !parseHoursRange(draftText(draft));
+
+function timeZoneOptions(current: string) {
+  let zones: string[] = [];
+  try { zones = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf?.('timeZone') || []; } catch { zones = []; }
+  return zones.includes(current) ? zones : [current, ...zones];
+}
+
 export function StoreSettingsPageClient({ initialData, initialError, shopChoices }: StoreSettingsPageClientProps) {
   const [saved, setSaved] = useState<ActiveShopStorefrontSettings | null>(initialData);
   const [form, setForm] = useState<FormState | null>(initialData ? toForm(initialData) : null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [drafts, setDrafts] = useState(() => draftsFrom(initialData ? toForm(initialData).hours : undefined));
+  // The full IANA list is filled in after mount so server and browser markup agree.
+  const [zones, setZones] = useState<string[]>([]);
+  useEffect(() => { Promise.resolve().then(() => setZones(timeZoneOptions(initialData?.timezone || 'America/New_York'))); }, [initialData?.timezone]);
   const formRef = useRef(form);
   formRef.current = form;
 
@@ -120,8 +140,16 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
     setForm((current) => (current ? { ...current, ...patch } : current));
   };
 
+  const hoursInvalid = SHOP_HOURS_DAYS.some((day) => draftInvalid(drafts[day]));
+  const setDraft = (day: string, patch: Partial<DayDraft>) => {
+    const next = { ...drafts[day], ...patch };
+    setDrafts({ ...drafts, [day]: next });
+    update({ hours: { ...form.hours, [day]: draftText(next) } });
+  };
+
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (hoursInvalid) { setError('Fix the highlighted hours before saving.'); return; }
     if (!safeLogo) {
       setError('The logo SVG is invalid. Fix it or choose a library icon before saving.');
       return;
@@ -139,7 +167,7 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
       setSaved(result.data);
       // Apply the saved values only if nothing was edited while saving; newer
       // typing is kept (and stays marked unsaved).
-      if (formRef.current && same(formRef.current, submitted)) setForm(toForm(result.data));
+      if (formRef.current && same(formRef.current, submitted)) { setForm(toForm(result.data)); setDrafts(draftsFrom(toForm(result.data).hours)); }
       setStatus('Store settings saved.');
     } catch {
       setError('The connection was interrupted. Your changes may not have been saved. Reload to check before saving again.');
@@ -206,7 +234,9 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
               </div>
               <div>
                 <Label htmlFor="timezone">Timezone</Label>
-                <Input id="timezone" value={form.timezone} maxLength={100} required onChange={(e) => update({ timezone: e.target.value })} className="mt-2 font-mono" />
+                <select id="timezone" value={form.timezone} required onChange={(e) => update({ timezone: e.target.value })} className={`${selectClass} mt-2 font-mono`}>
+                  {(zones.length ? zones : [form.timezone]).map((zone) => <option key={zone} value={zone}>{zone}</option>)}
+                </select>
               </div>
               <div>
                 <Label htmlFor="currency">Currency</Label>
@@ -219,19 +249,20 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
           <section aria-labelledby="settings-hours" className="space-y-1">
             <h2 id="settings-hours" className="border-b pb-2 text-sm font-semibold">Hours</h2>
             {SHOP_HOURS_DAYS.map((day) => {
-              const times = hoursTextToTimes(form.hours[day]);
-              const setDay = (text: string) => update({ hours: { ...form.hours, [day]: text } });
+              const draft = drafts[day];
+              const invalid = draftInvalid(draft);
               return (
                 <div key={day} className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b py-2.5 last:border-b-0">
-                  <Label htmlFor={`hours-${day}`} className="w-12 shrink-0"><StatusDot tone={times ? 'live' : 'off'} />{DAY_LABELS[day]}</Label>
-                  <Switch id={`hours-${day}`} aria-label={`Open ${DAY_LABELS[day]}`} checked={Boolean(times)} disabled={isLoading} onCheckedChange={(open) => setDay(open ? '9:00 AM - 7:00 PM' : 'Closed')} />
-                  {times ? (
+                  <Label htmlFor={`hours-${day}`} className="w-12 shrink-0"><StatusDot tone={invalid ? 'alert' : draft.open ? 'live' : 'off'} />{DAY_LABELS[day]}</Label>
+                  <Switch id={`hours-${day}`} aria-label={`Open ${DAY_LABELS[day]}`} checked={draft.open} disabled={isLoading} onCheckedChange={(open) => setDraft(day, { open })} />
+                  {draft.open ? (
                     <span className="flex min-w-0 items-center gap-2">
-                      <Input type="time" aria-label={`${DAY_LABELS[day]} opens`} value={times.open} step={900} disabled={isLoading} onChange={(e) => e.target.value && setDay(timesToHoursText(e.target.value, times.close))} className="w-32 font-mono" />
+                      <Input type="time" aria-label={`${DAY_LABELS[day]} opens`} aria-invalid={invalid} value={draft.start} step={900} disabled={isLoading} onChange={(e) => e.target.value && setDraft(day, { start: e.target.value })} className="w-32 font-mono" />
                       <span className="text-muted-foreground">–</span>
-                      <Input type="time" aria-label={`${DAY_LABELS[day]} closes`} value={times.close} step={900} disabled={isLoading} onChange={(e) => e.target.value && setDay(timesToHoursText(times.open, e.target.value))} className="w-32 font-mono" />
+                      <Input type="time" aria-label={`${DAY_LABELS[day]} closes`} aria-invalid={invalid} value={draft.end} step={900} disabled={isLoading} onChange={(e) => e.target.value && setDraft(day, { end: e.target.value })} className="w-32 font-mono" />
                     </span>
                   ) : <span className="text-sm text-muted-foreground">Closed</span>}
+                  {invalid ? <span role="alert" className="w-full text-xs text-destructive">Closing time must be after opening</span> : null}
                 </div>
               );
             })}
@@ -267,7 +298,7 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
           </div>
           {error && <Notice tone="alert">{error}</Notice>}
           <Track block>
-            <Pill type="submit" variant="primary" disabled={isLoading || !safeLogo || !dirty}>
+            <Pill type="submit" variant="primary" disabled={isLoading || !safeLogo || !dirty || hoursInvalid}>
               {isLoading ? 'Saving…' : 'Save Settings'}
             </Pill>
           </Track>

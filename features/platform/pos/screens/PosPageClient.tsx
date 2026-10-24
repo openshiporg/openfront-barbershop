@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCommandKey } from '@/features/platform/lib/useCommandKey';
+import { shopDateKey } from '@/features/shared/shop-time';
 import { Empty, Notice, Pager as KitPager, Pill, PillLink, Section, selectClass, StatusDot, Track } from '@/features/platform/lib/ui';
 import { checkoutAppointmentAction, recordProductSaleAction, refundCashCheckoutAction, returnProductSaleAction, type PosQuery } from '../actions/checkout';
 import type { Paging, PosAppointment, PosCustomerSummary, PosProjectionData, PosReceipt, ProductLineSummary } from '../lib/posTypes';
@@ -74,7 +75,10 @@ function Pager({ paging, label, href }: { paging: Paging; label: string; href: (
 
 export function PosPageClient({ data, query }: { data: PosProjectionData; query: PosQuery }) {
   const { appointments, requestedAppointment, requestedAppointmentId, timeZone } = data;
-  const [selectedId, setSelectedId] = useState(requestedAppointmentId || (appointments.find((appointment) => appointment.status === 'in_chair') || appointments[0])?.id || '');
+  // Visits from an earlier shop day are flagged and never preselected.
+  const today = shopDateKey(new Date(), timeZone);
+  const earlier = (appointment: PosAppointment) => Boolean(appointment.startsAt) && shopDateKey(String(appointment.startsAt), timeZone) < today;
+  const [selectedId, setSelectedId] = useState(requestedAppointmentId || appointments.find((appointment) => appointment.status === 'in_chair' && !earlier(appointment))?.id || appointments.find((appointment) => !earlier(appointment))?.id || '');
   // The selected ticket is resolved by id only; a missing ticket is never replaced by another.
   const selected = (requestedAppointment && requestedAppointment.id === selectedId ? requestedAppointment : null)
     || appointments.find((appointment) => appointment.id === selectedId)
@@ -110,10 +114,10 @@ export function PosPageClient({ data, query }: { data: PosProjectionData; query:
                 onClick={() => setSelectedId(appointment.id)}
                 className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 rounded-xl px-3 py-2.5 text-left transition aria-pressed:bg-background aria-pressed:shadow-sm aria-pressed:ring-1 aria-pressed:ring-black/5 hover:bg-background/60 dark:aria-pressed:bg-zinc-800"
               >
-                <span className="min-w-0 truncate font-medium"><StatusDot tone={appointment.status === 'in_chair' ? 'live' : appointment.status === 'checked_in' ? 'wait' : 'off'} />{customerName(appointment.customer)}</span>
+                <span className="min-w-0 truncate font-medium"><StatusDot tone={earlier(appointment) ? 'alert' : appointment.status === 'in_chair' ? 'live' : appointment.status === 'checked_in' ? 'wait' : 'off'} />{customerName(appointment.customer)}</span>
                 <span className="font-mono text-sm tabular-nums">{formatMoney(appointment.price)}</span>
                 <span className="col-span-2 truncate pl-4 text-xs text-muted-foreground">{serviceLabel(appointment)} · {barberLabel(appointment)} · {formatDateTime(appointment.startsAt, timeZone)}</span>
-                <span className="col-span-2 pl-4 text-xs text-muted-foreground">{statusLabel(appointment.status)} · payment {statusLabel(appointment.paymentStatus)}{(appointment.customer?.packageBalances?.length ?? 0) > 0 ? ' · package balance' : ''}</span>
+                <span className="col-span-2 pl-4 text-xs text-muted-foreground">{earlier(appointment) ? <span className="font-medium text-destructive">Earlier day · </span> : null}{statusLabel(appointment.status)}{appointment.paymentStatus && appointment.paymentStatus !== 'not_required' ? ` · ${statusLabel(appointment.paymentStatus)}` : ''}{(appointment.customer?.packageBalances?.length ?? 0) > 0 ? ' · package balance' : ''}</span>
               </button>
             ))}
             {!appointments.length && <p className="px-3 py-4 text-sm text-muted-foreground">{data.tickets.search ? `No open tickets match “${data.tickets.search}”.` : 'No checked-in or in-chair visits.'}</p>}
@@ -199,6 +203,7 @@ function TenderPanel({ appointment, closed, timeZone }: { appointment: PosAppoin
         </dl>
       </div>
       {appointment.status === 'checked_in' && !closed && <Notice>Seat this visit on the booking board before checkout.</Notice>}
+      {!closed && appointment.startsAt && shopDateKey(String(appointment.startsAt), timeZone) < shopDateKey(new Date(), timeZone) && <Notice tone="alert">Visit from {formatDateTime(appointment.startsAt, timeZone)}, an earlier day</Notice>}
       {paymentMethod === 'package' && total > 0 && <Notice tone="alert">A prepaid visit can’t include tip or tax. Mixed tender isn’t supported.</Notice>}
       {!amountsValid && <Notice tone="alert">Tip, discount and tax must be zero or positive amounts.</Notice>}
 
@@ -257,6 +262,7 @@ function TenderPanel({ appointment, closed, timeZone }: { appointment: PosAppoin
 function RetailSale({ data }: { data: PosProjectionData }) {
   const { products } = data;
   const [productId, setProductId] = useState((products.find((item) => item.availableQuantity > 0) || products[0])?.id || '');
+  const [retailTender, setRetailTender] = useState<'cash' | 'card'>('cash');
   const [quantity, setQuantity] = useState('1');
   const [taxRate, setTaxRate] = useState('0');
   const [feedback, setFeedback] = useState<Feedback>(null);
@@ -277,7 +283,7 @@ function RetailSale({ data }: { data: PosProjectionData }) {
 
   const submit = () => {
     if (!product || !quantityValid || !rateValid || !enough) return;
-    const input = { productId: product.id, quantity: parsedQuantity, paymentMethod: 'cash', taxRateBps };
+    const input = { productId: product.id, quantity: parsedQuantity, paymentMethod: retailTender, taxRateBps };
     setFeedback(null);
     startTransition(async () => {
       try {
@@ -319,7 +325,13 @@ function RetailSale({ data }: { data: PosProjectionData }) {
             <div className="bg-background px-3 py-2"><dt className="font-sans text-[11px] uppercase tracking-wider text-muted-foreground">Tax {rateValid ? parsedRate : 0}%</dt><dd>{formatMoney(taxAmount)}</dd></div>
             <div className="bg-background px-3 py-2"><dt className="font-sans text-[11px] uppercase tracking-wider text-muted-foreground">Total</dt><dd className="font-semibold">{formatMoney(total)}</dd></div>
           </dl>
-          <Track><Pill variant="primary" disabled={pending || !enough || !rateValid} onClick={submit}>Take {formatMoney(total)} cash</Pill></Track>
+          <div className="flex flex-wrap items-center gap-2">
+            <Track label="Retail tender">
+              <Pill size="sm" variant="flat" aria-pressed={retailTender === 'cash'} onClick={() => setRetailTender('cash')}>Cash</Pill>
+              <Pill size="sm" variant="flat" aria-pressed={retailTender === 'card'} onClick={() => setRetailTender('card')}>Card terminal</Pill>
+            </Track>
+            <Track><Pill variant="primary" disabled={pending || !enough || !rateValid} onClick={submit}>{retailTender === 'card' ? `Record ${formatMoney(total)} card` : `Take ${formatMoney(total)} cash`}</Pill></Track>
+          </div>
         </div>
       ) : <Empty>No active products. <Link className="underline" href="/dashboard/platform/services/new-product">Add a product</Link></Empty>}
       <div className="mt-3"><FeedbackMessage feedback={feedback} /></div>

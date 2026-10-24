@@ -1,6 +1,7 @@
 import { publicAccessTokenMatches } from '../utils/publicAccessToken';
 import { resolvePublishedShop } from '../utils/publicShop';
 import { shopDayRange } from '../../shared/shop-time';
+import { walkInStatus } from '../utils/walkInCapacity';
 
 type QueueArgs = {
   queueEntryId?: string | null;
@@ -103,4 +104,12 @@ export async function getPublicQueueEntry(
   }
 
   return publicQueueItem(item);
+}
+
+/** Whether walk-ins are open now, how many barbers are on the floor, and the next opening. */
+export async function getPublicWalkInStatus(_root: unknown, _args: unknown, context: PublicQueueContext) {
+  const prisma = context.sudo().prisma;
+  const shop = await resolvePublishedShop(prisma, { id: true, timezone: true, hours: true });
+  if (!shop) return { open: false, barbersOnNow: 0, opensAt: null, onNowIds: [] };
+  return walkInStatus(prisma, shop);
 }

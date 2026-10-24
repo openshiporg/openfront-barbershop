@@ -3,7 +3,6 @@
 import { storefrontClient } from '../config';
 import { rememberAccess } from '../access-cookies';
 import { readAccess } from '../access-cookie-read';
-import { getAllBarbers } from './services';
 
 type QueueEntry = { id: string; status: string; quotedWaitMinutes: number | null; requestedBarber?: { displayName: string } | null };
 export type QueueStatusLookup = { status: 'found'; entry: QueueEntry } | { status: 'not_found' } | { status: 'unavailable' };
@@ -34,27 +33,36 @@ export async function joinStorefrontQueue(input: { customerName: string; phone: 
 }
 
 type PublicQueueRow = { id: string; status: string; requestedService?: { durationMinutes?: number | null } | null };
-export type QueueSummary = { waiting: number; inChair: number; waitMinutes: number; order: string[] };
+type PublicWalkInStatus = { open: boolean; barbersOnNow: number; opensAt: string | null };
+export type QueueSummary = { open: boolean; opensAt: string | null; waiting: number; inChair: number; waitMinutes: number; order: string[] };
 
 const DEFAULT_VISIT_MINUTES = 30;
 
 /**
  * Public line summary for today. The wait for someone joining now is the
- * chair time of everyone ahead, shared across the barbers taking walk-ins.
+ * chair time of everyone ahead, shared across the barbers on the floor now.
  */
 export async function getStorefrontQueueSummary(): Promise<QueueSummary | null> {
   try {
-    const [result, barbers] = await Promise.all([
-      storefrontClient.request<{ getPublicQueue: PublicQueueRow[] }>('query{getPublicQueue{id status requestedService{durationMinutes}}}'),
-      getAllBarbers().catch(() => []),
-    ]);
+    const result = await storefrontClient.request<{ getPublicQueue: PublicQueueRow[]; getPublicWalkInStatus: PublicWalkInStatus }>('query{getPublicQueue{id status requestedService{durationMinutes}} getPublicWalkInStatus{open barbersOnNow opensAt}}');
+    const status = result.getPublicWalkInStatus;
     const waiting = result.getPublicQueue.filter((entry) => entry.status === 'waiting' || entry.status === 'texted');
     const chairMinutes = waiting.reduce((total, entry) => total + (entry.requestedService?.durationMinutes || DEFAULT_VISIT_MINUTES), 0);
     return {
+      open: status.open,
+      opensAt: status.opensAt,
       waiting: waiting.length,
       inChair: result.getPublicQueue.filter((entry) => entry.status === 'in_chair').length,
-      waitMinutes: Math.ceil(chairMinutes / Math.max(1, barbers.length) / 5) * 5,
+      waitMinutes: Math.ceil(chairMinutes / Math.max(1, status.barbersOnNow) / 5) * 5,
       order: waiting.map((entry) => entry.id),
     };
+  } catch { return null; }
+}
+
+/** Barbers working right now, for the storefront's "On the floor" board. */
+export async function getStorefrontOnNowBarberIds(): Promise<string[] | null> {
+  try {
+    const result = await storefrontClient.request<{ getPublicWalkInStatus: { onNowIds: string[] } }>('query{getPublicWalkInStatus{onNowIds}}');
+    return result.getPublicWalkInStatus.onNowIds;
   } catch { return null; }
 }

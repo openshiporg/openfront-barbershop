@@ -11,7 +11,8 @@ import { assertUsdSettlementCurrency } from '../utils/supportedSettlementCurrenc
 type Context = { session?: Parameters<typeof permissions.canManagePayments>[0]['session']; prisma: PrismaClient };
 // Retail card/gift-card settlement is not inferred from an operator click.
 // Add those tenders only when this command can require captured provider/ledger evidence.
-const METHODS = new Set(['cash']);
+// Card is tender taken on the shop's own terminal and recorded here.
+const METHODS = new Set(['cash', 'card']);
 const MAX_ALLOCATION_LOTS = 50;
 
 function lockLot(transaction: Prisma.TransactionClient, lotId: string) {
@@ -33,7 +34,7 @@ export function allocatedReturnTax(originalTax: number, originalQuantity: number
 
 export async function recordProductSale(_root: unknown, args: { productId: string; quantity: number; paymentMethod: string; taxRateBps?: number | null; idempotencyKey: string }, context: Context) {
   if (!permissions.canManagePayments({ session: context.session })) return { success: false, error: 'Not authorized to record product sales.', sale: null };
-  if (!args.productId || !args.idempotencyKey?.trim() || !METHODS.has(args.paymentMethod)) return { success: false, error: 'Product, cash tender, and idempotency key are required; other tenders need captured settlement evidence.', sale: null };
+  if (!args.productId || !args.idempotencyKey?.trim() || !METHODS.has(args.paymentMethod)) return { success: false, error: 'Choose a product and cash or card.', sale: null };
   try {
     const hash = hashPublicAccessToken(args.idempotencyKey.trim());
     const line = await runSerializableTransaction(context.prisma, async (client) => {

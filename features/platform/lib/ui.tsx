@@ -35,7 +35,7 @@ export function PageHeader({ title, tone, meta, actions }: { title: ReactNode; t
   );
 }
 
-export function Track({ children, className, label, block = false }: { children: ReactNode; className?: string; label?: string; block?: boolean }) {
+export function Track({ children, className, label, block = false, wrap = false }: { children: ReactNode; className?: string; label?: string; block?: boolean; wrap?: boolean }) {
   return (
     <div
       role={label ? 'group' : undefined}
@@ -43,7 +43,10 @@ export function Track({ children, className, label, block = false }: { children:
       className={cn(
         'max-w-full items-center gap-1 rounded-full bg-muted p-1 shadow-[inset_0_1px_2px_rgb(0_0_0/0.08)] ring-1 ring-inset ring-black/5 dark:bg-zinc-900 dark:shadow-[inset_0_1px_2px_rgb(0_0_0/0.5)] dark:ring-white/5',
         // Inline tracks never wrap into a lopsided blob: on narrow screens they scroll.
-        block ? 'flex w-full flex-wrap [&>*]:flex-1' : 'inline-flex flex-nowrap overflow-x-auto [scrollbar-width:none] [&>*]:shrink-0',
+        block ? 'flex w-full flex-wrap [&>*]:flex-1'
+          // Card actions wrap onto a second row so none is hidden off the edge.
+          : wrap ? 'inline-flex flex-wrap rounded-2xl'
+          : 'inline-flex flex-nowrap overflow-x-auto [scrollbar-width:none] [&>*]:shrink-0',
         className,
       )}
     >

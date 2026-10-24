@@ -11,7 +11,7 @@ import getPublicAppointment from "../queries/getPublicAppointment";
 import getPublicBookingEligibility from '../queries/getPublicBookingEligibility';
 import { getPublicBarbers, getPublicProducts, getPublicServiceCatalog } from "../queries/getPublicServices";
 import getPublicStorefrontSettings from "../queries/getStorefrontSettings";
-import { getPublicQueue, getPublicQueueEntry } from "../queries/getPublicQueue";
+import { getPublicQueue, getPublicQueueEntry, getPublicWalkInStatus } from "../queries/getPublicQueue";
 import createPublicQueueEntry from "./createPublicQueueEntry";
 import runBarbershopOnboarding from "./runBarbershopOnboarding";
 import initiateAppointmentPaymentSession from "./initiateAppointmentPaymentSession";
@@ -310,6 +310,13 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         slug: String!
       }
 
+      type PublicWalkInStatus {
+        open: Boolean!
+        barbersOnNow: Int!
+        opensAt: String
+        onNowIds: [ID!]!
+      }
+
       type ClaimableShop {
         id: ID!
         name: String!
@@ -388,6 +395,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         ): [AvailabilitySlot!]!
         getPublicQueue: [PublicQueueEntry!]!
         claimableShops: [ClaimableShop!]!
+        getPublicWalkInStatus: PublicWalkInStatus!
         getPublicQueueEntry(
           queueEntryId: ID!
           accessToken: String!
@@ -579,6 +587,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         getPublicQueue,
         getPublicQueueEntry,
         claimableShops,
+        getPublicWalkInStatus,
         getPublicAppointment,
       },
       Mutation: {

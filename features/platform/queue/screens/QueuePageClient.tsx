@@ -140,7 +140,7 @@ export function QueuePageClient({ data, breadcrumbs }: { data: QueueProjectionDa
                       </p>
                       {entry.notes && <p className="mt-2 ml-[4.75rem] rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground">{entry.notes}</p>}
                       <div className="mt-3 pl-[4.75rem]">
-                        <Track>
+                        <Track wrap>
                           {entry.status !== 'in_chair' && <Pill size="sm" variant="primary" disabled={pending || !canSeat} onClick={() => convertToAppointment(entry)}>Seat</Pill>}
                           {entry.status === 'in_chair' && entry.appointment?.id && <PillLink size="sm" variant="primary" href={`/dashboard/platform/pos?appointment=${encodeURIComponent(entry.appointment.id)}`}>Checkout</PillLink>}
                           {action && <Pill size="sm" disabled={pending} onClick={() => updateStatus(entry.id, action.status)}>{action.label}</Pill>}

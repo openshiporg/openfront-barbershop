@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { phoneHref } from '@/features/shared/storefront-settings';
 import { getAllServices, type StorefrontService } from '../lib/data/services';
 import { getPublicStorefrontSettings } from '../lib/data/settings';
@@ -68,15 +69,21 @@ export default async function QueuePage({ searchParams }: { searchParams?: Promi
         <main id="main-content" className="sf-container-narrow py-[var(--space-2xl)]">
           <p className="sf-eyebrow mb-3">Walk-ins</p>
           <h1 className="sf-display text-[var(--text-display-s)]">Next chair</h1>
-          <p className="sf-lead mt-4">Join the walk-in list. Seated between appointments; no fixed time.</p>
-          {summary ? (
+          {summary && !summary.open ? (
+            <div className="sf-empty mt-8" role="status">
+              <p className="sf-subtitle"><span className="sf-dot is-alert" aria-hidden="true" />Walk-ins closed</p>
+              {summary.opensAt ? <p className="sf-mono">{summary.opensAt}</p> : null}
+              <div className="sf-track"><Link href="/book" className="sf-pill is-primary">Book a time</Link></div>
+            </div>
+          ) : <p className="sf-lead mt-4">Join the walk-in list. Seated between appointments; no fixed time.</p>}
+          {summary && summary.open ? (
             <dl className="sf-ledger mt-8" aria-label="Walk-in line now">
               <div><dt><span className={`sf-dot ${summary.waiting ? 'is-wait' : 'is-live'}`} aria-hidden="true" />Waiting</dt><dd className="sf-mono">{summary.waiting}</dd></div>
               <div><dt>Wait</dt><dd className="sf-mono">{waitLabel(summary)}</dd></div>
               <div><dt>In the chair</dt><dd className="sf-mono">{summary.inChair}</dd></div>
             </dl>
           ) : null}
-          {catalogError ? <p role="alert" className="sf-notice is-error mt-8">The walk-in form couldn’t load. Try again in a moment.</p> : <QueuePageClient services={services} />}
+          {summary && !summary.open ? null : catalogError ? <p role="alert" className="sf-notice is-error mt-8">The walk-in form couldn’t load. Try again in a moment.</p> : <QueuePageClient services={services} />}
           {call ? <p className="sf-small sf-muted mt-6">Call {call}</p> : null}
         </main>
       )}
