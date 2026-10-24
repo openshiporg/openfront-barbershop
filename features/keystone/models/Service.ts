@@ -1,5 +1,5 @@
 import { list, graphql } from "@keystone-6/core";
-import { checkbox, integer, relationship, select, text, virtual } from "@keystone-6/core/fields";
+import { checkbox, image, integer, relationship, select, text, virtual } from "@keystone-6/core/fields";
 
 import { permissions, rules } from "../access";
 import { trackingFields } from "./trackingFields";
@@ -81,6 +81,7 @@ export const Service = list({
     name: text({ validation: { isRequired: true } }),
     description: text({ ui: { displayMode: "textarea" } }),
     imagePath: text({ ui: { description: "Relative public image path, e.g. /images/barbershop/service-classic-cut.svg." } }),
+    image: image({ storage: "my_images" }),
     durationMinutes: integer({ validation: { isRequired: true, min: 5 }, defaultValue: 30 }),
     price: integer({ validation: { isRequired: true, min: 0 }, ui: { description: "Base price in cents." } }),
     depositRequired: checkbox({ defaultValue: false }),

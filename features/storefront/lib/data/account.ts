@@ -25,9 +25,11 @@ export async function signUpAccount(previous: AccountState, form: FormData): Pro
   const name = String(form.get('name') || '').trim();
   const email = String(form.get('email') || '').trim().toLowerCase();
   const password = String(form.get('password') || '');
+  const phone = String(form.get('phone') || '').trim();
   if (!name || name.length > 120 || !EMAIL_PATTERN.test(email) || email.length > 254 || password.length < 10 || password.length > 1000) return { error: 'Enter a name, email and a password of at least 10 characters.' };
+  if (phone.replace(/\D/g, '').length < 7 || phone.length > 40) return { error: 'Enter a phone number for your bookings.' };
   // Only identity fields are sent: no role, membership or shop assignment.
-  const result = await keystoneClient(`mutation($name: String!, $email: String!, $password: String!) { createUser(data: { name: $name, email: $email, password: $password }) { id } }`, { name, email, password });
+  const result = await keystoneClient(`mutation($name: String!, $email: String!, $phone: String!, $password: String!) { createUser(data: { name: $name, email: $email, phone: $phone, password: $password }) { id } }`, { name, email, phone, password });
   if (!result.success) return { error: 'We couldn’t create an account with those details. If you already have an account, sign in or reset your password. Otherwise, book as a guest or contact the shop.' };
   return signInAccount(previous, form);
 }
@@ -60,11 +62,11 @@ export async function signOutAccount() {
   redirect('/account');
 }
 
-export type StorefrontAccount = { id: string; name: string; email: string };
+export type StorefrontAccount = { id: string; name: string; email: string; phone?: string | null };
 
 /** Distinguishes a signed-out visitor from an identity lookup that failed. */
 export async function getStorefrontAccountState(): Promise<{ status: 'signed_in'; user: StorefrontAccount } | { status: 'signed_out' } | { status: 'unavailable' }> {
-  const result = await keystoneClient<{ authenticatedItem: StorefrontAccount | null }>('query { authenticatedItem { ... on User { id name email } } }', {}, { cache: 'no-store' });
+  const result = await keystoneClient<{ authenticatedItem: StorefrontAccount | null }>('query { authenticatedItem { ... on User { id name email phone } } }', {}, { cache: 'no-store' });
   if (!result.success) return { status: 'unavailable' };
   return result.data.authenticatedItem ? { status: 'signed_in', user: result.data.authenticatedItem } : { status: 'signed_out' };
 }

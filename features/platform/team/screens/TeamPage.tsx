@@ -4,7 +4,8 @@ import { basePath } from '@/features/dashboard/lib/config';
 import { StatusTabs } from '@/features/platform/lib/forms';
 import { Empty, Notice, PageHeader, Readouts, Section, StatusDot, Track, type Tone } from '@/features/platform/lib/ui';
 import { getTeamAction } from '../actions/team';
-import { AddMemberButton, MemberActions, ROLE_LABELS } from '../components/TeamControls';
+import { AddMemberButton, MemberActions } from '../components/TeamControls';
+import { ROLE_LABELS } from '../lib/roles';
 
 const breadcrumbs = [
   { type: 'link' as const, label: 'Dashboard', href: basePath },

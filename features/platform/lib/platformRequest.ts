@@ -44,3 +44,14 @@ export async function platformCommand(query: string, variables: Record<string, u
 
 export const dollarsToCents = (value: unknown) => Math.round(Number(value || 0) * 100);
 export const trimmed = (value: unknown, max = 500) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/** A photo chosen in a platform form, or null when none was picked. */
+export function formImage(form: FormData, field: string): File | { error: string } | null {
+  const file = form.get(field);
+  if (!(file instanceof File) || !file.size) return null;
+  if (!/^image\/(jpeg|png|webp|gif|avif)$/.test(file.type)) return { error: 'Use a JPG, PNG, WebP, GIF or AVIF image.' };
+  if (file.size > MAX_IMAGE_BYTES) return { error: 'Images must be 5 MB or smaller.' };
+  return file;
+}

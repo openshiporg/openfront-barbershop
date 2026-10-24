@@ -5,6 +5,7 @@ type User {
   id: ID!
   name: String
   email: String
+  phone: String
   password: PasswordState
   role: Role
   barberProfile: Barber
@@ -169,6 +170,7 @@ enum OrderDirection {
 input UserUpdateInput {
   name: String
   email: String
+  phone: String
   password: String
   role: RoleRelateToOneForUpdateInput
   barberProfile: BarberRelateToOneForUpdateInput
@@ -230,6 +232,7 @@ input UserUpdateArgs {
 input UserCreateInput {
   name: String
   email: String
+  phone: String
   password: String
   role: RoleRelateToOneForCreateInput
   barberProfile: BarberRelateToOneForCreateInput
@@ -2305,6 +2308,7 @@ type Service {
   name: String
   description: String
   imagePath: String
+  image: ImageFieldOutput
   durationMinutes: Int
   price: Int
   depositRequired: Boolean
@@ -2333,6 +2337,22 @@ type Service {
   displayLabel: String
   createdAt: DateTime
   updatedAt: DateTime
+}
+
+type ImageFieldOutput {
+  id: ID!
+  filesize: Int!
+  width: Int!
+  height: Int!
+  extension: ImageExtension!
+  url: String!
+}
+
+enum ImageExtension {
+  jpg
+  png
+  webp
+  gif
 }
 
 enum ServiceStatusType {
@@ -2423,6 +2443,7 @@ input ServiceUpdateInput {
   name: String
   description: String
   imagePath: String
+  image: ImageFieldInput
   durationMinutes: Int
   price: Int
   depositRequired: Boolean
@@ -2445,6 +2466,13 @@ input ServiceUpdateInput {
   createdAt: DateTime
   updatedAt: DateTime
 }
+
+input ImageFieldInput {
+  upload: Upload!
+}
+
+"""The `Upload` scalar type represents a file upload."""
+scalar Upload
 
 input ServiceCategoryRelateToOneForUpdateInput {
   create: ServiceCategoryCreateInput
@@ -2476,6 +2504,7 @@ input ServiceCreateInput {
   name: String
   description: String
   imagePath: String
+  image: ImageFieldInput
   durationMinutes: Int
   price: Int
   depositRequired: Boolean
@@ -2522,6 +2551,7 @@ type Barber {
   legalName: String
   bio: String
   imagePath: String
+  photo: ImageFieldOutput
   phone: String
   email: String
   chairNumber: String
@@ -2633,6 +2663,7 @@ input BarberUpdateInput {
   legalName: String
   bio: String
   imagePath: String
+  photo: ImageFieldInput
   phone: String
   email: String
   chairNumber: String
@@ -2679,6 +2710,7 @@ input BarberCreateInput {
   legalName: String
   bio: String
   imagePath: String
+  photo: ImageFieldInput
   phone: String
   email: String
   chairNumber: String
@@ -3750,6 +3782,7 @@ type Appointment {
   price: Int
   depositAmount: Int
   cancellationReason: String
+  reminderSentAt: DateTime
   customerNotes: String
   guestNameSnapshot: String
   internalNotes: String
@@ -3828,6 +3861,7 @@ input AppointmentWhereInput {
   price: IntNullableFilter
   depositAmount: IntNullableFilter
   cancellationReason: StringFilter
+  reminderSentAt: DateTimeNullableFilter
   customerNotes: StringFilter
   guestNameSnapshot: StringFilter
   internalNotes: StringFilter
@@ -3888,6 +3922,7 @@ input AppointmentOrderByInput {
   price: OrderDirection
   depositAmount: OrderDirection
   cancellationReason: OrderDirection
+  reminderSentAt: OrderDirection
   customerNotes: OrderDirection
   guestNameSnapshot: OrderDirection
   internalNotes: OrderDirection
@@ -3924,6 +3959,7 @@ input AppointmentUpdateInput {
   price: Int
   depositAmount: Int
   cancellationReason: String
+  reminderSentAt: DateTime
   customerNotes: String
   guestNameSnapshot: String
   internalNotes: String
@@ -3985,6 +4021,7 @@ input AppointmentCreateInput {
   price: Int
   depositAmount: Int
   cancellationReason: String
+  reminderSentAt: DateTime
   customerNotes: String
   guestNameSnapshot: String
   internalNotes: String
@@ -6582,6 +6619,7 @@ type Product {
   cost: Int
   description: String
   imagePath: String
+  image: ImageFieldOutput
   inventoryTracked: Boolean
   metadata: JSON
   inventoryLots(where: InventoryLotWhereInput! = {}, orderBy: [InventoryLotOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: InventoryLotWhereUniqueInput): [InventoryLot!]
@@ -6673,6 +6711,7 @@ input ProductUpdateInput {
   cost: Int
   description: String
   imagePath: String
+  image: ImageFieldInput
   inventoryTracked: Boolean
   metadata: JSON
   inventoryLots: InventoryLotRelateToManyForUpdateInput
@@ -6697,6 +6736,7 @@ input ProductCreateInput {
   cost: Int
   description: String
   imagePath: String
+  image: ImageFieldInput
   inventoryTracked: Boolean
   metadata: JSON
   inventoryLots: InventoryLotRelateToManyForCreateInput
@@ -7121,6 +7161,8 @@ type Mutation {
   selectActiveShop(shopId: ID!): SelectActiveShopResult!
   claimShopOwnership(shopId: ID!): SelectActiveShopResult!
   addShopMemberByEmail(email: String!, membershipRole: String!): DomainCommandResult!
+  startDepositCheckout(appointmentId: ID!, accessToken: String): DomainCommandResult!
+  confirmDepositCheckout(appointmentId: ID!, accessToken: String): DomainCommandResult!
   markAppointmentNoShow(appointmentId: ID!, policyId: ID, reason: String!, idempotencyKey: String!): DomainCommandResult!
   transitionCommission(commissionId: ID!, toStatus: String!, reason: String, idempotencyKey: String!): DomainCommandResult!
   payApprovedCommissions(commissionIds: [ID!]!, notes: String, idempotencyKey: String!): DomainCommandResult!
@@ -7342,6 +7384,7 @@ type Query {
   getPublicQueue: [PublicQueueEntry!]!
   claimableShops: [ClaimableShop!]!
   getPublicWalkInStatus: PublicWalkInStatus!
+  getPublicPaymentOptions: PublicPaymentOptions!
   platformTeam: PlatformProjectionResult!
   getPublicQueueEntry(queueEntryId: ID!, accessToken: String!): PublicQueueEntry
   getPublicAppointment(appointmentId: ID!, accessToken: String): PublicAppointment
@@ -7733,6 +7776,10 @@ type SelectedActiveShop {
   id: ID!
   name: String!
   slug: String!
+}
+
+type PublicPaymentOptions {
+  onlineDeposits: Boolean!
 }
 
 type PublicPackageLine {

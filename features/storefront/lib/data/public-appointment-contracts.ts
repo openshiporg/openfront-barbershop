@@ -8,6 +8,7 @@ export type StorefrontBookedAppointment = {
   startsAt?: string | null;
   status?: string | null;
   paymentStatus?: string | null;
+  depositAmount?: number | null;
   service?: { id: string; name?: string | null; durationMinutes?: number | null; price?: number | null } | null;
   barber?: { id: string; displayName?: string | null; chairNumber?: string | null } | null;
 };
@@ -23,7 +24,7 @@ export type CreateBookingResult = {
 const GUEST_BOOKING_RESULT_FIELDS = `
   success disposition error accessToken
   appointment {
-    bookingEligibility bookingTimezone id startsAt status paymentStatus
+    bookingEligibility bookingTimezone id startsAt status paymentStatus depositAmount
     service { id name durationMinutes price }
     barber { id displayName chairNumber }
   }

@@ -26,6 +26,13 @@ export const paymentProviderAdapters = {
     allowsPublicSettlement: false,
     webhook: null,
   },
+  // Online deposits through Stripe Checkout; needs STRIPE_SECRET_KEY (as in E-commerce).
+  stripe: {
+    load: () => import('./stripe') as Promise<PaymentAdapterModule>,
+    settlement: 'processor',
+    allowsPublicSettlement: true,
+    webhook: null,
+  },
 } as const satisfies Record<string, PaymentAdapterRegistration>;
 
 export type PaymentProviderAdapterCode = keyof typeof paymentProviderAdapters;

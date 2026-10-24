@@ -1,5 +1,5 @@
 import { list } from '@keystone-6/core';
-import { checkbox, integer, json, relationship, select, text } from '@keystone-6/core/fields';
+import { checkbox, image, integer, json, relationship, select, text } from '@keystone-6/core/fields';
 
 import { permissions, rules } from '../access';
 import { trackingFields } from './trackingFields';
@@ -35,6 +35,7 @@ export const Product = list({
     cost: integer({ defaultValue: 0, validation: { min: 0 } }),
     description: text({ ui: { displayMode: 'textarea' } }),
     imagePath: text({ ui: { description: 'Relative public retail product path, e.g. /images/barbershop/product-matte-clay.svg.' } }),
+    image: image({ storage: 'my_images' }),
     inventoryTracked: checkbox({ defaultValue: true }),
     metadata: json(),
     inventoryLots: relationship({ ref: 'InventoryLot.product', many: true }),

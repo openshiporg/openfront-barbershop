@@ -2,6 +2,7 @@ import type { PrismaClient } from '@prisma/client';
 
 import { shopDayRange, shopDateKey } from '../../shared/shop-time';
 import { dayKeyForDate } from '../utils/availability';
+import { triggerReminderSweep } from '../utils/appointmentReminders';
 import { permissions, type Session } from '../access';
 // Explicitly authorized aggregate projections use the request's canonical client.
 // Cross-governed capabilities are checked below before any related-record read.
@@ -217,6 +218,7 @@ const BOOKING_STATUSES = ['requested', 'confirmed', 'checked_in', 'in_chair', 'c
 
 export async function getBookingProjection(_root: unknown, args: { date?: string | null; status?: string | null; page?: number | null }, context: Context) {
   const shopId = await scope(context, 'canManageAppointments', 'Not authorized to access booking operations.');
+  triggerReminderSweep(context.prisma);
   const shop = await context.prisma.shop.findUnique({ where: { id: shopId }, select: { timezone: true } });
   if (!shop?.timezone) throw new Error('Shop timezone is not configured. Set it in Store Settings.');
   const timeZone = shop.timezone;

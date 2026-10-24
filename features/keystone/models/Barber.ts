@@ -1,5 +1,5 @@
 import { list, graphql } from "@keystone-6/core";
-import { checkbox, integer, relationship, select, text, virtual } from "@keystone-6/core/fields";
+import { checkbox, image, integer, relationship, select, text, virtual } from "@keystone-6/core/fields";
 
 import { permissions, rules } from "../access";
 import { trackingFields } from "./trackingFields";
@@ -59,6 +59,7 @@ export const Barber = list({
     legalName: text(),
     bio: text({ ui: { displayMode: "textarea" } }),
     imagePath: text({ ui: { description: "Relative public portrait path, e.g. /images/barbershop/barber-maya-brooks.svg." } }),
+    photo: image({ storage: "my_images" }),
     phone: text(),
     email: text(),
     chairNumber: text({ ui: { description: "Chair or station shown on the shop floor." } }),

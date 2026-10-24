@@ -8,6 +8,12 @@ const nextConfig: NextConfig = {
   agentRules: false,
   allowedDevOrigins: ['barbershop.local'],
   serverExternalPackages: ['graphql'],
+  // Same as E-commerce: room for photo uploads through server actions.
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
+  },
   // Workaround since we diverged from Keystone reltionship and document views
   // typescript: {
   //   ignoreBuildErrors: true,

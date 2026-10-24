@@ -4,6 +4,7 @@ import { formatShopDateTime, shopMinute } from '../../shared/shop-time';
 import { dayKeyForDate, dayRange, isSlotAvailable, occupiedBufferMinutes } from '../utils/availability';
 import { clipToPostedHours } from '../../shared/shop-hours';
 import { sendAppointmentEmail } from '../lib/mail';
+import { onlineDepositProvider } from './publicDeposits';
 import {
   assertAppointmentCandidateSetComplete,
   lockBookingResources,
@@ -147,7 +148,7 @@ export async function createLockedAppointment({
     || service.shop.status !== 'active'
     || !service.shop.isPublic
   ) throw new BookingRejected('Selected service is no longer available.');
-  if (service.depositRequired) {
+  if (service.depositRequired && !(await onlineDepositProvider(transaction, publishedShop.id))) {
     throw new BookingRejected('Online booking for deposit-required services is unavailable until a customer payment provider is connected.');
   }
   if (!barber || barber.status !== 'active' || !barber.bookingEnabled) {
@@ -381,6 +382,9 @@ async function createBookingForActor(args: GuestBookingCommand, context: Booking
       if (accountId && !(await transaction.user.findUnique({ where: { id: accountId }, select: { id: true } }))) throw new Error('Account unavailable.');
       const original = await readGuestCommand(transaction, args, actor);
       if (original) return original;
+      // Like E-commerce checkout, an online booking needs an email: it carries the
+      // confirmation and the link that reopens the booking in any browser.
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(body.customerEmail || '')) throw new BookingRejected('Enter an email so we can send your confirmation.');
       // Original ACK precedes every mutable fresh-admission prerequisite.
       const startsAt = new Date(body.startsAt);
       if (startsAt.getTime() < Date.now() + 5 * 60_000 || startsAt.getTime() > Date.now() + 90 * 86400_000) throw new BookingRejected('Choose an appointment at least 5 minutes and no more than 90 days from now.');
@@ -395,7 +399,7 @@ async function createBookingForActor(args: GuestBookingCommand, context: Booking
       if (!service || !publishedShop || publishedShop.id !== body.shopId
         || service.status !== 'active' || service.shop?.id !== publishedShop.id
         || service.shop?.status !== 'active' || !service.shop?.isPublic) throw new BookingRejected('This service is no longer available online.');
-      if (service.depositRequired) throw new BookingRejected('This service needs a deposit and can’t be booked online yet. Contact the shop.');
+      if (service.depositRequired && !(await onlineDepositProvider(transaction as never, publishedShop.id))) throw new BookingRejected('This service needs a deposit and can’t be booked online. Contact the shop.');
       try {
         const policy = await requireEffectiveBookingPolicy(transaction, { shopId: publishedShop.id, at: new Date() });
         assertPublicServiceEligibility({

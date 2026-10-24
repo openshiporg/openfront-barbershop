@@ -4,6 +4,8 @@ import { AppointmentSelfService, AppointmentWaiver } from '../components/Appoint
 import { getPublicAppointment, type PublicAppointmentCustomer } from '../lib/data/public-appointments';
 import { getPublicStorefrontSettings } from '../lib/data/settings';
 import { getStorefrontAccount, getStorefrontBookingHistory, type AccountBooking } from '../lib/data/account';
+import { confirmDeposit, getOnlineDepositsEnabled } from '../lib/data/deposits';
+import { PayDepositButton } from '../components/PayDepositButton';
 import { formatShopDateTime } from '../../shared/shop-time';
 import { formatMoney, paymentLabel, statusLabel } from '../lib/format';
 import { StorefrontShell } from './StorefrontShell';
@@ -34,11 +36,15 @@ export default async function AppointmentStatusPage({
 }) {
   const params = searchParams ? await searchParams : {};
   const appointmentId = typeof params.id === 'string' ? params.id : '';
-  const [lookup, settings] = await Promise.all([
+  // Back from Stripe: record the deposit before showing the visit.
+  const depositReturn = params.deposit === 'return' && appointmentId ? await confirmDeposit(appointmentId) : null;
+  const [lookup, settings, onlineDeposits] = await Promise.all([
     appointmentId ? getPublicAppointment(appointmentId) : Promise.resolve(null),
     getPublicStorefrontSettings(),
+    getOnlineDepositsEnabled(),
   ]);
   const appointment = lookup?.status === 'found' ? lookup.appointment : null;
+  const depositDue = Boolean(appointment && appointment.paymentStatus === 'deposit_due' && onlineDeposits && !isTerminal(appointment.status));
   // Signed-in customers get their own visits instead of a sign-in prompt.
   const account = !appointment && lookup?.status !== 'unavailable' ? await getStorefrontAccount() : null;
   const history = account ? await getStorefrontBookingHistory(1) : null;
@@ -140,6 +146,9 @@ export default async function AppointmentStatusPage({
                   <h2 id="payment-heading" className="sf-eyebrow">Payment</h2>
                   {transaction ? <p className="sf-mono text-[2rem] font-semibold leading-none">{transaction.formattedTotal || formatMoney(transaction.total)}</p> : null}
                   <p className="sf-small">{paymentLine}</p>
+                  {depositReturn === true ? <p role="status" className="sf-notice">Deposit received</p> : null}
+                  {params.deposit === 'cancelled' && depositDue ? <p role="status" className="sf-notice">Deposit not paid</p> : null}
+                  {depositDue ? <PayDepositButton appointmentId={appointment.id} label={`Pay ${formatMoney(appointment.depositAmount)} deposit`} /> : null}
                   {transaction && (transaction.status === 'refunded' || transaction.status === 'partially_refunded') ? (
                     <p className="sf-small sf-muted">
                       {transaction.formattedRefundedAmount

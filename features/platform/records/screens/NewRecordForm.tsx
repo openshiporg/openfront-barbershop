@@ -8,14 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Notice, Pill, PillLink, Section, selectClass, Track } from '@/features/platform/lib/ui';
 import { createBarberAction, createCustomerAction, createProductAction, createServiceAction, type RecordOptions } from '../actions/records';
 
-export type RecordKind = 'service' | 'barber' | 'customer' | 'product';
-
-export const RECORD_RETURN: Record<RecordKind, string> = {
-  service: '/dashboard/platform/services',
-  barber: '/dashboard/platform/staff',
-  customer: '/dashboard/platform/customers',
-  product: '/dashboard/platform/services',
-};
+import { RECORD_RETURN, type RecordKind } from '../lib/recordKinds';
 
 function Field({ id, label, children, wide = false }: { id: string; label: string; children: ReactNode; wide?: boolean }) {
   return <div className={wide ? 'grid gap-1.5 sm:col-span-2' : 'grid gap-1.5'}><Label htmlFor={id}>{label}</Label>{children}</div>;

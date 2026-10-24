@@ -19,6 +19,7 @@ export type PosAppointment = {
   status?: string | null;
   paymentStatus?: string | null;
   price?: number | null;
+  depositAmount?: number | null;
   serviceId?: string | null;
   // Accepted snapshots captured at booking; the ticket identity shown to the operator.
   serviceTitleSnapshot?: string | null;

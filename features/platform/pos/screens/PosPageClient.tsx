@@ -161,6 +161,9 @@ function TenderPanel({ appointment, closed, timeZone }: { appointment: PosAppoin
   const subtotal = paymentMethod === 'package' ? 0 : appointment.price || 0;
   const appliedDiscount = Math.min(discount || 0, subtotal);
   const total = subtotal + (tip || 0) + (tax || 0) - appliedDiscount;
+  // A deposit paid online counts toward the receipt; only the balance is collected here.
+  const depositPaid = appointment.paymentStatus === 'deposit_paid' && paymentMethod !== 'package' ? Math.min(appointment.depositAmount || 0, total) : 0;
+  const collect = total - depositPaid;
   const eligible = !closed && !paid && appointment.status === 'in_chair' && amountsValid && (paymentMethod !== 'package' || (total === 0 && Boolean(packageBalanceId)));
   const id = appointment.id;
 
@@ -203,6 +206,7 @@ function TenderPanel({ appointment, closed, timeZone }: { appointment: PosAppoin
         </dl>
       </div>
       {appointment.status === 'checked_in' && !closed && <Notice>Seat this visit on the booking board before checkout.</Notice>}
+      {depositPaid > 0 && !closed && <Notice>Deposit {formatMoney(depositPaid)} paid online · collect {formatMoney(collect)}</Notice>}
       {!closed && appointment.startsAt && shopDateKey(String(appointment.startsAt), timeZone) < shopDateKey(new Date(), timeZone) && <Notice tone="alert">Visit from {formatDateTime(appointment.startsAt, timeZone)}, an earlier day</Notice>}
       {paymentMethod === 'package' && total > 0 && <Notice tone="alert">A prepaid visit can’t include tip or tax. Mixed tender isn’t supported.</Notice>}
       {!amountsValid && <Notice tone="alert">Tip, discount and tax must be zero or positive amounts.</Notice>}
@@ -252,7 +256,7 @@ function TenderPanel({ appointment, closed, timeZone }: { appointment: PosAppoin
       <FeedbackMessage feedback={feedback} />
       <Track block>
         <Pill variant="primary" disabled={pending || !eligible} onClick={submitCheckout}>
-          {pending ? 'Processing…' : paymentMethod === 'package' ? 'Redeem visit' : paymentMethod === 'card' ? `Record ${formatMoney(total)} card` : `Take ${formatMoney(total)} cash`}
+          {pending ? 'Processing…' : paymentMethod === 'package' ? 'Redeem visit' : paymentMethod === 'card' ? `Record ${formatMoney(collect)} card` : `Take ${formatMoney(collect)} cash`}
         </Pill>
       </Track>
     </div>

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getOnlineDepositsEnabled } from '../lib/data/deposits';
 import { ArrowLeft, ArrowUpRight } from 'lucide-react';
 import { StorefrontShell } from './StorefrontShell';
 import { getAllServices } from '../lib/data/services';
@@ -14,7 +15,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function ServiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const service = (await getAllServices()).find(item => item.id === id);
+  const [services, onlineDeposits] = await Promise.all([getAllServices(), getOnlineDepositsEnabled()]);
+  const service = services.find(item => item.id === id);
   if (!service) notFound();
   const image = service.imagePath?.endsWith('.svg') ? undefined : service.imagePath;
 
@@ -33,7 +35,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
               <div><dt>Time in chair</dt><dd className="sf-mono">{formatDuration(service.durationMinutes)}</dd></div>
               {service.depositRequired ? <div><dt>Deposit</dt><dd className="sf-mono">{formatMoney(service.depositAmount || 0)}</dd></div> : null}
             </dl>
-            {service.depositRequired
+            {service.depositRequired && !onlineDeposits
               ? <p role="status" className="sf-notice">Online booking unavailable for deposit-required services.</p>
               : <div className="sf-track"><Link href={`/book?service=${encodeURIComponent(service.id)}`} className="sf-pill is-primary">Choose a time</Link><Link href="/queue" className="sf-pill">Join walk-ins</Link></div>}
             {service.specialists?.length ? (

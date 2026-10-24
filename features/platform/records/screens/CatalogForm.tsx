@@ -102,6 +102,7 @@ export function CatalogForm({ kind, record, options }: { kind: CatalogKind; reco
             </fieldset>
           )}
 
+          {kind === 'service' || kind === 'product' ? <Field id="catalog-image" label={record?.hasImage ? 'Replace photo' : 'Photo'} wide><Input id="catalog-image" name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" /></Field> : null}
           <Field id="catalog-description" label="Description" wide><Textarea id="catalog-description" name="description" defaultValue={record?.description} maxLength={2000} /></Field>
         </div>
       </Section>

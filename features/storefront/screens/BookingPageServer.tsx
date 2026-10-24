@@ -3,6 +3,7 @@ import { getAllBarbers, getAllServices, type StorefrontBarber, type StorefrontSe
 import { getPublicStorefrontSettings } from '../lib/data/settings';
 import { getPublicBookingEligibility } from '../lib/data/booking-eligibility';
 import { getStorefrontAccount } from '../lib/data/account';
+import { getOnlineDepositsEnabled } from '../lib/data/deposits';
 import { BookingPage } from './BookingPage';
 import { StorefrontShell } from './StorefrontShell';
 
@@ -17,13 +18,13 @@ export default async function BookingPageServer() {
     getPublicBookingEligibility(),
   ]);
 
-  const account = await getStorefrontAccount();
+  const [account, onlineDeposits] = await Promise.all([getStorefrontAccount(), getOnlineDepositsEnabled()]);
   const accountId = account?.id || '';
-  const accountProfile = account ? { name: account.name || '', email: account.email || '', phone: '' } : null;
+  const accountProfile = account ? { name: account.name || '', email: account.email || '', phone: account.phone || '' } : null;
   return (
     <StorefrontShell allowUnavailableChildren>
         <Suspense fallback={<div className="min-h-screen" aria-label="Loading booking" />}>
-          <BookingPage accountId={accountId} accountProfile={accountProfile} services={catalog.services} barbers={catalog.barbers} settings={settings} bookingEligibility={bookingEligibility} catalogError={catalog.error} />
+          <BookingPage accountId={accountId} accountProfile={accountProfile} onlineDeposits={onlineDeposits} services={catalog.services} barbers={catalog.barbers} settings={settings} bookingEligibility={bookingEligibility} catalogError={catalog.error} />
         </Suspense>
     </StorefrontShell>
   );

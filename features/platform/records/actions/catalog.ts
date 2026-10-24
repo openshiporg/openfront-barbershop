@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { getActiveShopChoicesAction } from '@/features/platform/barbershop/actions/shop';
-import { dollarsToCents, platformRequest, trimmed } from '@/features/platform/lib/platformRequest';
+import { dollarsToCents, formImage, platformRequest, trimmed } from '@/features/platform/lib/platformRequest';
+import { uploadRecordImage } from '@/features/platform/lib/uploadImage';
 
 /**
  * Edit commands for the service menu and retail catalog, in dollars. Writes go
@@ -37,6 +38,7 @@ export type CatalogRecord = {
   discountPercent?: number;
   // package
   items?: Array<{ id: string; serviceId: string; quantity: number }>;
+  hasImage?: boolean;
 };
 
 export type CatalogOptions = { shopName: string; categories: Option[]; barbers: Option[]; services: Option[] };
@@ -61,8 +63,8 @@ export async function getCatalogOptionsAction(): Promise<CatalogOptions | null> 
 }
 
 const QUERIES: Record<CatalogKind, string> = {
-  service: `query($id: ID!) { item: service(where: { id: $id }) { id name description status price durationMinutes depositAmount depositRequired bookingBufferMinutes credentialRequired waiverRequired category { id } specialists { id } } }`,
-  product: `query($id: ID!) { item: product(where: { id: $id }) { id name description status price sku cost productType } }`,
+  service: `query($id: ID!) { item: service(where: { id: $id }) { id name description status price durationMinutes depositAmount depositRequired bookingBufferMinutes credentialRequired waiverRequired category { id } specialists { id } image { id } } }`,
+  product: `query($id: ID!) { item: product(where: { id: $id }) { id name description status price sku cost productType image { id } } }`,
   package: `query($id: ID!) { item: servicePackage(where: { id: $id }) { id name description status price items { id quantity service { id } } } }`,
   plan: `query($id: ID!) { item: membershipPlan(where: { id: $id }) { id name description status price billingInterval includedVisits discountPercent } }`,
 };
@@ -83,6 +85,7 @@ export async function getCatalogRecordAction(kind: CatalogKind, id: string): Pro
     sku: String(item.sku || ''), cost: Number(item.cost || 0), productType: String(item.productType || 'other'),
     billingInterval: String(item.billingInterval || 'monthly'), includedVisits: Number(item.includedVisits ?? 1), discountPercent: Number(item.discountPercent ?? 0),
     items: (item.items || []).map((line) => ({ id: line.id, serviceId: line.service?.id || '', quantity: line.quantity })),
+    hasImage: Boolean(item.image),
   };
 }
 
@@ -152,6 +155,8 @@ export async function saveCatalogRecordAction(kind: CatalogKind, id: string | nu
   if (!shop) return { success: false, error: 'Select an active shop first.' };
   const parsed = readData(kind, form, Boolean(id));
   if ('error' in parsed) return { success: false, error: parsed.error };
+  const image = kind === 'service' || kind === 'product' ? formImage(form, 'image') : null;
+  if (image && 'error' in image) return { success: false, error: image.error };
   const lines = kind === 'package' ? packageLines(form) : [];
   if (kind === 'package' && !lines.length) return { success: false, error: 'Add at least one service to the package.' };
   if (lines.some((line) => line.quantity > 50)) return { success: false, error: 'Use 50 visits or fewer per service.' };
@@ -179,6 +184,10 @@ export async function saveCatalogRecordAction(kind: CatalogKind, id: string | nu
   if (kind === 'package' && savedId) {
     const added = await platformRequest(`mutation($data: [ServicePackageItemCreateInput!]!) { createServicePackageItems(data: $data) { id } }`, { data: lines.map((line) => ({ package: { connect: { id: savedId } }, service: { connect: { id: line.serviceId } }, quantity: line.quantity })) });
     if (!added.ok) return { success: false, error: added.error };
+  }
+  if (image && savedId) {
+    const uploaded = await uploadRecordImage(kind === 'service' ? 'Service' : 'Product', savedId, 'image', image);
+    if (!uploaded.success) return { success: false, error: uploaded.error, id: savedId };
   }
   revalidatePath(RETURN[kind]);
   revalidatePath('/', 'layout');

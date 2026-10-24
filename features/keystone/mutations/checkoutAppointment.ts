@@ -40,7 +40,7 @@ function clean(value?: string | null) {
 }
 
 function assertCheckoutReplay(transaction: { paymentMethod: unknown; tipAmount: number | null; discountAmount: number | null; taxAmount: number | null; total: number | null; packageBalanceId: string | null; paymentSessionId: string | null; notes: string | null }, expected: { paymentMethod: string; tipAmount: number; discountAmount: number; taxAmount: number; total: number; packageBalanceId: string; paymentSessionId: string; notes: string }) {
-  if (String(transaction.paymentMethod) !== expected.paymentMethod || (transaction.tipAmount || 0) !== expected.tipAmount || (transaction.discountAmount || 0) !== expected.discountAmount || (transaction.taxAmount || 0) !== expected.taxAmount || (transaction.total || 0) !== expected.total || (transaction.packageBalanceId || '') !== expected.packageBalanceId || (transaction.paymentSessionId || '') !== expected.paymentSessionId || (transaction.notes || '') !== expected.notes) throw new Error('This appointment was already checked out with different tender or totals.');
+  if (String(transaction.paymentMethod) !== expected.paymentMethod || (transaction.tipAmount || 0) !== expected.tipAmount || (transaction.discountAmount || 0) !== expected.discountAmount || (transaction.taxAmount || 0) !== expected.taxAmount || (transaction.total || 0) !== expected.total || (transaction.packageBalanceId || '') !== expected.packageBalanceId || (expected.paymentSessionId && (transaction.paymentSessionId || '') !== expected.paymentSessionId) || ((transaction.notes || '') !== expected.notes && !(transaction.notes || '').startsWith(expected.notes ? `${expected.notes} · Deposit ` : 'Deposit '))) throw new Error('This appointment was already checked out with different tender or totals.');
 }
 
 const checkoutInclude = {
@@ -166,6 +166,11 @@ export default async function checkoutAppointment(
       }
 
       const completedAt = new Date();
+      // A deposit paid online is part of this receipt's total; staff collect the balance.
+      const depositSession = !paymentSession && appointment.paymentStatus === 'deposit_paid'
+        ? await transaction.paymentSession.findFirst({ where: { appointmentId: appointment.id, status: 'captured', transaction: null }, orderBy: { capturedAt: 'desc' } })
+        : null;
+      const depositNote = depositSession ? `Deposit ${(depositSession.amount / 100).toFixed(2)} paid online` : '';
       const checkout = await transaction.checkoutTransaction.create({
         data: {
           shopId: appointment.shopId,
@@ -179,14 +184,14 @@ export default async function checkoutAppointment(
           discountAmount,
           total,
           paymentMethod: paymentMethod as Prisma.CheckoutTransactionCreateInput['paymentMethod'],
-          providerPaymentId: paymentSession?.providerPaymentId || '',
+          providerPaymentId: paymentSession?.providerPaymentId || depositSession?.providerPaymentId || '',
           packageBalanceId: packageBalance?.id,
-          paymentSessionId: paymentSession?.id,
+          paymentSessionId: paymentSession?.id || depositSession?.id,
           completedAt,
           currencyCode: 'USD',
           merchantSnapshot: { name: appointment.shop.name, legalName: appointment.shop.legalName, address: appointment.shop.address, phone: appointment.shop.phone, timezone: appointment.shop.timezone },
           taxRuleSnapshot: { mode: 'operator_entered', amount: taxAmount },
-          notes: clean(args.notes),
+          notes: [clean(args.notes), depositNote].filter(Boolean).join(' · '),
         },
       });
 

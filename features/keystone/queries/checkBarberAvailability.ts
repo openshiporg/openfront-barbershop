@@ -5,6 +5,7 @@ import { displayTimeToMinutes } from '../utils/availability';
 import { shopWallTime, shopMinute } from '../../shared/shop-time';
 import { resolvePublishedShop } from '../utils/publicShop';
 import { clipToPostedHours } from '../../shared/shop-hours';
+import { onlineDepositProvider } from '../mutations/publicDeposits';
 
 // Matches the online booking window enforced in createOnlineBooking.
 const BOOKING_HORIZON_MS = 90 * 86400_000;
@@ -38,7 +39,9 @@ export default async function checkBarberAvailability(_root: unknown, args: Args
   if (!barber || !publishedShop || barber.status !== 'active' || !barber.bookingEnabled || !barber.chair || barber.chair.status !== 'active' || shop?.id !== publishedShop.id || shop.status !== 'active' || !shop.isPublic) return [];
 
   const service = await sudo.prisma.service.findFirst({ where: { id: args.serviceId, shopId: shop.id, status: 'active' }, select: { id: true, durationMinutes: true, depositRequired: true, bookingBufferMinutes: true, specialists: { select: { id: true } } } });
-  if (!service || service.depositRequired || service.durationMinutes !== serviceDuration || (service.specialists.length && !service.specialists.some(item => item.id === barberId))) return [];
+  // Deposit services are bookable online only when the shop takes deposits online.
+  if (service?.depositRequired && !(await onlineDepositProvider(sudo.prisma as never, shop.id))) return [];
+  if (!service || service.durationMinutes !== serviceDuration || (service.specialists.length && !service.specialists.some(item => item.id === barberId))) return [];
   const timeZone = shop.timezone || 'UTC';
   const dayOfWeek = dayKeyForDate(args.date, timeZone); const { start, end } = dayRange(args.date, timeZone);
   if (Number.isNaN(start.getTime()) || end <= new Date() || start.getTime() > Date.now() + BOOKING_HORIZON_MS) return [];

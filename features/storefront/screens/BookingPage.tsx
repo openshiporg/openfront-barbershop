@@ -11,6 +11,7 @@ import type { PublicStorefrontSettings } from '@/features/shared/storefront-sett
 import type { StorefrontBarber, StorefrontService } from '../lib/data/services';
 import { shopDateKey, formatShopDateTime } from '../../shared/shop-time';
 import { formatDuration, formatMoney } from '../lib/format';
+import { PayDepositButton } from '../components/PayDepositButton';
 import type { PublicBookingEligibility } from '../../shared/public-booking-eligibility';
 
 function actorStorage(accountId: string) {
@@ -26,6 +27,8 @@ type BookingPageProps = {
   accountId?: string;
   /** Signed-in customer's saved details, used to fill step 04. */
   accountProfile?: { name: string; email: string; phone: string } | null;
+  /** The shop takes deposits online (Stripe); otherwise deposit services are booked by phone. */
+  onlineDeposits?: boolean;
   services: StorefrontService[];
   barbers: StorefrontBarber[];
   settings: PublicStorefrontSettings | null;
@@ -42,8 +45,6 @@ function defaultBookingDate(timeZone: string) {
   return tomorrow.toISOString().slice(0, 10);
 }
 
-// Deposits can't be taken online, so deposit services are booked by phone.
-const bookableOnline = (service: StorefrontService | undefined) => Boolean(service && !service.depositRequired);
 
 // Online bookings open up to 90 days ahead (enforced again on the server).
 const BOOKING_HORIZON_DAYS = 90;
@@ -69,8 +70,9 @@ function barbersForService(service: StorefrontService | undefined, barbers: Stor
   return specialists.length ? specialists : barbers;
 }
 
-export function BookingPage({ services, barbers, settings, bookingEligibility, accountId = '', accountProfile = null, catalogError = null }: BookingPageProps) {
+export function BookingPage({ services, barbers, settings, bookingEligibility, accountId = '', accountProfile = null, onlineDeposits = false, catalogError = null }: BookingPageProps) {
   const searchParams = useSearchParams();
+  const bookableOnline = (service: StorefrontService | undefined) => Boolean(service && (!service.depositRequired || onlineDeposits));
   const firstBookable = services.find(bookableOnline);
   const [selectedServiceId, setSelectedServiceId] = useState(() => {
     const requested = searchParams?.get('service') || '';
@@ -257,8 +259,8 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
       setError(bookingEligibility.error || 'Online booking is unavailable right now. Contact the shop.');
       return;
     }
-    if (!selectedService || !bookableOnline(selectedService) || !selectedSlot || !customer.name.trim() || !customer.phone.trim()) {
-      setError('Choose a service and time, and enter your name and phone number.');
+    if (!selectedService || !bookableOnline(selectedService) || !selectedSlot || !customer.name.trim() || !customer.phone.trim() || !customer.email.trim()) {
+      setError('Choose a service and time, and enter your name, phone and email.');
       return;
     }
 
@@ -322,8 +324,9 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
             <div><dt>Saved to</dt><dd>{accountId ? 'Your account' : 'This browser'}</dd></div>
             {customer.email.trim() ? <div><dt>Confirmation by email</dt><dd className="break-all">{customer.email.trim()}</dd></div> : null}
           </dl>
+          {createdAppointment.paymentStatus === 'deposit_due' && onlineDeposits ? <PayDepositButton appointmentId={createdAppointment.id} label={`Pay ${formatMoney(createdAppointment.depositAmount || 0)} deposit to hold it`} /> : null}
           <div className="sf-track">
-            <Link href={`/appointment?id=${encodeURIComponent(createdAppointment.id)}`} className="sf-pill is-primary">View status</Link>
+            {createdAppointment.paymentStatus === 'deposit_due' && onlineDeposits ? null : <Link href={`/appointment?id=${encodeURIComponent(createdAppointment.id)}`} className="sf-pill is-primary">View status</Link>}
             <Link href="/" className="sf-pill">Back to shop</Link>
           </div>
         </section>
@@ -371,7 +374,7 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
                   <button type="button" key={service.id} aria-pressed={selectedServiceId === service.id} disabled={!bookableOnline(service)} onClick={() => chooseService(service)} className="sf-option">
                     <span className="sf-option-title">{service.name}</span>
                     <span className="sf-mono">{formatMoney(service.price)}</span>
-                    <span className="sf-option-meta"><span className="sf-mono">{formatDuration(service.durationMinutes)}</span>{service.depositRequired && ` · Deposit ${formatMoney(service.depositAmount || 0)} · Call to book`}</span>
+                    <span className="sf-option-meta"><span className="sf-mono">{formatDuration(service.durationMinutes)}</span>{service.depositRequired && ` · Deposit ${formatMoney(service.depositAmount || 0)}${onlineDeposits ? ' paid online' : ' · Call to book'}`}</span>
                   </button>
                 ))}
               </div>
@@ -442,8 +445,8 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
                 <label className="sf-field"><span>Phone</span>
                   <input name="phone" type="tel" inputMode="tel" autoComplete="tel" maxLength={40} value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} className="sf-input" required />
                 </label>
-                <label className="sf-field sm:col-span-2"><span>Email (optional)</span>
-                  <input name="email" type="email" autoComplete="email" maxLength={254} value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} className="sf-input" />
+                <label className="sf-field sm:col-span-2"><span>Email</span>
+                  <input name="email" type="email" autoComplete="email" maxLength={254} required value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} className="sf-input" />
                 </label>
                 <label className="sf-field sm:col-span-2"><span>Notes for the barber (optional)</span>
                   <textarea name="notes" maxLength={2000} value={customer.notes} onChange={(e) => setCustomer({ ...customer, notes: e.target.value })} className="sf-textarea" />

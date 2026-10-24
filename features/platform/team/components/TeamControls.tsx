@@ -7,7 +7,7 @@ import { DrawerForm, Field, TransitionPills } from '@/features/platform/lib/form
 import { selectClass } from '@/features/platform/lib/ui';
 import { addMemberAction, setMemberRoleAction, setMemberStatusAction, type TeamMember } from '../actions/team';
 
-export const ROLE_LABELS: Record<string, string> = { owner: 'Owner', manager: 'Manager', front_desk: 'Front desk', barber: 'Barber', viewer: 'Viewer' };
+import { ROLE_LABELS } from '../lib/roles';
 
 function RoleSelect({ id, name, defaultValue, onChange, disabled }: { id: string; name?: string; defaultValue: string; onChange?: (value: string) => void; disabled?: boolean }) {
   return (
@@ -19,7 +19,7 @@ function RoleSelect({ id, name, defaultValue, onChange, disabled }: { id: string
 
 export function AddMemberButton() {
   return (
-    <DrawerForm trigger="Add member" triggerVariant="primary" title="Add a team member" description="They need an account first." action={addMemberAction} submitLabel="Add">
+    <DrawerForm trigger="Add member" triggerVariant="primary" title="Add a team member" description="Someone without an account gets an email to set a password." action={addMemberAction} submitLabel="Add">
       <Field id="member-email" label="Account email" wide><Input id="member-email" name="email" type="email" required maxLength={254} autoComplete="off" /></Field>
       <Field id="member-role" label="Role"><RoleSelect id="member-role" name="membershipRole" defaultValue="barber" /></Field>
     </DrawerForm>

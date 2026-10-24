@@ -3,7 +3,8 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { activeShop } from '@/features/platform/lib/activeShop';
-import { platformCommand, platformRequest, trimmed } from '@/features/platform/lib/platformRequest';
+import { formImage, platformCommand, platformRequest, trimmed } from '@/features/platform/lib/platformRequest';
+import { uploadRecordImage } from '@/features/platform/lib/uploadImage';
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
 
@@ -65,6 +66,8 @@ export async function updateBarberAction(id: string, form: FormData) {
   if (!(bufferMinutes >= 0 && bufferMinutes <= 240)) return { success: false, error: 'Cleanup time must be 0 to 240 minutes.' };
   if (!(commission >= 0 && commission <= 100)) return { success: false, error: 'Commission must be 0 to 100%.' };
   if (!['active', 'away', 'inactive'].includes(status)) return { success: false, error: 'Choose a status.' };
+  const photo = formImage(form, 'photo');
+  if (photo && 'error' in photo) return { success: false, error: photo.error };
   const chairId = String(form.get('chairId') || '');
   const chairNumber = trimmed(form.get('chairNumber'), 40);
   const serviceIds = form.getAll('serviceIds').map(String).filter(Boolean);
@@ -75,6 +78,10 @@ export async function updateBarberAction(id: string, form: FormData) {
     specialties: { set: serviceIds.map((serviceId) => ({ id: serviceId })) },
   } });
   if (!result.ok) return { success: false, error: result.error };
+  if (photo) {
+    const uploaded = await uploadRecordImage('Barber', id, 'photo', photo);
+    if (!uploaded.success) return { success: false, error: uploaded.error };
+  }
   refresh(id);
   return { success: true };
 }

@@ -9,7 +9,7 @@ import { canReadPeople, canUpdatePeople } from '../utils/peopleAccess'
 
 // role is listed because createAuth merges initFirstItem itemData into the
 // input; public callers still cannot set it (role field create access).
-const PUBLIC_USER_CREATE_FIELDS = new Set(['name', 'email', 'password', 'role'])
+const PUBLIC_USER_CREATE_FIELDS = new Set(['name', 'email', 'phone', 'password', 'role'])
 
 export const User = list({
   access: {
@@ -69,6 +69,7 @@ export const User = list({
         isRequired: true,
       },
     }),
+    phone: text({ isFilterable: false, isOrderable: false, ui: { description: 'Used to fill in bookings.' } }),
     password: password({
       access: {
         read: denyAll,

@@ -27,6 +27,7 @@ import transitionQueueEntry from "./transitionQueueEntry";
 import selectActiveShop from "./selectActiveShop";
 import claimShopOwnership, { claimableShops } from "./claimShopOwnership";
 import { addShopMemberByEmail, platformTeam } from "./manageTeam";
+import { confirmDepositCheckout, getPublicPaymentOptions, startDepositCheckout } from "./publicDeposits";
 import markAppointmentNoShow from "./markAppointmentNoShow";
 import { createCommissionPayout, transitionCommission } from "./manageCommissions";
 import { recordProductSale, returnProductSaleLine } from "./manageProductSales";
@@ -312,6 +313,10 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         slug: String!
       }
 
+      type PublicPaymentOptions {
+        onlineDeposits: Boolean!
+      }
+
       type PublicPackageLine {
         quantity: Int!
         serviceId: ID!
@@ -436,6 +441,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         getPublicQueue: [PublicQueueEntry!]!
         claimableShops: [ClaimableShop!]!
         getPublicWalkInStatus: PublicWalkInStatus!
+        getPublicPaymentOptions: PublicPaymentOptions!
         platformTeam: PlatformProjectionResult!
         getPublicQueueEntry(
           queueEntryId: ID!
@@ -545,6 +551,8 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         selectActiveShop(shopId: ID!): SelectActiveShopResult!
         claimShopOwnership(shopId: ID!): SelectActiveShopResult!
         addShopMemberByEmail(email: String!, membershipRole: String!): DomainCommandResult!
+        startDepositCheckout(appointmentId: ID!, accessToken: String): DomainCommandResult!
+        confirmDepositCheckout(appointmentId: ID!, accessToken: String): DomainCommandResult!
 
         markAppointmentNoShow(appointmentId: ID!, policyId: ID, reason: String!, idempotencyKey: String!): DomainCommandResult!
         transitionCommission(commissionId: ID!, toStatus: String!, reason: String, idempotencyKey: String!): DomainCommandResult!
@@ -633,6 +641,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         getPublicQueueEntry,
         claimableShops,
         getPublicWalkInStatus,
+        getPublicPaymentOptions,
         platformTeam,
         getPublicAppointment,
       },
@@ -661,6 +670,8 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         selectActiveShop,
         claimShopOwnership,
         addShopMemberByEmail,
+        startDepositCheckout,
+        confirmDepositCheckout,
         markAppointmentNoShow: async (root, args, context) => {
           const result = await markAppointmentNoShow(root, args, context); return { success: result.success, error: result.error, data: result.evidence };
         },

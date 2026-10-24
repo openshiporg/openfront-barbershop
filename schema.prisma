@@ -15,6 +15,7 @@ model User {
   id                          String                    @id @default(cuid())
   name                        String                    @default("")
   email                       String                    @unique @default("")
+  phone                       String                    @default("")
   password                    String
   role                        Role?                     @relation("User_role", fields: [roleId], references: [id])
   roleId                      String?                   @map("role")
@@ -301,6 +302,11 @@ model Service {
   name                                   String                   @default("")
   description                            String                   @default("")
   imagePath                              String                   @default("")
+  image_id                               String?
+  image_filesize                         Int?
+  image_width                            Int?
+  image_height                           Int?
+  image_extension                        String?
   durationMinutes                        Int                      @default(30)
   price                                  Int
   depositRequired                        Boolean                  @default(false)
@@ -341,6 +347,11 @@ model Barber {
   legalName                          String                   @default("")
   bio                                String                   @default("")
   imagePath                          String                   @default("")
+  photo_id                           String?
+  photo_filesize                     Int?
+  photo_width                        Int?
+  photo_height                       Int?
+  photo_extension                    String?
   phone                              String                   @default("")
   email                              String                   @default("")
   chairNumber                        String                   @default("")
@@ -608,6 +619,7 @@ model Appointment {
   price                                Int?
   depositAmount                        Int?                          @default(0)
   cancellationReason                   String                        @default("")
+  reminderSentAt                       DateTime?
   customerNotes                        String                        @default("")
   guestNameSnapshot                    String                        @default("")
   internalNotes                        String                        @default("")
@@ -1213,6 +1225,11 @@ model Product {
   cost               Int?                    @default(0)
   description        String                  @default("")
   imagePath          String                  @default("")
+  image_id           String?
+  image_filesize     Int?
+  image_width        Int?
+  image_height       Int?
+  image_extension    String?
   inventoryTracked   Boolean                 @default(true)
   metadata           Json?
   inventoryLots      InventoryLot[]          @relation("InventoryLot_product")

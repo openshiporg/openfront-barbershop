@@ -2,7 +2,8 @@ import { PageContainer } from '@/features/dashboard/components/PageContainer';
 import { basePath } from '@/features/dashboard/lib/config';
 import { Notice, PageHeader } from '@/features/platform/lib/ui';
 import { getRecordOptionsAction } from '../actions/records';
-import { NewRecordForm, RECORD_RETURN, type RecordKind } from './NewRecordForm';
+import { NewRecordForm } from './NewRecordForm';
+import { RECORD_RETURN, type RecordKind } from '../lib/recordKinds';
 
 const TITLES: Record<RecordKind, { title: string; parent: string }> = {
   service: { title: 'New service', parent: 'Services & packages' },

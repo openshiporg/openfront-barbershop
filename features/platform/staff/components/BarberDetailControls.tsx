@@ -37,6 +37,7 @@ export function EditBarberButton({ data }: { data: BarberPageData }) {
           })}
         </Track>
       </fieldset>
+      <Field id="barber-photo" label="Photo" wide><Input id="barber-photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" /></Field>
       <Field id="barber-bio" label="Bio" wide><Textarea id="barber-bio" name="bio" defaultValue={barber.bio || ''} maxLength={2000} /></Field>
     </DrawerForm>
   );

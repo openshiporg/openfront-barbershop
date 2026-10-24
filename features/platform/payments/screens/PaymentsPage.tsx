@@ -5,7 +5,7 @@ import { formatShopDateTime } from '@/features/shared/shop-time';
 import { Empty, Notice, PageHeader, PillLink, Readouts, Section, StatusDot, Track } from '@/features/platform/lib/ui';
 import { ReconciliationControls } from '@/features/platform/barbershop/screens/OperationsControls';
 import { getPaymentsAction } from '../actions/payments';
-import { ProviderInstall, SetUpManualPayments } from '../components/PaymentControls';
+import { ProviderInstall, SetUpManualPayments, SetUpStripe } from '../components/PaymentControls';
 
 const breadcrumbs = [
   { type: 'link' as const, label: 'Dashboard', href: basePath },
@@ -20,6 +20,7 @@ export default async function PaymentsPage() {
   const data = await getPaymentsAction();
   const header = <PageHeader title="Payments" tone={data ? (data.providers.some((provider) => provider.isInstalled) ? 'live' : 'wait') : 'alert'} meta={data?.shopName} actions={<Track><PillLink href="/dashboard/platform/pos">POS checkout</PillLink></Track>} />;
   if (!data) return <PageContainer title="Payments" header={header} breadcrumbs={breadcrumbs}><div className="px-4 pb-8 md:px-6"><Notice tone="alert">Payments couldn’t load. Your role may not include payments.</Notice></div></PageContainer>;
+  const stripeOn = data.stripeKeyConfigured && data.providers.some((provider) => provider.code === 'pp_stripe' && provider.isInstalled);
   const settled = data.receipts.filter((receipt) => ['paid', 'partially_refunded', 'refunded'].includes(receipt.status));
   const byTender = new Map<string, { count: number; total: number }>();
   for (const receipt of settled) {
@@ -38,8 +39,8 @@ export default async function PaymentsPage() {
           { label: 'Open card payments', value: data.sessions.length, tone: data.sessions.length ? 'wait' : undefined },
         ]} />
 
-        <Section id="payments-providers" title="Payment methods" count={data.providers.length} actions={!data.providers.length ? <SetUpManualPayments /> : undefined}>
-          <p className="pb-3 text-xs text-muted-foreground">Cash, card on the shop terminal and package visits are taken at POS. Online card processing is not connected.</p>
+        <Section id="payments-providers" title="Payment methods" count={data.providers.length} actions={<span className="flex flex-wrap gap-2">{!data.providers.length ? <SetUpManualPayments /> : null}{data.stripeKeyConfigured && !data.providers.some((provider) => provider.code === 'pp_stripe' && provider.isInstalled) ? <SetUpStripe /> : null}</span>}>
+          <p className="pb-3 text-xs text-muted-foreground"><StatusDot tone={stripeOn ? 'live' : 'off'} />{stripeOn ? 'Online deposits on (Stripe)' : data.stripeKeyConfigured ? 'Online deposits off' : 'Online deposits off · STRIPE_SECRET_KEY not set on the server'}</p>
           {!data.providers.length ? <Empty>No payment method set up.</Empty> : (
             <ul>
               {data.providers.map((provider) => (
