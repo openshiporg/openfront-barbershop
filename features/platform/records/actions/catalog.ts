@@ -86,7 +86,7 @@ export async function getCatalogRecordAction(kind: CatalogKind, id: string): Pro
   };
 }
 
-const RETURN: Record<CatalogKind, string> = { service: '/dashboard/platform/services', product: '/dashboard/platform/services', package: '/dashboard/platform/services', plan: '/dashboard/platform/services' };
+const RETURN: Record<CatalogKind, string> = { service: '/dashboard/platform/services', product: '/dashboard/platform/inventory', package: '/dashboard/platform/services', plan: '/dashboard/platform/services' };
 const STATUSES: Record<CatalogKind, string[]> = { service: ['active', 'hidden', 'archived'], product: ['active', 'draft', 'archived'], package: ['active', 'hidden', 'archived'], plan: ['active', 'paused', 'archived'] };
 const MUTATION: Record<CatalogKind, { create: string; update: string; input: string }> = {
   service: { create: 'createService', update: 'updateService', input: 'Service' },

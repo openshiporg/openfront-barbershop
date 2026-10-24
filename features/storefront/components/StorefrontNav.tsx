@@ -11,6 +11,7 @@ import { StoreLogo } from './StoreLogo';
 const items = [
   { href: '/services', label: 'Services' },
   { href: '/barbers', label: 'Barbers' },
+  { href: '/shop', label: 'Shop' },
   { href: '/queue', label: 'Walk-ins' },
   { href: '/appointment', label: 'My appointment' },
   { href: '/account', label: 'Account' },

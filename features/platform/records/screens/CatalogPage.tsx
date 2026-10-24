@@ -14,7 +14,7 @@ export async function CatalogPage({ kind, params }: { kind: CatalogKind; params?
   const title = record ? record.name : `New ${NOUN[kind]}`;
   const breadcrumbs = [
     { type: 'link' as const, label: 'Dashboard', href: basePath },
-    { type: 'link' as const, label: 'Services & packages', href: '/dashboard/platform/services' },
+    kind === 'product' ? { type: 'link' as const, label: 'Inventory', href: '/dashboard/platform/inventory' } : { type: 'link' as const, label: 'Services & packages', href: '/dashboard/platform/services' },
     { type: 'page' as const, label: title },
   ];
   return (

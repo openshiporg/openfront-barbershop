@@ -1,4 +1,4 @@
-import { BarChart3, CalendarDays, ClipboardList, CreditCard, ListChecks, PackageOpen, Scissors, Settings, UsersRound } from 'lucide-react'
+import { BadgeDollarSign, BarChart3, Boxes, CalendarDays, ClipboardList, CreditCard, ListChecks, PackageOpen, Scissors, ScrollText, Settings, ShieldCheck, Wallet, UsersRound } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export interface PlatformNavItem {
@@ -65,6 +65,41 @@ export const platformNavItems: PlatformNavItem[] = [
     href: '/platform/pos',
     description: 'Take payment for visits, record retail sales and returns, and review receipts.',
     icon: CreditCard,
+    group: 'shop-workflows',
+  },
+  {
+    title: 'Inventory',
+    href: '/platform/inventory',
+    description: 'Retail stock on hand, deliveries, waste and corrections, and suppliers.',
+    icon: Boxes,
+    group: 'shop-workflows',
+  },
+  {
+    title: 'Payroll',
+    href: '/platform/payroll',
+    description: 'Approve commissions, pay barbers, and review payouts and tips.',
+    icon: BadgeDollarSign,
+    group: 'shop-workflows',
+  },
+  {
+    title: 'Payments',
+    href: '/platform/payments',
+    description: 'Payment methods, takings by tender, receipts and card payment checks.',
+    icon: Wallet,
+    group: 'shop-workflows',
+  },
+  {
+    title: 'Policies',
+    href: '/platform/policies',
+    description: 'Booking policy versions and no-show fees.',
+    icon: ScrollText,
+    group: 'shop-workflows',
+  },
+  {
+    title: 'Team',
+    href: '/platform/team',
+    description: 'Who can sign in to the shop, their roles and access.',
+    icon: ShieldCheck,
     group: 'shop-workflows',
   },
   {

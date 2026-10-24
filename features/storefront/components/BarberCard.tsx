@@ -25,7 +25,7 @@ export function BarberCard({ barber, priority = false }: BarberCardProps) {
   const specialties = (barber.specialties || []).slice(0, 3);
 
   return (
-    <Link href={`/book?barber=${encodeURIComponent(barber.id)}`} className="sf-chair">
+    <Link href={`/barbers/${encodeURIComponent(barber.id)}`} className="sf-chair">
       <div className="sf-chair-photo">
         <StorefrontImage
           src={photo.src}

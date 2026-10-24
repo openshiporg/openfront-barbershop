@@ -7120,6 +7120,7 @@ type Mutation {
   transitionQueueEntry(queueEntryId: ID!, toStatus: String!, idempotencyKey: String!): TransitionQueueEntryResult!
   selectActiveShop(shopId: ID!): SelectActiveShopResult!
   claimShopOwnership(shopId: ID!): SelectActiveShopResult!
+  addShopMemberByEmail(email: String!, membershipRole: String!): DomainCommandResult!
   markAppointmentNoShow(appointmentId: ID!, policyId: ID, reason: String!, idempotencyKey: String!): DomainCommandResult!
   transitionCommission(commissionId: ID!, toStatus: String!, reason: String, idempotencyKey: String!): DomainCommandResult!
   payApprovedCommissions(commissionIds: [ID!]!, notes: String, idempotencyKey: String!): DomainCommandResult!
@@ -7319,6 +7320,9 @@ type Query {
   validateUserPasswordResetToken(email: String!, token: String!): ValidateUserPasswordResetTokenResult
   redirectToInit: Boolean
   accountBookings(page: Int): PlatformProjectionResult!
+  accountBalances: PlatformProjectionResult!
+  getPublicMembershipOffers: PublicMembershipOffers!
+  getPublicBarberWeek(barberId: ID!): [PublicBarberDay!]!
   exportMyAccountData: PlatformProjectionResult!
   getPublicStorefrontSettings: PublicStorefrontSettings
   getPublicServiceCatalog: [PublicServiceCategory!]!
@@ -7338,6 +7342,7 @@ type Query {
   getPublicQueue: [PublicQueueEntry!]!
   claimableShops: [ClaimableShop!]!
   getPublicWalkInStatus: PublicWalkInStatus!
+  platformTeam: PlatformProjectionResult!
   getPublicQueueEntry(queueEntryId: ID!, accessToken: String!): PublicQueueEntry
   getPublicAppointment(appointmentId: ID!, accessToken: String): PublicAppointment
 }
@@ -7728,6 +7733,41 @@ type SelectedActiveShop {
   id: ID!
   name: String!
   slug: String!
+}
+
+type PublicPackageLine {
+  quantity: Int!
+  serviceId: ID!
+  serviceName: String!
+}
+
+type PublicPackageOffer {
+  id: ID!
+  name: String!
+  description: String
+  price: Int!
+  items: [PublicPackageLine!]!
+}
+
+type PublicPlanOffer {
+  id: ID!
+  name: String!
+  description: String
+  price: Int!
+  billingInterval: String!
+  includedVisits: Int
+  discountPercent: Int
+}
+
+type PublicMembershipOffers {
+  packages: [PublicPackageOffer!]!
+  plans: [PublicPlanOffer!]!
+}
+
+type PublicBarberDay {
+  dayOfWeek: String!
+  startMinute: Int
+  endMinute: Int
 }
 
 type PublicWalkInStatus {

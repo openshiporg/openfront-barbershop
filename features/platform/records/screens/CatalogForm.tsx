@@ -15,7 +15,7 @@ const STATUS: Record<CatalogKind, Array<{ value: string; label: string; tone: To
   plan: [{ value: 'active', label: 'For sale', tone: 'live' }, { value: 'paused', label: 'Paused', tone: 'wait' }, { value: 'archived', label: 'Archived', tone: 'off' }],
 };
 const PRODUCT_TYPES = [['pomade', 'Pomade'], ['beard_care', 'Beard care'], ['shampoo', 'Shampoo'], ['tool', 'Tool'], ['other', 'Other']];
-const BACK = '/dashboard/platform/services';
+const backFor = (kind: CatalogKind, id?: string) => (kind === 'product' ? (id ? `/dashboard/platform/inventory/${id}` : '/dashboard/platform/inventory') : '/dashboard/platform/services');
 
 export function CatalogForm({ kind, record, options }: { kind: CatalogKind; record: CatalogRecord | null; options: CatalogOptions }) {
   const router = useRouter();
@@ -34,7 +34,7 @@ export function CatalogForm({ kind, record, options }: { kind: CatalogKind; reco
     startTransition(async () => {
       const result = await saveCatalogRecordAction(kind, record?.id || null, form);
       if (!result.success) { setError(result.error || 'This couldn’t be saved.'); return; }
-      if (!record) { router.push(BACK); router.refresh(); return; }
+      if (!record) { router.push(backFor(kind, result.id)); router.refresh(); return; }
       setSaved(true);
       router.refresh();
     });
@@ -108,7 +108,7 @@ export function CatalogForm({ kind, record, options }: { kind: CatalogKind; reco
       {error ? <Notice tone="alert">{error}</Notice> : null}
       {saved ? <Notice>Saved</Notice> : null}
       <Track>
-        <PillLink href={BACK}>{record ? 'Back' : 'Cancel'}</PillLink>
+        <PillLink href={backFor(kind, record?.id)}>{record ? 'Back' : 'Cancel'}</PillLink>
         <Pill type="submit" variant="primary" disabled={pending}>{pending ? 'Saving…' : 'Save'}</Pill>
       </Track>
     </form>

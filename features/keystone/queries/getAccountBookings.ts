@@ -90,3 +90,31 @@ export async function recoverAccountBooking(_root: unknown, args: GuestBookingCo
     });
   } catch { return unresolvedGuestCommand(); }
 }
+
+/**
+ * Package and membership balances for the signed-in account: client profiles
+ * linked to the account, or created by its own bookings.
+ */
+export async function getAccountBalances(_root: unknown, _args: unknown, context: KeystoneContext) {
+  const accountId = await currentAccountId(context);
+  if (!accountId) return { success: false, error: 'Sign in to view balances.', data: null };
+  const booked = await context.prisma.appointment.findMany({ where: { accountId, customerId: { not: null } }, select: { customerId: true }, distinct: ['customerId'], take: 200 });
+  const customerIds = booked.map((row) => row.customerId).filter((id): id is string => Boolean(id));
+  const balances = await context.prisma.customerPackage.findMany({
+    where: { status: { in: ['active', 'paused'] }, customer: { OR: [{ userId: accountId }, ...(customerIds.length ? [{ id: { in: customerIds } }] : [])] } },
+    orderBy: [{ createdAt: 'desc' }],
+    take: 50,
+    select: { id: true, status: true, remainingVisits: true, expiresAt: true, nextBillingAt: true, servicePackage: { select: { name: true } }, membershipPlan: { select: { name: true, billingInterval: true } } },
+  });
+  return {
+    success: true,
+    error: null,
+    data: balances.map((item) => ({
+      id: item.id, status: item.status, remainingVisits: item.remainingVisits,
+      name: item.membershipPlan?.name || item.servicePackage?.name || 'Balance',
+      kind: item.membershipPlan ? 'membership' : 'package',
+      billingInterval: item.membershipPlan?.billingInterval || null,
+      expiresAt: item.expiresAt?.toISOString() || null, nextBillingAt: item.nextBillingAt?.toISOString() || null,
+    })),
+  };
+}

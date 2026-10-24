@@ -21,9 +21,7 @@ type Data = {
 };
 
 const money = (value?: number | null) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((value || 0) / 100);
-const item = (slug: string, id: string) => `${basePath}/${slug}/${id}`;
 const edit = (path: string, id: string) => `/dashboard/platform/services/${path}${encodeURIComponent(id)}`;
-const create = (slug: string) => `${basePath}/${slug}/create`;
 
 const breadcrumbs = [
   { type: 'link' as const, label: 'Dashboard', href: basePath },
@@ -38,7 +36,7 @@ function header(tone?: Tone) {
     <PageHeader
       title="Services & packages"
       tone={tone}
-      actions={<Track><PillLink variant="primary" href="/dashboard/platform/services/new"><Plus /> Service</PillLink><PillLink href={create('service-categories')}>Category</PillLink></Track>}
+      actions={<Track><PillLink variant="primary" href="/dashboard/platform/services/new"><Plus /> Service</PillLink><PillLink href="/dashboard/platform/services/categories">Categories</PillLink></Track>}
     />
   );
 }
@@ -108,7 +106,7 @@ export default async function ServicesPage() {
           id="svc-eligibility"
           title="Online booking"
           tone={eligibility?.data ? 'live' : 'alert'}
-          actions={<Track><PillLink size="sm" href={`${basePath}/booking-policies`}>Booking policies</PillLink></Track>}
+          actions={<Track><PillLink size="sm" href="/dashboard/platform/policies">Policies</PillLink></Track>}
         >
           <p className="text-sm">{eligibility?.data?.description || eligibility?.error || 'Booking eligibility could not be loaded.'}</p>
           {data.uncategorizedServices.length > 0 && <p className="mt-2 text-xs text-muted-foreground"><StatusDot tone="off" />Uncategorized services: staff booking only.</p>}
@@ -121,7 +119,7 @@ export default async function ServicesPage() {
               {data.categories.map((category) => (
                 <div key={category.id}>
                   <h3 className="flex items-baseline justify-between gap-2 pb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    <Link className="hover:text-foreground hover:underline" href={item('service-categories', category.id)}><StatusDot tone={statusTone(category.status)} />{category.name}</Link>
+                    <Link className="hover:text-foreground hover:underline" href="/dashboard/platform/services/categories"><StatusDot tone={statusTone(category.status)} />{category.name}</Link>
                     <span className="font-mono tabular-nums">{category.services.length}</span>
                   </h3>
                   {category.services.length ? <ServiceRows services={category.services} /> : <Empty>No services in this category.</Empty>}
@@ -154,7 +152,7 @@ export default async function ServicesPage() {
             </Section>
             <Section id="svc-retail" title="Retail" count={data.products.length} actions={<Track><PillLink size="sm" href="/dashboard/platform/services/new-product"><ShoppingBag /> Product</PillLink></Track>}>
               {!data.products.length && <Empty>No retail products.</Empty>}
-              <ul>{data.products.map((product) => <PriceRow key={product.id} href={edit('products/', product.id)} name={product.name} sub={`${product.sku} · ${product.status}`} price={product.price} status={product.status} />)}</ul>
+              <ul>{data.products.map((product) => <PriceRow key={product.id} href={`/dashboard/platform/inventory/${product.id}`} name={product.name} sub={`${product.sku} · ${product.status}`} price={product.price} status={product.status} />)}</ul>
             </Section>
           </div>
         </div>

@@ -40,7 +40,7 @@ function header(tone?: Tone) {
     <PageHeader
       title="Barbers & schedules"
       tone={tone}
-      actions={<Track><PillLink variant="primary" href="/dashboard/platform/staff/new"><Plus /> Barber</PillLink><PillLink href={`${basePath}/barber-chairs`}>Chairs</PillLink></Track>}
+      actions={<Track><PillLink variant="primary" href="/dashboard/platform/staff/new"><Plus /> Barber</PillLink><PillLink href="/dashboard/platform/staff/chairs">Chairs</PillLink></Track>}
     />
   );
 }
@@ -94,13 +94,12 @@ export default async function StaffPage() {
               <section key={barber.id} aria-labelledby={`barber-${barber.id}`} className="min-w-0">
                 <div className="flex flex-wrap items-end justify-between gap-3 border-b pb-3">
                   <div className="min-w-0">
-                    <h2 id={`barber-${barber.id}`} className="text-lg font-semibold tracking-tight"><StatusDot tone={barber.bookingEnabled ? 'live' : 'off'} />{barber.displayName}</h2>
+                    <h2 id={`barber-${barber.id}`} className="text-lg font-semibold tracking-tight"><StatusDot tone={barber.bookingEnabled ? 'live' : 'off'} /><Link className="hover:underline" href={`/dashboard/platform/staff/${barber.id}`}>{barber.displayName}</Link></h2>
                     <p className="text-xs text-muted-foreground"><span className="font-mono">{chair ? `Chair ${chair}` : 'No chair'}</span>{barber.chair && barber.chair.status !== 'active' ? ` (${barber.chair.status})` : ''}{barber.status !== 'active' ? ` · ${barber.status}` : ''} · {barber.bookingEnabled ? 'Books online' : 'Not booking online'} · {barber.accountLinked ? 'Account linked' : 'No login'}</p>
                   </div>
                   <Track>
-                    <PillLink size="sm" href={`${basePath}/barbers/${barber.id}`}>Profile</PillLink>
-                    <PillLink size="sm" href={`${basePath}/barber-schedules${filterBy('barber', barber.id)}`}>Hours</PillLink>
-                    <PillLink size="sm" href={`${basePath}/barber-schedules/create`}><Plus /> Hours</PillLink>
+                    <PillLink size="sm" href={`/dashboard/platform/staff/${barber.id}`}>Profile</PillLink>
+                    <PillLink size="sm" href={`/dashboard/platform/staff/${barber.id}#barber-hours`}>Hours</PillLink>
                   </Track>
                 </div>
 

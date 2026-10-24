@@ -3,7 +3,8 @@ import type { GraphQLSchema } from 'graphql';
 import redirectToInit from "./redirectToInit";
 import checkBarberAvailability from "../queries/checkBarberAvailability";
 import createOnlineBooking, { createAccountBooking } from "./createOnlineBooking";
-import { exportMyAccountData, getAccountBookings, recoverAccountBooking } from "../queries/getAccountBookings";
+import { exportMyAccountData, getAccountBalances, getAccountBookings, recoverAccountBooking } from "../queries/getAccountBookings";
+import { getPublicBarberWeek, getPublicMembershipOffers } from "../queries/getPublicOffers";
 import { recoverGuestBooking } from "../utils/guestBookingCommand";
 import checkoutAppointment from "./checkoutAppointment";
 import ensureDefaultPaymentProvider from "./ensureDefaultPaymentProvider";
@@ -25,6 +26,7 @@ import transitionAppointment from "./transitionAppointment";
 import transitionQueueEntry from "./transitionQueueEntry";
 import selectActiveShop from "./selectActiveShop";
 import claimShopOwnership, { claimableShops } from "./claimShopOwnership";
+import { addShopMemberByEmail, platformTeam } from "./manageTeam";
 import markAppointmentNoShow from "./markAppointmentNoShow";
 import { createCommissionPayout, transitionCommission } from "./manageCommissions";
 import { recordProductSale, returnProductSaleLine } from "./manageProductSales";
@@ -310,6 +312,41 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         slug: String!
       }
 
+      type PublicPackageLine {
+        quantity: Int!
+        serviceId: ID!
+        serviceName: String!
+      }
+
+      type PublicPackageOffer {
+        id: ID!
+        name: String!
+        description: String
+        price: Int!
+        items: [PublicPackageLine!]!
+      }
+
+      type PublicPlanOffer {
+        id: ID!
+        name: String!
+        description: String
+        price: Int!
+        billingInterval: String!
+        includedVisits: Int
+        discountPercent: Int
+      }
+
+      type PublicMembershipOffers {
+        packages: [PublicPackageOffer!]!
+        plans: [PublicPlanOffer!]!
+      }
+
+      type PublicBarberDay {
+        dayOfWeek: String!
+        startMinute: Int
+        endMinute: Int
+      }
+
       type PublicWalkInStatus {
         open: Boolean!
         barbersOnNow: Int!
@@ -371,6 +408,9 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
       type Query {
         redirectToInit: Boolean
         accountBookings(page: Int): PlatformProjectionResult!
+        accountBalances: PlatformProjectionResult!
+        getPublicMembershipOffers: PublicMembershipOffers!
+        getPublicBarberWeek(barberId: ID!): [PublicBarberDay!]!
         exportMyAccountData: PlatformProjectionResult!
         getPublicStorefrontSettings: PublicStorefrontSettings
         getPublicServiceCatalog: [PublicServiceCategory!]!
@@ -396,6 +436,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         getPublicQueue: [PublicQueueEntry!]!
         claimableShops: [ClaimableShop!]!
         getPublicWalkInStatus: PublicWalkInStatus!
+        platformTeam: PlatformProjectionResult!
         getPublicQueueEntry(
           queueEntryId: ID!
           accessToken: String!
@@ -503,6 +544,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
 
         selectActiveShop(shopId: ID!): SelectActiveShopResult!
         claimShopOwnership(shopId: ID!): SelectActiveShopResult!
+        addShopMemberByEmail(email: String!, membershipRole: String!): DomainCommandResult!
 
         markAppointmentNoShow(appointmentId: ID!, policyId: ID, reason: String!, idempotencyKey: String!): DomainCommandResult!
         transitionCommission(commissionId: ID!, toStatus: String!, reason: String, idempotencyKey: String!): DomainCommandResult!
@@ -543,6 +585,9 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         getPublicStorefrontSettings,
         getPublicServiceCatalog,
         accountBookings: getAccountBookings,
+        accountBalances: getAccountBalances,
+        getPublicMembershipOffers,
+        getPublicBarberWeek,
         exportMyAccountData,
         getPublicBookingEligibility,
         getPublicBarbers,
@@ -588,6 +633,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         getPublicQueueEntry,
         claimableShops,
         getPublicWalkInStatus,
+        platformTeam,
         getPublicAppointment,
       },
       Mutation: {
@@ -614,6 +660,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         transitionQueueEntry,
         selectActiveShop,
         claimShopOwnership,
+        addShopMemberByEmail,
         markAppointmentNoShow: async (root, args, context) => {
           const result = await markAppointmentNoShow(root, args, context); return { success: result.success, error: result.error, data: result.evidence };
         },

@@ -110,18 +110,18 @@ export default async function BarbershopOperationsPage() {
         ]} />
 
         <div className="grid min-w-0 gap-8 xl:grid-cols-2">
-          <Section id="ops-chairs" title="Chairs" count={data.counts.chairs ?? undefined} actions={<ViewAll slug="barber-chairs" />}>
+          <Section id="ops-chairs" title="Chairs" count={data.counts.chairs ?? undefined} actions={<ViewAll slug="platform/staff/chairs" />}>
             {data.chairs === null ? <Restricted>Chairs restricted for your role.</Restricted> : <>
               <ul>
                 {data.chairs.map((chair) => (
                   <li key={chair.id} className="flex min-w-0 items-baseline justify-between gap-3 border-b py-2.5 text-sm last:border-b-0">
-                    <Link className="min-w-0 truncate font-medium hover:underline" href={`${basePath}/barber-chairs/${chair.id}`}><StatusDot tone={statusTone(chair.status)} />Chair <span className="font-mono">{chair.chairNumber}</span>{chair.stationName ? <span className="ml-1.5 font-normal text-muted-foreground">{chair.stationName}</span> : null}</Link>
+                    <Link className="min-w-0 truncate font-medium hover:underline" href="/dashboard/platform/staff/chairs"><StatusDot tone={statusTone(chair.status)} />Chair <span className="font-mono">{chair.chairNumber}</span>{chair.stationName ? <span className="ml-1.5 font-normal text-muted-foreground">{chair.stationName}</span> : null}</Link>
                     <span className="truncate text-muted-foreground">{chair.assignedBarbers?.map((barber) => barber.name).join(', ') || 'Unassigned'}</span>
                   </li>
                 ))}
               </ul>
               {!data.chairs.length && <EmptyLine>No chairs yet.</EmptyLine>}
-              <More shown={data.chairs.length} total={data.counts.chairs} slug="barber-chairs" noun="chairs" />
+              <More shown={data.chairs.length} total={data.counts.chairs} slug="platform/staff/chairs" noun="chairs" />
             </>}
           </Section>
 
@@ -133,36 +133,36 @@ export default async function BarbershopOperationsPage() {
           </Section>
         </div>
 
-        <Section id="ops-inventory" title="Stock" tone={reorder.length ? 'wait' : undefined} count={data.counts.lots ?? undefined} actions={<ViewAll slug="inventory-lots" />}>
+        <Section id="ops-inventory" title="Stock" tone={reorder.length ? 'wait' : undefined} count={data.counts.lots ?? undefined} actions={<ViewAll slug="platform/inventory" />}>
           {data.lots === null ? <Restricted>Inventory restricted for your role.</Restricted> : <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
             <div className="min-w-0">
               {reorder.length > 0 && <p className="mb-3 text-sm"><StatusDot tone="wait" />Reorder: {reorder.map((product) => `${product.name} (${product.onHand})`).join(', ')}</p>}
               <div className={tableClass}><Table><TableHeader><TableRow><TableHead>Lot</TableHead><TableHead>Product</TableHead><TableHead>Supplier</TableHead><TableHead className="text-right">Left</TableHead></TableRow></TableHeader><TableBody>{data.lots.length ? data.lots.map(x => <TableRow key={x.id}><TableCell><Link className="font-mono text-xs hover:underline" href={`${basePath}/inventory-lots/${x.id}`}>{x.lotNumber}</Link><div className="text-xs text-muted-foreground">{x.status}{x.expiresAt ? ` · exp ${when(x.expiresAt)}` : ''}</div></TableCell><TableCell>{x.product?.name ?? '—'}</TableCell><TableCell>{x.supplier?.name ?? '—'}</TableCell><TableCell className="text-right font-mono tabular-nums">{x.quantityRemaining ?? 0}/{x.quantityReceived ?? 0}</TableCell></TableRow>) : <Empty span={4} text="No inventory lots yet."/>}</TableBody></Table></div>
-              <More shown={data.lots.length} total={data.counts.lots} slug="inventory-lots" noun="lots" />
+              <More shown={data.lots.length} total={data.counts.lots} slug="platform/inventory" noun="lots" />
               <h3 className="mt-6 border-b pb-2 text-sm font-semibold">Suppliers <span className="ml-1 font-mono text-xs font-normal text-muted-foreground">{data.counts.suppliers ?? ''}</span></h3>
-              <ul className="grid gap-x-6 sm:grid-cols-2">{(data.suppliers || []).slice(0, 6).map(x => <li key={x.id} className="border-b py-2.5 text-sm"><Link href={`${basePath}/suppliers/${x.id}`} className="font-medium hover:underline"><StatusDot tone={statusTone(x.status)} />{x.name}</Link><p className="truncate text-xs text-muted-foreground">{x.contactName ?? 'No contact'} · {x.email || x.phone || 'no details'}</p></li>)}</ul>
+              <ul className="grid gap-x-6 sm:grid-cols-2">{(data.suppliers || []).slice(0, 6).map(x => <li key={x.id} className="border-b py-2.5 text-sm"><Link href="/dashboard/platform/inventory/suppliers" className="font-medium hover:underline"><StatusDot tone={statusTone(x.status)} />{x.name}</Link><p className="truncate text-xs text-muted-foreground">{x.contactName ?? 'No contact'} · {x.email || x.phone || 'no details'}</p></li>)}</ul>
               {!data.suppliers?.length && <EmptyLine>No suppliers yet.</EmptyLine>}
-              <More shown={Math.min(6, data.suppliers?.length || 0)} total={data.counts.suppliers} slug="suppliers" noun="suppliers" />
+              <More shown={Math.min(6, data.suppliers?.length || 0)} total={data.counts.suppliers} slug="platform/inventory/suppliers" noun="suppliers" />
             </div>
             <InventoryReceiptControls products={data.products || []} suppliers={data.suppliers || []} supplierTotal={data.counts.suppliers} timeZone={timeZone} />
           </div>}
         </Section>
 
         <div className="grid min-w-0 gap-8 xl:grid-cols-2">
-          <Section id="ops-commissions" title="Open commissions" count={data.counts.commissions ?? undefined} actions={<ViewAll slug="commissions" />}>
+          <Section id="ops-commissions" title="Open commissions" count={data.counts.commissions ?? undefined} actions={<ViewAll slug="platform/payroll" />}>
             <div className={tableClass}><Table><TableHeader><TableRow><TableHead>Visit</TableHead><TableHead>Barber</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader><TableBody>{data.commissions.length ? data.commissions.map(x => <TableRow key={x.id}><TableCell className="align-top"><span className="text-sm font-medium"><StatusDot tone={statusTone(x.status)} />{x.appointment?.serviceTitleSnapshot || 'Retail sale'}</span><div className="text-xs text-muted-foreground">{(x.appointment?.startsAt || x.transaction?.completedAt || x.createdAt) ? when(String(x.appointment?.startsAt || x.transaction?.completedAt || x.createdAt)) : '—'} · {label(x.status)} · {x.commissionRate ?? '0'}%</div><CommissionControls commission={x} /></TableCell><TableCell className="align-top">{x.barber?.name ?? '—'}</TableCell><TableCell className="text-right align-top font-mono tabular-nums">{money(x.commissionAmount)}</TableCell></TableRow>) : <Empty span={3} text="No open commissions."/>}</TableBody></Table></div>
-            <More shown={data.commissions.length} total={data.counts.commissions} slug="commissions" noun="open commissions" />
+            <More shown={data.commissions.length} total={data.counts.commissions} slug="platform/payroll" noun="open commissions" />
           </Section>
 
-          <Section id="ops-tips" title="Tips" count={data.counts.tips ?? undefined} actions={<ViewAll slug="tips" />}>
+          <Section id="ops-tips" title="Tips" count={data.counts.tips ?? undefined} actions={<ViewAll slug="platform/payroll" />}>
             <div className={tableClass}><Table><TableHeader><TableRow><TableHead>When</TableHead><TableHead>Barber</TableHead><TableHead>Customer</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader><TableBody>{data.tips.length ? data.tips.map(x => <TableRow key={x.id}><TableCell><span className="text-sm">{x.createdAt ? when(x.createdAt) : '—'}</span><div className="text-xs capitalize text-muted-foreground">{x.paymentMethod}</div></TableCell><TableCell>{x.barber?.name ?? '—'}</TableCell><TableCell>{x.customer?.name ?? '—'}</TableCell><TableCell className="text-right font-mono tabular-nums">{money(x.amount)}</TableCell></TableRow>) : <Empty span={4} text="No tips yet."/>}</TableBody></Table></div>
-            <More shown={data.tips.length} total={data.counts.tips} slug="tips" noun="tips" />
+            <More shown={data.tips.length} total={data.counts.tips} slug="platform/payroll" noun="tips" />
           </Section>
         </div>
 
-        <Section id="ops-payouts" title="Payouts recorded" count={data.counts.payouts ?? undefined} actions={<ViewAll slug="commission-payouts" />}>
-          <div className={tableClass}><Table><TableHeader><TableRow><TableHead>Payout</TableHead><TableHead>Barber</TableHead><TableHead>Paid</TableHead><TableHead>Reference</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader><TableBody>{data.payouts.length ? data.payouts.map(x => <TableRow key={x.id}><TableCell><Link className="font-mono text-xs hover:underline" href={`${basePath}/commission-payouts/${x.id}`}>{x.payoutNumber}</Link><div className="text-xs text-muted-foreground">{x.commissionCount} commission{x.commissionCount === 1 ? '' : 's'}{x.status ? ` · ${label(x.status)}` : ''}</div></TableCell><TableCell>{x.barber?.name ?? '—'}</TableCell><TableCell className="whitespace-nowrap">{when(x.paidAt)}</TableCell><TableCell className="max-w-48 truncate">{x.notes || '—'}</TableCell><TableCell className="text-right font-mono tabular-nums">{money(x.totalAmount)}</TableCell></TableRow>) : <Empty span={5} text="No payouts recorded."/>}</TableBody></Table></div>
-          <More shown={data.payouts.length} total={data.counts.payouts} slug="commission-payouts" noun="payouts" />
+        <Section id="ops-payouts" title="Payouts recorded" count={data.counts.payouts ?? undefined} actions={<ViewAll slug="platform/payroll" />}>
+          <div className={tableClass}><Table><TableHeader><TableRow><TableHead>Payout</TableHead><TableHead>Barber</TableHead><TableHead>Paid</TableHead><TableHead>Reference</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader><TableBody>{data.payouts.length ? data.payouts.map(x => <TableRow key={x.id}><TableCell><Link className="font-mono text-xs hover:underline" href="/dashboard/platform/payroll">{x.payoutNumber}</Link><div className="text-xs text-muted-foreground">{x.commissionCount} commission{x.commissionCount === 1 ? '' : 's'}{x.status ? ` · ${label(x.status)}` : ''}</div></TableCell><TableCell>{x.barber?.name ?? '—'}</TableCell><TableCell className="whitespace-nowrap">{when(x.paidAt)}</TableCell><TableCell className="max-w-48 truncate">{x.notes || '—'}</TableCell><TableCell className="text-right font-mono tabular-nums">{money(x.totalAmount)}</TableCell></TableRow>) : <Empty span={5} text="No payouts recorded."/>}</TableBody></Table></div>
+          <More shown={data.payouts.length} total={data.counts.payouts} slug="platform/payroll" noun="payouts" />
         </Section>
 
         {(data.paymentSessions.length > 0 || data.reconciliations.length > 0) && (
@@ -173,20 +173,20 @@ export default async function BarbershopOperationsPage() {
               </Section>
             )}
             {data.reconciliations.length > 0 && (
-              <Section id="ops-reconciliations" title="Processor checks" count={data.counts.reconciliations ?? undefined} actions={<ViewAll slug="payment-reconciliations" />}>
+              <Section id="ops-reconciliations" title="Processor checks" count={data.counts.reconciliations ?? undefined} actions={<ViewAll slug="platform/payments" />}>
                 <div className={tableClass}><Table><TableHeader><TableRow><TableHead>Checked</TableHead><TableHead>Before</TableHead><TableHead>Processor</TableHead><TableHead>After</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader><TableBody>{data.reconciliations.map(x => <TableRow key={x.id}><TableCell className="whitespace-nowrap">{x.changed && <StatusDot tone="wait" />}{when(x.observedAt)}</TableCell><TableCell>{label(x.localStatusBefore)}</TableCell><TableCell>{label(x.remoteStatus)}</TableCell><TableCell>{label(x.localStatusAfter)}</TableCell><TableCell className="text-right font-mono tabular-nums">{money(x.amount)}</TableCell></TableRow>)}</TableBody></Table></div>
-                <More shown={data.reconciliations.length} total={data.counts.reconciliations} slug="payment-reconciliations" noun="checks" />
+                <More shown={data.reconciliations.length} total={data.counts.reconciliations} slug="platform/payments" noun="checks" />
               </Section>
             )}
           </div>
         )}
 
         <div className="grid min-w-0 gap-8 xl:grid-cols-2">
-          <Section id="ops-policies" title="No-show policies" count={data.counts.policies ?? undefined} actions={<ViewAll slug="no-show-policies" />}>
+          <Section id="ops-policies" title="No-show policies" count={data.counts.policies ?? undefined} actions={<ViewAll slug="platform/policies" />}>
             {data.policies === null ? <Restricted>No-show policies restricted for your role.</Restricted> : <>
-              <ul>{data.policies.map(x => <li key={x.id} className="flex min-w-0 items-baseline justify-between gap-3 border-b py-2.5 text-sm last:border-b-0"><Link href={`${basePath}/no-show-policies/${x.id}`} className="min-w-0 truncate font-medium hover:underline"><StatusDot tone={statusTone(x.status)} />{x.name}</Link><span className="shrink-0 text-muted-foreground"><span className="font-mono tabular-nums">{money(x.feeAmount)}</span> · {x.graceMinutes ?? 0}m grace{x.appliesToMemberships ? ' · memberships' : ''}</span></li>)}</ul>
-              {!data.policies.length && <EmptyLine>No no-show policies. <Link className="underline" href={`${basePath}/no-show-policies/create`}>Add a policy</Link></EmptyLine>}
-              <More shown={data.policies.length} total={data.counts.policies} slug="no-show-policies" noun="policies" />
+              <ul>{data.policies.map(x => <li key={x.id} className="flex min-w-0 items-baseline justify-between gap-3 border-b py-2.5 text-sm last:border-b-0"><Link href="/dashboard/platform/policies" className="min-w-0 truncate font-medium hover:underline"><StatusDot tone={statusTone(x.status)} />{x.name}</Link><span className="shrink-0 text-muted-foreground"><span className="font-mono tabular-nums">{money(x.feeAmount)}</span> · {x.graceMinutes ?? 0}m grace{x.appliesToMemberships ? ' · memberships' : ''}</span></li>)}</ul>
+              {!data.policies.length && <EmptyLine>No no-show policies. <Link className="underline" href="/dashboard/platform/policies">Add a policy</Link></EmptyLine>}
+              <More shown={data.policies.length} total={data.counts.policies} slug="platform/policies" noun="policies" />
             </>}
           </Section>
 

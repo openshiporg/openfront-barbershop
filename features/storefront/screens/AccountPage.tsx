@@ -6,6 +6,7 @@ import { AccountForms } from '../components/AccountForms';
 import { AccountDataExport } from '../components/AccountDataExport';
 import { getStorefrontAccountState, getStorefrontBookingHistory, signOutAccount } from '../lib/data/account';
 import { getPublicStorefrontSettings } from '../lib/data/settings';
+import { getAccountBalances } from '../lib/data/offers';
 import { formatMoney, paymentLabel, statusLabel } from '../lib/format';
 
 function bookingTime(startsAt: string, timeZone: string | null) {
@@ -19,7 +20,7 @@ export default async function AccountPage({ searchParams }: { searchParams?: Pro
   const page = Math.max(1, Math.floor(Number(typeof params.page === 'string' ? params.page : 1)) || 1);
   const [account, settings] = await Promise.all([getStorefrontAccountState(), getPublicStorefrontSettings()]);
   const user = account.status === 'signed_in' ? account.user : null;
-  const history = user ? await getStorefrontBookingHistory(page) : null;
+  const [history, balances] = user ? await Promise.all([getStorefrontBookingHistory(page), getAccountBalances()]) : [null, null];
   const result = history?.success ? history.data.accountBookings : null;
   const data = result?.success ? result.data : null;
   const telephoneHref = phoneHref(settings?.phone);
@@ -76,6 +77,21 @@ export default async function AccountPage({ searchParams }: { searchParams?: Pro
               )}
             </section>
             <aside className="sf-block content-start lg:border-t-0 lg:pt-0" aria-labelledby="your-data-heading">
+              <section aria-labelledby="balances-heading" className="grid gap-2">
+                <h2 id="balances-heading" className="sf-eyebrow">Packages and memberships</h2>
+                {balances === null ? <p role="alert" className="sf-small sf-muted">Balances couldn’t load.</p>
+                  : !balances.length ? <p className="sf-small sf-muted">None yet · <Link className="sf-link" href="/memberships">See memberships</Link></p>
+                  : (
+                    <ul className="sf-ledger">
+                      {balances.map((balance) => (
+                        <li key={balance.id} className="flex justify-between gap-3">
+                          <span><span className={`sf-dot ${balance.status === 'active' ? 'is-live' : 'is-wait'}`} aria-hidden="true" />{balance.name}{balance.status === 'paused' ? <span className="sf-muted"> · paused</span> : null}</span>
+                          <span className="sf-mono">{balance.remainingVisits ?? 0} {balance.remainingVisits === 1 ? 'visit' : 'visits'}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+              </section>
               <h2 id="your-data-heading" className="sf-eyebrow">Your data</h2>
               <AccountDataExport />
               <p className="sf-small sf-muted">Corrections or deletion: contact the shop{telephoneHref && settings?.phone ? <> at <a className="sf-link" href={`tel:${telephoneHref}`}>{settings.phone}</a></> : null}.</p>
