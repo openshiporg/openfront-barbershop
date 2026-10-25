@@ -379,17 +379,20 @@ async function resolveCliShop(stats: SeedStats, shopSeed: SeedRecord) {
   return { id: shop.id, jurisdictionCode: text(shop.jurisdictionCode, data.jurisdictionCode), created: false }
 }
 
-/** Refresh the request session from durable data so child hooks see the
- * caller's current owner membership and active shop, not an old cookie. */
-async function refreshSeedSession(userId: string) {
+/** Load the caller's session from durable data so child hooks see the
+ * current owner membership and active shop, not an old cookie. The caller
+ * must enter the returned context itself: AsyncLocalStorage.enterWith inside
+ * this awaited helper would not reach the caller's continuation, leaving the
+ * stale session in place for the first run on a brand-new shop. */
+async function refreshedSeedSession(userId: string): Promise<BarbershopSeedContext | undefined> {
   const context = seedContextStorage.getStore()
-  if (!context?.withSession) return
+  if (!context?.withSession) return undefined
   const [current] = await getSudoContext().query.User.findMany({
     where: { id: { equals: userId } }, take: 1,
     query: `id name activeShop { id slug status } shopMemberships { id status membershipRole shop { id slug status } } role { id name canSeeOtherPeople canEditOtherPeople canManagePeople canManageRoles canAccessDashboard canManageOnboarding canManageServices canManageStaff canManageSchedules canManageAppointments canManageQueue canManageCustomers canManageCustomerNotes canManageMemberships canManagePayments canViewReports }`,
   })
   if (!current) throw new Error('Onboarding account is unavailable.')
-  seedContextStorage.enterWith(context.withSession({ itemId: userId, listKey: 'User', data: current }))
+  return context.withSession({ itemId: userId, listKey: 'User', data: current })
 }
 
 export async function runBarbershopSeed({
@@ -442,7 +445,10 @@ export async function runBarbershopSeed({
   const shop = userId ? await resolveCallerShop(stats, userId, shopSeed) : await resolveCliShop(stats, shopSeed)
   const shopId = shop.id
   const shopJurisdictionCode = text(shop.jurisdictionCode, text(seed.shop.jurisdictionCode, 'US-NY'))
-  if (userId) await refreshSeedSession(userId)
+  if (userId) {
+    const refreshed = await refreshedSeedSession(userId)
+    if (refreshed) seedContextStorage.enterWith(refreshed)
+  }
 
   for (const policy of seed.bookingPolicies ?? []) {
     const existing = await findFirst('BookingPolicy', { shop: { id: { equals: shopId } } }, 'id status')
