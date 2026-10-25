@@ -1,34 +1,41 @@
-/* Barbershop storefront tokens.
- * Bone paper, navy felt boards, cobalt accent (merchant preset), barber-pole red
- * reserved for the stripe motif. Signage display type, mono for times and prices.
+/* Barbershop storefront tokens: the felt letter board after close.
+ * The whole page is the navy felt of a shop's price board; type is bone
+ * signage. The barber pole (red and bone) is the one motif. The merchant's
+ * accent preset is set inline for a light page, so --sf-accent lifts it to a
+ * lightness that reads on felt while keeping the merchant's hue.
  */
 
 [data-storefront] {
-  --color-paper: oklch(96.6% 0.008 85);
-  --color-paper-2: oklch(93% 0.011 85);
-  --color-paper-3: oklch(88% 0.014 85);
-  --color-ink: oklch(19% 0.032 262);
-  --color-ink-2: oklch(31% 0.03 262);
-  --color-ink-muted: oklch(45% 0.022 262);
-  --color-rule: oklch(85% 0.012 85);
-  --color-rule-strong: oklch(68% 0.018 262);
+  --color-paper: oklch(17% 0.032 262);
+  --color-paper-2: oklch(21% 0.036 262);
+  --color-paper-3: oklch(26% 0.038 262);
+  --color-ink: oklch(95% 0.014 85);
+  --color-ink-2: oklch(85% 0.016 85);
+  --color-ink-muted: oklch(71% 0.024 262);
+  --color-rule: oklch(28% 0.034 262);
+  --color-rule-strong: oklch(44% 0.03 262);
   --color-accent: oklch(50% 0.2 263);
   --color-accent-hover: oklch(43% 0.19 263);
   --color-accent-ink: oklch(98% 0.01 263);
   --color-accent-soft: oklch(92% 0.04 263);
-  --color-inverse: oklch(21% 0.036 262);
-  --color-inverse-2: oklch(29% 0.036 262);
-  --color-inverse-3: oklch(36% 0.034 262);
-  --color-inverse-ink: oklch(95.5% 0.01 85);
-  --color-inverse-muted: oklch(76% 0.022 262);
-  --color-pole: oklch(55% 0.2 27);
-  --color-live: oklch(63% 0.16 152);
-  --color-wait: oklch(74% 0.15 75);
-  --color-off: oklch(66% 0.012 262);
-  --color-focus: oklch(60% 0.2 263);
-  --color-error: oklch(48% 0.18 27);
-  --color-error-soft: oklch(93% 0.035 27);
-  --color-photo-shade: oklch(14% 0.03 262 / 0.62);
+  --color-inverse: oklch(12.5% 0.028 262);
+  --color-inverse-2: oklch(23% 0.032 262);
+  --color-inverse-3: oklch(33% 0.032 262);
+  --color-inverse-ink: oklch(95% 0.014 85);
+  --color-inverse-muted: oklch(72% 0.024 262);
+  --color-pole: oklch(61% 0.2 27);
+  --color-live: oklch(76% 0.16 152);
+  --color-wait: oklch(80% 0.14 75);
+  --color-off: oklch(62% 0.015 262);
+  --color-focus: oklch(72% 0.16 263);
+  --color-error: oklch(74% 0.15 27);
+  --color-error-soft: oklch(27% 0.07 27);
+  --color-photo-shade: oklch(12% 0.03 262 / 0.7);
+
+  /* Lifted merchant accent and what sits on it. */
+  --sf-accent: oklch(from var(--color-accent) 74% calc(c * 0.85) h);
+  --sf-accent-strong: oklch(from var(--color-accent) 80% calc(c * 0.8) h);
+  --sf-on-accent: oklch(from var(--color-accent) 16% 0.03 h);
 
   --font-display: var(--font-big-shoulders), 'Arial Narrow', sans-serif;
   --font-body: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
@@ -55,8 +62,8 @@
   --radius-md: 0.75rem;
   --radius-lg: 1.25rem;
   --radius-pill: 999px;
-  --shadow-raised: 0 1px 0 oklch(100% 0 0 / 0.7) inset, 0 1px 2px oklch(19% 0.03 262 / 0.16), 0 2px 6px oklch(19% 0.03 262 / 0.08);
-  --shadow-recessed: inset 0 1px 2px oklch(19% 0.03 262 / 0.14), inset 0 0 0 1px oklch(19% 0.03 262 / 0.05);
+  --shadow-raised: 0 1px 0 oklch(100% 0 0 / 0.07) inset, 0 1px 2px oklch(0% 0 0 / 0.5), 0 2px 8px oklch(0% 0 0 / 0.25);
+  --shadow-recessed: inset 0 1px 3px oklch(0% 0 0 / 0.55), inset 0 0 0 1px oklch(100% 0 0 / 0.04);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-fast: 120ms;
   --dur-med: 220ms;
@@ -66,6 +73,7 @@
 
   color: var(--color-ink);
   background: var(--color-paper);
+  color-scheme: dark;
   font-family: var(--font-body);
   font-size: var(--text-body);
   line-height: 1.55;

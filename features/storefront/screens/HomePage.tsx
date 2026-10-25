@@ -22,22 +22,24 @@ export default async function HomePage() {
   return (
     <StorefrontShell>
       <main id="main-content">
-        <section className="sf-container sf-hero">
-          <div className="sf-hero-copy">
-            {state ? <p className="sf-eyebrow"><span className={`sf-dot ${state.open ? 'is-live' : ''}`} aria-hidden="true" />{state.label}</p> : null}
-            <h1 className="sf-display">{settings.name}</h1>
-            {settings.tagline ? <p className="sf-lead">{settings.tagline}</p> : null}
-            <div className="sf-track">
-              <Link href="/book" className="sf-pill is-primary">Book a chair</Link>
-              <Link href="/queue" className="sf-pill">Join walk-ins</Link>
-            </div>
-            <div className="sf-hero-meta">
-              {settings.address ? <span>{settings.address}</span> : null}
-              {telephoneHref && settings.phone ? <a href={`tel:${telephoneHref}`} className="sf-mono"><strong>{settings.phone}</strong></a> : null}
-            </div>
-          </div>
+        <section className="sf-hero" aria-labelledby="home-title">
           <div className="sf-hero-media">
-            <StorefrontImage src="/images/barbershop/photo/shop-floor.webp" fallbackSrc="/images/barbershop/photo/shop-floor.webp" alt={`${settings.name} shop floor`} priority sizes="(max-width: 1024px) 100vw, 48vw" />
+            <StorefrontImage src="/images/barbershop/photo/shop-floor.webp" fallbackSrc="/images/barbershop/photo/shop-floor.webp" alt={`${settings.name} shop floor`} priority sizes="100vw" />
+          </div>
+          <div className="sf-container sf-hero-inner">
+            <div className="sf-hero-copy">
+              {state ? <p className="sf-eyebrow"><span className={`sf-dot ${state.open ? 'is-live' : ''}`} aria-hidden="true" />{state.label}</p> : null}
+              <h1 id="home-title" className="sf-display">{settings.name}</h1>
+              {settings.tagline ? <p className="sf-lead">{settings.tagline}</p> : null}
+              <div className="sf-track self-start">
+                <Link href="/book" className="sf-pill is-primary">Book a chair</Link>
+                <Link href="/queue" className="sf-pill">Join walk-ins</Link>
+              </div>
+              <div className="sf-hero-meta">
+                {settings.address ? <span>{settings.address}</span> : null}
+                {telephoneHref && settings.phone ? <a href={`tel:${telephoneHref}`} className="sf-mono"><strong>{settings.phone}</strong></a> : null}
+              </div>
+            </div>
             {onFloor.length ? (
               <div className="sf-hero-board">
                 <p className="sf-eyebrow mb-1">On the floor</p>
