@@ -4,7 +4,7 @@ import { getPublicStorefrontSettings } from '@/features/storefront/lib/data/sett
 import { trustedOrigin } from '@/features/shared/trusted-origin';
 import { sanitizeStoreLogoSvg } from '@/features/shared/sanitize-store-logo';
 import { normalizeStoreLogoColor } from '@/features/platform/store-settings/lib/store-logo';
-import '@/features/storefront/styles/storefront.css';
+import '@/features/storefront/styles/barbershop.css';
 
 const bigShoulders = Big_Shoulders({
   variable: '--font-big-shoulders',

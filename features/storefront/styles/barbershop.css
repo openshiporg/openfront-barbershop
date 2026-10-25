@@ -246,8 +246,8 @@ html:has([data-storefront]), html:has([data-storefront]) body { background: oklc
 [data-storefront] .sf-footer-base a { min-height: 1.5rem; }
 
 /* Centered states */
-[data-storefront] .sf-state { display: grid; min-height: 70vh; place-items: center; padding: 1.5rem; }
-[data-storefront] .sf-state > main { display: grid; width: 100%; max-width: 32rem; gap: 1rem; justify-items: start; }
+[data-storefront] .sf-state, [data-storefront].sf-state { display: grid; min-height: 100vh; place-items: center; padding: 1.5rem; }
+[data-storefront] .sf-state > main, [data-storefront].sf-state > main { display: grid; width: 100%; max-width: 32rem; gap: 1rem; justify-items: start; }
 
 @media (hover: hover) and (pointer: fine) {
   [data-storefront] .sf-pill:hover:not(:disabled) { background: var(--color-paper-3); color: var(--color-ink); }
