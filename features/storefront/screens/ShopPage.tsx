@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { phoneHref } from '@/features/shared/storefront-settings';
 import { StorefrontImage } from '../components/StorefrontImage';
+import { productArt } from '../components/productArt';
 import { getRetailProducts, type StorefrontProduct } from '../lib/data/services';
 import { getPublicStorefrontSettings } from '../lib/data/settings';
 import { formatMoney } from '../lib/format';
@@ -22,29 +23,31 @@ export default async function ShopPage() {
     <StorefrontShell>
       <main id="main-content">
         <section className="sf-container sf-page-head">
-          <p className="sf-eyebrow">Sold at the counter</p>
           <div className="sf-page-head-row">
             <h1 className="sf-display">Shop</h1>
-            <div className="sf-track">
-              <Link href="/book" className="sf-pill is-primary">Book a chair</Link>
-              {telephone && settings.phone ? <a href={`tel:${telephone}`} className="sf-pill">Call {settings.phone}</a> : null}
-            </div>
+            {telephone && settings.phone ? <div className="sf-actions"><a href={`tel:${telephone}`} className="sf-btn">Call to hold one</a></div> : null}
           </div>
+          <p className="sf-lead">Sold at the counter. There’s no online checkout; pick it up on your visit.</p>
         </section>
-        <section className="sf-container sf-section pt-[var(--space-xl)]">
+        <section className="sf-container sf-section is-tight">
           {products === null ? <p role="alert" className="sf-notice is-error">Products couldn’t load. Try again in a moment.</p>
             : !products.length ? <p className="sf-muted">No products listed.</p>
             : [...groups.entries()].map(([type, items]) => (
               <section key={type} aria-labelledby={`shop-${type}`} className="mb-[var(--space-2xl)]">
-                <h2 id={`shop-${type}`} className="sf-eyebrow mb-4">{TYPE[type] || type}</h2>
-                <div className="sf-chair-grid">
-                  {items.map((product) => (
-                    <Link key={product.id} href={`/shop/${encodeURIComponent(product.id)}`} className="sf-chair">
-                      <div className="sf-chair-photo"><StorefrontImage src={product.imagePath?.endsWith('.svg') ? undefined : product.imagePath} fallbackSrc="/images/barbershop/photo/shop-floor.webp" alt={product.name} sizes="(max-width: 640px) 100vw, 33vw" /></div>
-                      <div className="sf-chair-name"><h3 className="sf-subtitle">{product.name}</h3><span className="sf-mono">{formatMoney(product.price)}</span></div>
-                      {product.description ? <p className="sf-small sf-muted">{product.description}</p> : null}
-                    </Link>
-                  ))}
+                <h2 id={`shop-${type}`} className="sf-subtitle mb-4 border-b-[3px] border-current pb-2">{TYPE[type] || type}</h2>
+                <div className="sf-product-grid">
+                  {items.map((product) => {
+                    const art = productArt(product);
+                    return (
+                      <Link key={product.id} href={`/shop/${encodeURIComponent(product.id)}`} className="sf-product">
+                        <div className="sf-product-art">
+                          {art ? <StorefrontImage src={art} fallbackSrc={art} alt={product.name} sizes="(max-width: 640px) 50vw, 33vw" /> : <span className="sf-product-label" aria-hidden="true">{product.name}</span>}
+                        </div>
+                        <div className="sf-product-name"><h3>{product.name}</h3><span className="sf-product-price">{formatMoney(product.price)}</span></div>
+                        {product.description ? <p className="sf-small sf-muted">{product.description}</p> : null}
+                      </Link>
+                    );
+                  })}
                 </div>
               </section>
             ))}

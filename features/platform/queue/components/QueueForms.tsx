@@ -54,9 +54,9 @@ export function AddWalkInForm({ services, barbers, onClose }: { services: QueueS
   return (
     <div className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="grid gap-1"><Label htmlFor={`${id}-name`}>Guest name</Label><Input id={`${id}-name`} value={name} maxLength={120} onChange={(event) => setName(event.target.value)} /></div>
-        <div className="grid gap-1"><Label htmlFor={`${id}-phone`}>Phone (optional)</Label><Input id={`${id}-phone`} value={phone} maxLength={40} inputMode="tel" onChange={(event) => setPhone(event.target.value)} /></div>
-        <div className="grid gap-1"><Label htmlFor={`${id}-party`}>Party size</Label><Input id={`${id}-party`} value={partySize} inputMode="numeric" onChange={(event) => setPartySize(event.target.value)} /></div>
+        <div className="grid gap-1"><Label htmlFor={`${id}-name`}>Guest name</Label><Input className="rounded-[6px]" id={`${id}-name`} value={name} maxLength={120} onChange={(event) => setName(event.target.value)} /></div>
+        <div className="grid gap-1"><Label htmlFor={`${id}-phone`}>Phone (optional)</Label><Input className="rounded-[6px]" id={`${id}-phone`} value={phone} maxLength={40} inputMode="tel" onChange={(event) => setPhone(event.target.value)} /></div>
+        <div className="grid gap-1"><Label htmlFor={`${id}-party`}>Party size</Label><Input className="rounded-[6px]" id={`${id}-party`} value={partySize} inputMode="numeric" onChange={(event) => setPartySize(event.target.value)} /></div>
         <div className="grid gap-1">
           <Label htmlFor={`${id}-service`}>Service</Label>
           <select id={`${id}-service`} className={selectClass} value={serviceId} onChange={(event) => { setServiceId(event.target.value); setBarberId(''); }}>
@@ -71,8 +71,8 @@ export function AddWalkInForm({ services, barbers, onClose }: { services: QueueS
             {barberOptions.map((item) => <option key={item.id} value={item.id}>{item.displayName || 'Barber'}</option>)}
           </select>
         </div>
-        <div className="grid gap-1"><Label htmlFor={`${id}-wait`}>Quoted wait, min (optional)</Label><Input id={`${id}-wait`} value={wait} inputMode="numeric" onChange={(event) => setWait(event.target.value)} /></div>
-        <div className="grid gap-1 sm:col-span-2 lg:col-span-3"><Label htmlFor={`${id}-notes`}>Notes (optional)</Label><Input id={`${id}-notes`} value={notes} maxLength={1000} onChange={(event) => setNotes(event.target.value)} /></div>
+        <div className="grid gap-1"><Label htmlFor={`${id}-wait`}>Quoted wait, min (optional)</Label><Input className="rounded-[6px]" id={`${id}-wait`} value={wait} inputMode="numeric" onChange={(event) => setWait(event.target.value)} /></div>
+        <div className="grid gap-1 sm:col-span-2 lg:col-span-3"><Label htmlFor={`${id}-notes`}>Notes (optional)</Label><Input className="rounded-[6px]" id={`${id}-notes`} value={notes} maxLength={1000} onChange={(event) => setNotes(event.target.value)} /></div>
       </div>
       <Track>
         <Pill variant="primary" disabled={pending} onClick={submit}>{pending ? 'Adding…' : 'Add to queue'}</Pill>

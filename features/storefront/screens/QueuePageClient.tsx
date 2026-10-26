@@ -26,16 +26,16 @@ export function QueuePageClient({ services }: { services: StorefrontService[] })
     return (
       <section className="sf-ticket mt-8" role="status" aria-label="Queue ticket">
         <div className="sf-ticket-head">
-          <div className="grid gap-2">
-            <p className="sf-eyebrow text-[var(--color-inverse-muted)]"><span className="sf-dot is-wait" aria-hidden="true" />On the list</p>
-            <p className="sf-ticket-wait">{result.queueEntry.quotedWaitMinutes != null ? `${result.queueEntry.quotedWaitMinutes} min` : 'In line'}</p>
+          <div className="grid gap-3">
+            <p className="sf-eyebrow"><span className="sf-dot is-wait" aria-hidden="true" />On the list</p>
+            <p className="sf-ticket-wait">{result.queueEntry.quotedWaitMinutes != null ? <>{result.queueEntry.quotedWaitMinutes}<small> min</small></> : <small>In line</small>}</p>
           </div>
         </div>
         <dl>
           <div><dt>Barber</dt><dd>{result.queueEntry.requestedBarber?.displayName || 'Next available'}</dd></div>
           <div><dt>Time</dt><dd>Seated when a chair is free</dd></div>
         </dl>
-        <div className="sf-track is-block"><Link className="sf-pill is-primary" href={`/queue?id=${encodeURIComponent(result.queueEntry.id)}`}>View ticket</Link></div>
+        <div className="sf-actions is-block"><Link className="sf-btn is-primary" href={`/queue?id=${encodeURIComponent(result.queueEntry.id)}`}>View ticket</Link></div>
       </section>
     );
   }
@@ -61,7 +61,7 @@ export function QueuePageClient({ services }: { services: StorefrontService[] })
         <label className="sf-field"><span>Party</span><input className="sf-input sf-mono" name="partySize" type="number" min={1} max={8} defaultValue={1} required /></label>
       </div>
       {error && <p role="alert" className="sf-notice is-error">{error}</p>}
-      <div className="sf-track is-block"><button className="sf-pill is-primary" disabled={pending || !services.length}>{pending ? 'Joining…' : 'Join walk-in list'}</button></div>
+      <div className="sf-actions is-block"><button className="sf-btn is-accent" disabled={pending || !services.length}>{pending ? 'Taking a number…' : 'Take a number'}</button></div>
     </form>
   );
 }

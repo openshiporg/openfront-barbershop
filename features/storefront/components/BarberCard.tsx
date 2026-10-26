@@ -1,11 +1,13 @@
 import Link from 'next/link';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import type { StorefrontBarber } from '../lib/data/services';
 import { StorefrontImage } from './StorefrontImage';
 
 type BarberCardProps = {
   barber: StorefrontBarber;
   priority?: boolean;
+  /** Working right now, when known from the live floor. */
+  onFloor?: boolean;
 };
 
 const barberFallbacks: Record<string, string> = {
@@ -20,7 +22,7 @@ export function barberPhoto(barber: Pick<StorefrontBarber, 'displayName' | 'imag
 }
 
 /** A chair on the floor: photo, chair number, barber, what they cut. */
-export function BarberCard({ barber, priority = false }: BarberCardProps) {
+export function BarberCard({ barber, priority = false, onFloor }: BarberCardProps) {
   const photo = barberPhoto(barber);
   const specialties = (barber.specialties || []).slice(0, 3);
 
@@ -34,12 +36,13 @@ export function BarberCard({ barber, priority = false }: BarberCardProps) {
           priority={priority}
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
         />
-        {barber.chairNumber ? <span className="sf-chair-no">Chair {barber.chairNumber}</span> : null}
+        {barber.chairNumber ? <span className="sf-chair-no">Chair<b>{barber.chairNumber}</b></span> : null}
       </div>
       <div className="sf-chair-name">
         <h3 className="sf-subtitle">{barber.displayName}</h3>
-        <ArrowUpRight aria-hidden="true" />
+        <ArrowRight aria-hidden="true" />
       </div>
+      {onFloor !== undefined ? <p className="sf-small font-semibold"><span className={`sf-dot ${onFloor ? 'is-live' : ''}`} aria-hidden="true" />{onFloor ? 'On the floor now' : 'Not on the floor now'}</p> : null}
       {barber.bio ? <p className="sf-small sf-muted">{barber.bio}</p> : null}
       {specialties.length ? <ul className="sf-chair-tags" aria-label={`${barber.displayName} services`}>{specialties.map((service) => <li key={service.id} className="sf-tag">{service.name}</li>)}</ul> : null}
     </Link>

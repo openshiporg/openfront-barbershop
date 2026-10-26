@@ -6,15 +6,14 @@ export function StorefrontFooter({ settings }: { settings: PublicStorefrontSetti
   const telephoneHref = phoneHref(settings.phone);
 
   return (
-    <footer className="sf-footer">
-      <div className="sf-pole" aria-hidden="true" />
+    <footer className="sf-footer sf-on-dark">
       <div className="sf-container sf-footer-main">
         <div className="grid gap-4">
           <p className="sf-footer-mark"><StoreLogo svg={settings.logoIcon} color={settings.logoColor} />{settings.name}</p>
-          {settings.tagline ? <p className="max-w-md text-[var(--color-inverse-muted)]">{settings.tagline}</p> : null}
+          {settings.tagline ? <p className="sf-muted max-w-md">{settings.tagline}</p> : null}
         </div>
         <nav className="sf-footer-nav" aria-label="Storefront links">
-          <Link href="/book">Book a chair</Link>
+          <Link href="/book">Book a time</Link>
           <Link href="/queue">Walk-ins</Link>
           <Link href="/services">Services</Link>
           <Link href="/barbers">Barbers</Link>

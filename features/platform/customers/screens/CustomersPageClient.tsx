@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, type ReactNode } from 'react';
 import Link from 'next/link';
+import { Plus, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCommandKey } from '@/features/platform/lib/useCommandKey';
-import { Empty, Notice, Pager, Pill, PillLink, Restricted, Section, selectClass, StatusDot, Tag, Track, type Tone } from '@/features/platform/lib/ui';
+import { cn } from '@/lib/utils';
+import { Empty, Notice, Pager, Pill, PillLink, Restricted, Section, selectClass, StatusCell, StatusDot, Tag, Track, type Tone } from '@/features/platform/lib/ui';
+import { Segmented } from '@/features/platform/booking/components/FloorKit';
 import {
   addCustomerNoteAction,
   issueCustomerWaiverAction,
@@ -81,6 +84,16 @@ function FeedbackMessage({ feedback }: { feedback: Feedback }) {
   return <div aria-live="polite">{feedback && <Notice tone={feedback.tone}>{feedback.text}</Notice>}</div>;
 }
 
+/** A form folded behind the action that needs it. */
+function Reveal({ label, open, onToggle, children }: { label: ReactNode; open: boolean; onToggle: () => void; children: ReactNode }) {
+  return (
+    <div className="mt-3">
+      {!open && <Pill size="sm" onClick={onToggle} aria-expanded={false}><Plus />{label}</Pill>}
+      {open && <div className="space-y-3 rounded-[6px] border p-3">{children}</div>}
+    </div>
+  );
+}
+
 function ViewAll({ href, label }: { href: string; label: string }) {
   return <Link href={href} className="text-xs font-medium text-primary underline-offset-4 hover:underline">{label}</Link>;
 }
@@ -94,48 +107,58 @@ export function CustomersPageClient({ data, search, planSearch, initialCustomerI
   const lastIndex = Math.min(total, (page - 1) * pageSize + (customers.length - (data.requestedCustomerId ? 1 : 0)));
 
   return (
-    <div className="flex min-w-0 flex-col gap-6 px-4 pb-8 md:px-6">
-      <form action="/dashboard/platform/customers" className="flex items-end gap-2" role="search">
-        <div className="grid min-w-0 flex-1 gap-1">
-          <Label htmlFor="customer-search" className="text-xs text-muted-foreground">Search customers</Label>
-          <Input id="customer-search" name="q" defaultValue={search} placeholder="Name, phone, or email" />
-        </div>
-        <Track><Pill type="submit">Search</Pill>{search ? <PillLink href="/dashboard/platform/customers">Clear</PillLink> : null}</Track>
+    <div className="flex min-w-0 flex-col gap-6 px-4 pb-24 md:px-6">
+      <form action="/dashboard/platform/customers" role="search" className="relative w-full max-w-xl">
+        {planSearch && <input type="hidden" name="plans" value={planSearch} />}
+        <label htmlFor="customer-search" className="sr-only">Find a customer</label>
+        <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <input id="customer-search" name="q" type="search" defaultValue={search} placeholder="Find a customer by name, phone or email" className="h-10 w-full rounded-[6px] border bg-background pl-9 pr-16 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+        {search && <Link href="/dashboard/platform/customers" className="absolute right-1.5 top-1/2 inline-flex h-7 -translate-y-1/2 items-center rounded-[6px] px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Clear</Link>}
       </form>
 
-      <div className="grid min-w-0 grid-cols-1 gap-8 xl:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
-        <Section id="customer-directory-heading" title="Directory" count={total ? `${firstIndex}–${lastIndex} / ${total}` : '0'}>
-          <div className="space-y-1 rounded-2xl bg-muted/50 p-1 ring-1 ring-inset ring-black/5 dark:ring-white/5">
-            {customers.map((customer) => {
-              const isSelected = selected?.id === customer.id;
-              return (
-                <button
-                  key={customer.id}
-                  type="button"
-                  aria-pressed={isSelected}
-                  aria-controls="customer-detail"
-                  onClick={() => setSelectedId(customer.id)}
-                  className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 rounded-xl px-3 py-2.5 text-left transition aria-pressed:bg-background aria-pressed:shadow-sm aria-pressed:ring-1 aria-pressed:ring-black/5 hover:bg-background/60 dark:aria-pressed:bg-zinc-800"
-                >
-                  <span className="min-w-0 truncate font-medium"><StatusDot tone={customerTone[customer.status as CustomerStatus] || 'off'} />{fullName(customer)}</span>
-                  <span className="font-mono text-xs tabular-nums text-muted-foreground">{formatDay(customer.lastVisitAt, timeZone, '—')}</span>
-                  <span className="col-span-2 truncate pl-4 text-xs text-muted-foreground">{customer.phone || customer.email || 'No contact'}{data.requestedCustomerId === customer.id ? ' · requested record' : ''}</span>
-                </button>
-              );
-            })}
-            {!customers.length && (
-              <p className="px-3 py-4 text-sm text-muted-foreground">
-                {search ? <>No customers match “{search}”.</> : <>No customers yet. <Link className="underline" href="/dashboard/platform/customers/new">Add a customer</Link></>}
-              </p>
-            )}
+      <div className="grid min-w-0 grid-cols-1 items-start gap-8 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+        <section aria-labelledby="customer-directory-heading" className="min-w-0 space-y-3">
+          <h2 id="customer-directory-heading" className="text-sm font-semibold">{search ? 'Matches' : 'Customers'}<span className="ml-2 text-xs font-normal tabular-nums text-muted-foreground">{total ? `${firstIndex}–${lastIndex} of ${total}` : '0'}</span></h2>
+          <div className="relative overflow-hidden rounded-[6px] border bg-background">
+            <div aria-hidden="true" className="hidden h-9 grid-cols-[minmax(0,1fr)_7rem_6.5rem] items-center gap-3 border-b bg-muted/40 px-3 text-xs font-medium text-muted-foreground sm:grid">
+              <span>Customer</span><span>Status</span><span className="text-right">Last visit</span>
+            </div>
+            <ul aria-label="Customers">
+              {customers.map((customer) => {
+                const isSelected = selected?.id === customer.id;
+                return (
+                  <li key={customer.id} className="border-b last:border-b-0">
+                    <button
+                      type="button"
+                      aria-pressed={isSelected}
+                      aria-controls="customer-detail"
+                      onClick={() => setSelectedId(customer.id)}
+                      className={cn('grid min-h-11 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-2 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[minmax(0,1fr)_7rem_6.5rem]', isSelected && 'bg-muted hover:bg-muted')}
+                    >
+                      <span className="min-w-0">
+                        <span className={cn('block truncate', isSelected ? 'font-semibold' : 'font-medium')}>{fullName(customer)}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{customer.phone || customer.email || 'No contact'}{data.requestedCustomerId === customer.id ? ' · requested record' : ''}</span>
+                      </span>
+                      <span className="hidden sm:block"><StatusCell tone={customerTone[customer.status as CustomerStatus] || 'off'}><span className="capitalize">{statusLabel(customer.status)}</span></StatusCell></span>
+                      <span className="text-right text-xs tabular-nums text-muted-foreground">{formatDay(customer.lastVisitAt, timeZone, '—')}</span>
+                    </button>
+                  </li>
+                );
+              })}
+              {!customers.length && (
+                <li className="px-3 py-6 text-sm text-muted-foreground">
+                  {search ? <>No customers match “{search}”.</> : <>No customers yet.</>} <Link className="font-medium text-foreground underline underline-offset-4" href="/dashboard/platform/customers/new">Add a customer</Link>
+                </li>
+              )}
+            </ul>
           </div>
           <Pager label="Customer pages" page={page} pages={Math.ceil(total / pageSize)} prev={page > 1 ? pageHref(search, page - 1, planSearch) : null} next={page * pageSize < total ? pageHref(search, page + 1, planSearch) : null} />
-        </Section>
+        </section>
 
         <section id="customer-detail" aria-label={selected ? `Customer details: ${fullName(selected)}` : 'Customer details'} className="min-w-0">
           {selected
             ? <CustomerDetail key={selected.id} customer={selected} data={data} search={search} planSearch={planSearch} />
-            : <Empty>Select a customer.</Empty>}
+            : <div className="rounded-[6px] border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">{customers.length ? 'Choose a customer.' : 'No customer selected.'}</div>}
         </section>
       </div>
     </div>
@@ -164,6 +187,8 @@ function CustomerDetail({ customer, data, search, planSearch }: { customer: Cust
   const [consentFeedback, setConsentFeedback] = useState<Feedback>(null);
   const [noteFeedback, setNoteFeedback] = useState<Feedback>(null);
   const [pending, startTransition] = useTransition();
+  const [openForm, setOpenForm] = useState<'note' | 'sell' | 'waiver' | null>(planSearch ? 'sell' : null);
+  const toggle = (form: 'note' | 'sell' | 'waiver') => setOpenForm((current) => (current === form ? null : form));
 
   const noteKey = useCommandKey(`customer-note:${customer.id}`);
   const membershipKey = useCommandKey(`customer-membership:${customer.id}`);
@@ -248,38 +273,81 @@ function CustomerDetail({ customer, data, search, planSearch }: { customer: Cust
 
   const waiverTone = (waiver: NonNullable<CustomerHistoryItem['waivers']>[number]): Tone => (waiver.signedAt || waiver.status === 'signed' ? 'live' : ['draft', 'sent'].includes(waiver.status) ? 'wait' : 'off');
 
+  const notesSection = (
+    <Section id={`notes-${customer.id}`} title="Preferences & notes" count={notesAccess === 'granted' ? customer.notes?.length ?? 0 : undefined} actions={notesAccess === 'granted' ? <ViewAll href={listHref('customer-notes', customer.id)} label="All notes" /> : undefined}>
+      <ul>
+        {(customer.notes || []).map((note) => (
+          <li key={note.id} className="border-b py-2.5 text-sm last:border-b-0">
+            <div className="flex flex-wrap items-baseline justify-between gap-2"><Tag>{statusLabel(note.noteType)}</Tag><span className="text-xs tabular-nums text-muted-foreground">{formatDateTime(note.createdAt, timeZone)}</span></div>
+            <p className="mt-1 whitespace-pre-wrap break-words">{note.body}</p>
+            {note.appointment && <p className="mt-1 text-xs text-muted-foreground">{note.appointment.serviceTitleSnapshot || 'Appointment'} · {formatDateTime(note.appointment.startsAt, timeZone)}</p>}
+          </li>
+        ))}
+      </ul>
+      {notesAccess === 'restricted'
+        ? <Restricted>Notes restricted for your role.</Restricted>
+        : !customer.notes?.length && <Empty>No notes yet.</Empty>}
+      {notesAccess === 'granted' && (customer.notes?.length || 0) >= limit && <p className="pt-2 text-xs text-muted-foreground">Latest {limit}</p>}
+      {notesAccess === 'granted' && (
+        <Reveal label="Add note" open={openForm === 'note'} onToggle={() => toggle('note')}>
+          <div className="grid gap-1">
+            <Label htmlFor={noteTypeId} className="text-xs text-muted-foreground">Type</Label>
+            <select id={noteTypeId} value={noteType} onChange={(event) => setNoteType(event.target.value)} className={selectClass}>
+              <option value="preference">Preference</option>
+              <option value="formula">Formula / cut detail</option>
+              <option value="service_issue">Service issue</option>
+              <option value="general">General</option>
+            </select>
+          </div>
+          <Label htmlFor={noteId} className="sr-only">Note</Label>
+          <textarea id={noteId} value={noteBody} onChange={(event) => setNoteBody(event.target.value)} placeholder="Guard length, fade height, beard line…" className="min-h-24 w-full rounded-[6px] border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+          <Track><Pill size="sm" variant="primary" disabled={pending || !noteBody.trim()} onClick={addNote}>Add note</Pill><Pill size="sm" onClick={() => setOpenForm(null)}>Close</Pill></Track>
+          <FeedbackMessage feedback={noteFeedback} />
+        </Reveal>
+      )}
+    </Section>
+  );
+
   return (
     <div className="space-y-8">
-      <div className="space-y-3">
+      <div className="space-y-3 border-b pb-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-xl font-semibold tracking-tight"><StatusDot tone={customerTone[customer.status as CustomerStatus] || 'off'} />{fullName(customer)}</h2>
+            <h2 className="text-xl font-semibold tracking-tight">{fullName(customer)}</h2>
             <p className="text-sm text-muted-foreground">{customer.phone || 'No phone'} · {customer.email || 'No email'} · prefers {statusLabel(customer.preferredContactMethod)}</p>
             {data.staffAccess === 'restricted'
               ? <p className="text-sm text-muted-foreground">Preferred barber restricted.</p>
-              : customer.preferredBarber && <p className="text-sm text-muted-foreground">Preferred barber: {customer.preferredBarber.displayName || 'Barber unavailable'}</p>}
+              : customer.preferredBarber && <p className="text-sm">Preferred barber: <span className="font-medium">{customer.preferredBarber.displayName || 'Barber unavailable'}</span></p>}
+            <p className="text-sm text-muted-foreground">Last visit {formatDay(customer.lastVisitAt, timeZone, 'not recorded')}</p>
           </div>
-          <Track><PillLink size="sm" href={`/dashboard/customers/${customer.id}`}>Edit profile</PillLink></Track>
+          <PillLink size="sm" href={`/dashboard/customers/${customer.id}`}>Edit profile</PillLink>
         </div>
-        <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
-          <Track label={`Status for ${fullName(customer)}`} className="flex-nowrap">
-            {(['active', 'vip', 'needs_attention', 'blocked'] as CustomerStatus[]).map((status) => <Pill key={status} size="sm" variant="flat" aria-pressed={customer.status === status} disabled={pending} onClick={() => updateStatus(status)} className="capitalize">{statusLabel(status)}</Pill>)}
-          </Track>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">Status</span>
+          <Segmented
+            label={`Status for ${fullName(customer)}`}
+            value={(customer.status || 'active') as CustomerStatus}
+            disabled={pending}
+            onChange={(status) => { if (status !== customer.status) updateStatus(status); }}
+            options={(['active', 'vip', 'needs_attention', 'blocked'] as CustomerStatus[]).map((status) => ({ value: status, label: <span className="capitalize"><StatusDot tone={customerTone[status]} className="mr-1.5" />{status === 'vip' ? 'VIP' : statusLabel(status)}</span> }))}
+          />
         </div>
         <FeedbackMessage feedback={profileFeedback} />
       </div>
 
       <div className="grid min-w-0 gap-8 lg:grid-cols-2">
-        <Section id={`visits-${customer.id}`} title="Recent visits" count={appointmentsAccess === 'granted' ? customer.appointments?.length ?? 0 : undefined} actions={appointmentsAccess === 'granted' ? <ViewAll href={listHref('appointments', customer.id)} label="All visits" /> : undefined}>
+        {notesSection}
+
+        <Section id={`visits-${customer.id}`} title="Visit history" count={appointmentsAccess === 'granted' ? customer.appointments?.length ?? 0 : undefined} actions={appointmentsAccess === 'granted' ? <ViewAll href={listHref('appointments', customer.id)} label="All visits" /> : undefined}>
           {appointmentsAccess === 'restricted' && <Restricted>Visit history restricted for your role.</Restricted>}
           <ul>
             {(customer.appointments || []).map((appointment) => (
               <li key={appointment.id} className="border-b py-2.5 text-sm last:border-b-0">
-                <div className="flex items-baseline justify-between gap-3"><strong className="min-w-0 truncate font-medium">{appointment.serviceTitleSnapshot || 'Service label not recorded'}</strong><span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{formatDay(appointment.startsAt, timeZone)}</span></div>
+                <div className="flex items-baseline justify-between gap-3"><strong className="min-w-0 truncate font-medium">{appointment.serviceTitleSnapshot || 'Service label not recorded'}</strong><span className="shrink-0 text-xs tabular-nums text-muted-foreground">{formatDay(appointment.startsAt, timeZone)}</span></div>
                 <p className="text-xs text-muted-foreground">{appointment.barberNameSnapshot || 'Barber not recorded'} · {statusLabel(appointment.status)}{appointment.paymentStatus && appointment.paymentStatus !== 'not_required' ? ` · ${statusLabel(appointment.paymentStatus)}` : ''}</p>
                 {appointment.transaction && (
                   <p className="mt-1 text-xs">
-                    <span className="font-mono tabular-nums">{appointment.transaction.formattedTotal || formatMoney(appointment.transaction.total)}</span> {statusLabel(appointment.transaction.paymentMethod)} ·{' '}
+                    <span className="tabular-nums">{appointment.transaction.formattedTotal || formatMoney(appointment.transaction.total)}</span> {statusLabel(appointment.transaction.paymentMethod)} ·{' '}
                     <Link className="font-medium underline-offset-4 hover:underline" href={`/dashboard/checkout-transactions/${appointment.transaction.id}`}>Receipt</Link>
                   </p>
                 )}
@@ -288,10 +356,12 @@ function CustomerDetail({ customer, data, search, planSearch }: { customer: Cust
           </ul>
           {appointmentsAccess === 'granted' && paymentsAccess === 'restricted' && Boolean(customer.appointments?.length) && <p className="text-xs text-muted-foreground">Payment details restricted.</p>}
           {appointmentsAccess === 'granted' && !customer.appointments?.length && <Empty>No visits yet.</Empty>}
-          {appointmentsAccess === 'granted' && (customer.appointments?.length || 0) >= limit && <p className="pt-2 font-mono text-xs text-muted-foreground">Latest {limit}</p>}
+          {appointmentsAccess === 'granted' && (customer.appointments?.length || 0) >= limit && <p className="pt-2 text-xs text-muted-foreground">Latest {limit}</p>}
           {paymentsAccess === 'granted' && <p className="pt-2"><ViewAll href={listHref('checkout-transactions', customer.id)} label="All receipts" /></p>}
         </Section>
+      </div>
 
+      <div className="grid min-w-0 gap-8 lg:grid-cols-2">
         <Section id={`balances-${customer.id}`} title="Memberships & packages" count={membershipsAccess === 'granted' ? customer.packageBalances?.length ?? 0 : undefined} actions={membershipsAccess === 'granted' ? <ViewAll href={listHref('customer-packages', customer.id)} label="All balances" /> : undefined}>
           <ul>
             {(customer.packageBalances || []).map((balance) => {
@@ -299,12 +369,12 @@ function CustomerDetail({ customer, data, search, planSearch }: { customer: Cust
               return (
                 <li key={balance.id} className="border-b py-2.5 text-sm last:border-b-0">
                   <div className="flex items-baseline justify-between gap-3">
-                    <strong className="min-w-0 truncate font-medium"><StatusDot tone={balance.status === 'active' ? 'live' : balance.status === 'paused' ? 'wait' : 'off'} />{balance.servicePackage?.name || balance.membershipPlan?.name || 'Balance'}</strong>
-                    <span className="shrink-0 font-mono text-xs tabular-nums">{balance.remainingVisits ?? 0} left</span>
+                    <strong className="min-w-0 truncate font-medium">{balance.servicePackage?.name || balance.membershipPlan?.name || 'Balance'}</strong>
+                    <span className="shrink-0 text-xs tabular-nums">{balance.remainingVisits ?? 0} left</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">{statusLabel(balance.status)}{balance.expiresAt ? ` · ${balance.status === 'expired' ? 'expired' : 'expires'} ${formatDay(balance.expiresAt, timeZone)}` : ''}</p>
+                  <p className="text-xs text-muted-foreground"><StatusDot tone={balance.status === 'active' ? 'live' : balance.status === 'paused' ? 'wait' : 'off'} className="mr-1.5" />{statusLabel(balance.status)}{balance.expiresAt ? ` · ${balance.status === 'expired' ? 'expired' : 'expires'} ${formatDay(balance.expiresAt, timeZone)}` : ''}</p>
                   {balance.membershipPlan && (renewable || ['active', 'paused'].includes(String(balance.status))) && (
-                    <Track className="mt-2">
+                    <Track wrap className="mt-2">
                       {renewable && paymentsAccess === 'granted' && <Pill size="sm" disabled={pending} onClick={() => runMembership('renew', balance.id)}>Renew · {formatMoney(balance.membershipPlan.price)} cash</Pill>}
                       {balance.status === 'active' && <Pill size="sm" disabled={pending} onClick={() => runMembership('pause', balance.id)}>Pause</Pill>}
                       {balance.status === 'paused' && <Pill size="sm" disabled={pending} onClick={() => runMembership('resume', balance.id)}>Resume</Pill>}
@@ -318,24 +388,22 @@ function CustomerDetail({ customer, data, search, planSearch }: { customer: Cust
           {membershipsAccess === 'restricted' && <Restricted>Membership details restricted for your role.</Restricted>}
           {membershipsAccess === 'granted' && !customer.packageBalances?.length && <Empty>No package or membership balance.</Empty>}
           {membershipsAccess === 'granted' && membershipPlans && (
-            <div className="mt-4 space-y-3 rounded-2xl bg-muted/50 p-3 ring-1 ring-inset ring-black/5 dark:ring-white/5">
-              <form action="/dashboard/platform/customers" className="flex items-end gap-2" role="search">
+            <Reveal label="Sell membership or package" open={openForm === 'sell'} onToggle={() => toggle('sell')}>
+              <form action="/dashboard/platform/customers" className="relative" role="search">
                 {search && <input type="hidden" name="q" value={search} />}
                 <input type="hidden" name="customer" value={customer.id} />
-                <div className="grid min-w-0 flex-1 gap-1">
-                  <Label htmlFor={`plan-search-${customer.id}`} className="text-xs text-muted-foreground">Find a plan or package</Label>
-                  <Input id={`plan-search-${customer.id}`} name="plans" defaultValue={planSearch} placeholder="Plan name" />
-                </div>
-                <Track><Pill type="submit" size="sm">Find</Pill></Track>
+                <Label htmlFor={`plan-search-${customer.id}`} className="sr-only">Find a plan or package</Label>
+                <Search aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <input id={`plan-search-${customer.id}`} name="plans" type="search" defaultValue={planSearch} placeholder="Find a plan, then Enter" className="h-9 w-full rounded-[6px] border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
               </form>
               {membershipPlans.length > 0 ? (
                 <div className="grid gap-1">
                   <Label htmlFor={planId} className="text-xs text-muted-foreground">Membership</Label>
-                  <div className="flex items-center gap-2">
-                    <select id={planId} value={membershipPlanId} onChange={(event) => setMembershipPlanId(event.target.value)} className={`${selectClass} flex-1`}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select id={planId} value={membershipPlanId} onChange={(event) => setMembershipPlanId(event.target.value)} className={`${selectClass} min-w-48 flex-1`}>
                       {membershipPlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} · {formatMoney(plan.price)} / {statusLabel(plan.billingInterval)}</option>)}
                     </select>
-                    <Track><Pill size="sm" variant="primary" disabled={pending || !membershipPlanId || paymentsAccess !== 'granted'} onClick={() => runMembership('purchase')}>Sell · cash</Pill></Track>
+                    <Pill size="sm" variant="primary" disabled={pending || !membershipPlanId || paymentsAccess !== 'granted'} onClick={() => runMembership('purchase')}>Sell · cash</Pill>
                   </div>
                 </div>
               ) : <p className="text-xs text-muted-foreground">{planSearch ? `No active plans match “${planSearch}”.` : 'No active membership plans.'}</p>}
@@ -343,87 +411,52 @@ function CustomerDetail({ customer, data, search, planSearch }: { customer: Cust
               {servicePackages && servicePackages.length > 0 && (
                 <div className="grid gap-1">
                   <Label htmlFor={packageSaleId} className="text-xs text-muted-foreground">Package</Label>
-                  <div className="flex items-center gap-2">
-                    <select id={packageSaleId} value={servicePackageId} onChange={(event) => setServicePackageId(event.target.value)} className={`${selectClass} flex-1`}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select id={packageSaleId} value={servicePackageId} onChange={(event) => setServicePackageId(event.target.value)} className={`${selectClass} min-w-48 flex-1`}>
                       {servicePackages.map((pkg) => <option key={pkg.id} value={pkg.id}>{pkg.name} · {pkg.visits} visit{pkg.visits === 1 ? '' : 's'} · {formatMoney(pkg.price)}</option>)}
                     </select>
-                    <Track><Pill size="sm" variant="primary" disabled={pending || !servicePackageId || paymentsAccess !== 'granted'} onClick={() => runMembership('purchase_package')}>Sell · cash</Pill></Track>
+                    <Pill size="sm" variant="primary" disabled={pending || !servicePackageId || paymentsAccess !== 'granted'} onClick={() => runMembership('purchase_package')}>Sell · cash</Pill>
                   </div>
                   {data.servicePackagesTruncated && <p className="text-xs text-muted-foreground">More packages match. Narrow the search.</p>}
                 </div>
               )}
               {paymentsAccess !== 'granted' && <p className="text-xs text-muted-foreground"><StatusDot tone="off" />Selling needs payment access.</p>}
-              <p className="text-xs text-muted-foreground">Cash only.</p>
-            </div>
+              <div className="flex items-center justify-between gap-2"><p className="text-xs text-muted-foreground">Cash only.</p><Pill size="sm" onClick={() => setOpenForm(null)}>Close</Pill></div>
+            </Reveal>
           )}
           <div className="mt-3"><FeedbackMessage feedback={membershipFeedback} /></div>
         </Section>
-      </div>
 
-      <div className="grid min-w-0 gap-8 lg:grid-cols-2">
         <Section id={`consent-${customer.id}`} title="Consent & waivers" actions={<ViewAll href={listHref('waiver-forms', customer.id)} label="All waivers" />}>
           <p className="text-sm"><StatusDot tone={customer.acceptsMarketing ? 'live' : 'off'} />{customer.acceptsMarketing ? `Marketing allowed via ${statusLabel(customer.preferredContactMethod)}` : 'No marketing'} <span className="text-xs text-muted-foreground">· staff-recorded</span></p>
-          <Track className="mt-3" label="Record the customer's contact preference">
-            <Pill size="sm" disabled={pending} onClick={() => saveConsent(true, 'sms')}>Prefers SMS</Pill>
-            <Pill size="sm" disabled={pending} onClick={() => saveConsent(true, 'email')}>Prefers email</Pill>
-            <Pill size="sm" disabled={pending} onClick={() => saveConsent(false, customer.preferredContactMethod || 'sms')}>Declines marketing</Pill>
-          </Track>
-          <ul className="mt-4">
-            {(customer.waivers || []).map((waiver) => <li key={waiver.id} className="flex flex-wrap items-baseline justify-between gap-2 border-b py-2 text-sm last:border-b-0"><span className="min-w-0 truncate"><StatusDot tone={waiverTone(waiver)} />{waiver.title} <span className="text-xs text-muted-foreground">{statusLabel(waiver.waiverType)}</span></span><span className="text-xs text-muted-foreground">{waiver.signedAt || waiver.status === 'signed' ? `signed${waiver.signedAt ? ` ${formatDay(waiver.signedAt, timeZone)}` : ''}` : ['draft', 'sent'].includes(waiver.status) ? 'awaiting signature' : statusLabel(waiver.status)}</span></li>)}
+          <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Record the customer's contact preference">
+            <Pill size="sm" variant="flat" disabled={pending} onClick={() => saveConsent(true, 'sms')}>Prefers SMS</Pill>
+            <Pill size="sm" variant="flat" disabled={pending} onClick={() => saveConsent(true, 'email')}>Prefers email</Pill>
+            <Pill size="sm" variant="flat" disabled={pending} onClick={() => saveConsent(false, customer.preferredContactMethod || 'sms')}>Declines marketing</Pill>
+          </div>
+          <ul className="mt-3">
+            {(customer.waivers || []).map((waiver) => <li key={waiver.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 border-b py-2 text-sm last:border-b-0"><span className="min-w-0 break-words"><StatusDot tone={waiverTone(waiver)} />{waiver.title} <span className="text-xs text-muted-foreground">{statusLabel(waiver.waiverType)}</span></span><span className="text-xs text-muted-foreground">{waiver.signedAt || waiver.status === 'signed' ? `signed${waiver.signedAt ? ` ${formatDay(waiver.signedAt, timeZone)}` : ''}` : ['draft', 'sent'].includes(waiver.status) ? 'awaiting signature' : statusLabel(waiver.status)}</span></li>)}
           </ul>
           {!customer.waivers?.length && <Empty>No waivers on record.</Empty>}
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <div className="grid gap-1">
-              <Label htmlFor={waiverTitleId} className="text-xs text-muted-foreground">Waiver title</Label>
-              <Input id={waiverTitleId} value={waiverTitle} maxLength={200} onChange={(event) => setWaiverTitle(event.target.value)} />
-            </div>
-            <div className="grid gap-1">
-              <Label htmlFor={waiverTypeId} className="text-xs text-muted-foreground">Waiver type</Label>
-              <select id={waiverTypeId} value={waiverType} onChange={(event) => setWaiverType(event.target.value)} className={selectClass}>
-                <option value="general">General</option>
-                <option value="minor_consent">Minor consent</option>
-                <option value="chemical_service">Chemical service</option>
-                <option value="photo_release">Photo release</option>
-              </select>
-            </div>
-          </div>
-          <Track className="mt-3"><Pill size="sm" variant="primary" disabled={pending || !waiverTitle.trim()} onClick={issueWaiver}>Create waiver record</Pill></Track>
-          <div className="mt-3"><FeedbackMessage feedback={consentFeedback} /></div>
-        </Section>
-
-        <Section id={`notes-${customer.id}`} title="Notes" count={notesAccess === 'granted' ? customer.notes?.length ?? 0 : undefined} actions={notesAccess === 'granted' ? <ViewAll href={listHref('customer-notes', customer.id)} label="All notes" /> : undefined}>
-          {notesAccess === 'granted' && (
-            <div className="mb-4 space-y-2">
-              <div className="flex items-end gap-2">
-                <div className="grid min-w-0 flex-1 gap-1">
-                  <Label htmlFor={noteTypeId} className="text-xs text-muted-foreground">Type</Label>
-                  <select id={noteTypeId} value={noteType} onChange={(event) => setNoteType(event.target.value)} className={selectClass}>
-                    <option value="preference">Preference</option>
-                    <option value="formula">Formula / cut detail</option>
-                    <option value="service_issue">Service issue</option>
-                    <option value="general">General</option>
-                  </select>
-                </div>
+          <Reveal label="New waiver record" open={openForm === 'waiver'} onToggle={() => toggle('waiver')}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-1">
+                <Label htmlFor={waiverTitleId} className="text-xs text-muted-foreground">Waiver title</Label>
+                <Input id={waiverTitleId} className="rounded-[6px]" value={waiverTitle} maxLength={200} onChange={(event) => setWaiverTitle(event.target.value)} />
               </div>
-              <Label htmlFor={noteId} className="sr-only">Note</Label>
-              <textarea id={noteId} value={noteBody} onChange={(event) => setNoteBody(event.target.value)} placeholder="Guard length, fade height, beard line…" className="min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm" />
-              <Track><Pill size="sm" variant="primary" disabled={pending || !noteBody.trim()} onClick={addNote}>Add note</Pill></Track>
-              <FeedbackMessage feedback={noteFeedback} />
+              <div className="grid gap-1">
+                <Label htmlFor={waiverTypeId} className="text-xs text-muted-foreground">Waiver type</Label>
+                <select id={waiverTypeId} value={waiverType} onChange={(event) => setWaiverType(event.target.value)} className={selectClass}>
+                  <option value="general">General</option>
+                  <option value="minor_consent">Minor consent</option>
+                  <option value="chemical_service">Chemical service</option>
+                  <option value="photo_release">Photo release</option>
+                </select>
+              </div>
             </div>
-          )}
-          <ul>
-            {(customer.notes || []).map((note) => (
-              <li key={note.id} className="border-b py-2.5 text-sm last:border-b-0">
-                <div className="flex flex-wrap items-baseline justify-between gap-2"><Tag>{statusLabel(note.noteType)}</Tag><span className="font-mono text-xs tabular-nums text-muted-foreground">{formatDateTime(note.createdAt, timeZone)}</span></div>
-                <p className="mt-1 whitespace-pre-wrap break-words">{note.body}</p>
-                {note.appointment && <p className="mt-1 text-xs text-muted-foreground">{note.appointment.serviceTitleSnapshot || 'Appointment'} · {formatDateTime(note.appointment.startsAt, timeZone)}</p>}
-              </li>
-            ))}
-          </ul>
-          {notesAccess === 'restricted'
-            ? <Restricted>Notes restricted for your role.</Restricted>
-            : !customer.notes?.length && <Empty>No notes yet.</Empty>}
-          {notesAccess === 'granted' && (customer.notes?.length || 0) >= limit && <p className="pt-2 font-mono text-xs text-muted-foreground">Latest {limit}</p>}
+            <Track><Pill size="sm" variant="primary" disabled={pending || !waiverTitle.trim()} onClick={issueWaiver}>Create waiver record</Pill><Pill size="sm" onClick={() => setOpenForm(null)}>Close</Pill></Track>
+          </Reveal>
+          <div className="mt-3"><FeedbackMessage feedback={consentFeedback} /></div>
         </Section>
       </div>
     </div>

@@ -31,3 +31,15 @@ export function paymentLabel(status?: string | null) {
 export function statusLabel(status?: string | null) {
   return status?.replace(/_/g, ' ') || 'unknown';
 }
+
+/** Today's date in the shop, printed on the "Book a time" ticket stub. */
+export function shopTodayStub(timeZone?: string | null) {
+  if (!timeZone) return null;
+  try {
+    const now = new Date();
+    return {
+      day: new Intl.DateTimeFormat('en-US', { timeZone, day: 'numeric' }).format(now),
+      month: new Intl.DateTimeFormat('en-US', { timeZone, month: 'short' }).format(now),
+    };
+  } catch { return null; }
+}

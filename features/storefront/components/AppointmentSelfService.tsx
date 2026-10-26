@@ -50,7 +50,7 @@ export function AppointmentWaiver(props: {
   const [guardianName, setGuardianName] = useState('');
   const [affirmation, setAffirmation] = useState(false);
 
-  if (props.waiverSigned) return <section className="sf-block"><p className="sf-eyebrow"><span className="sf-dot is-live" aria-hidden="true" />Waiver signed</p></section>;
+  if (props.waiverSigned) return <section className="sf-block"><p className="sf-subtitle"><span className="sf-dot is-live" aria-hidden="true" />Waiver signed</p></section>;
 
   async function sign() {
     setPending(true); setMessage('');
@@ -65,17 +65,17 @@ export function AppointmentWaiver(props: {
 
   return (
     <section className="sf-block" aria-labelledby="waiver-heading">
-      <h2 className="sf-eyebrow"><span className="sf-dot is-wait" aria-hidden="true" />Waiver required</h2>
+      <h2 className="sf-subtitle"><span className="sf-dot is-wait" aria-hidden="true" />Waiver required</h2>
       <h3 id="waiver-heading" className="font-semibold break-words">{props.waiverTemplateKey} · version {props.waiverTemplateVersion}</h3>
-      <div className="max-h-48 overflow-auto whitespace-pre-wrap rounded-[var(--radius-sm)] bg-[var(--color-paper-2)] p-3 sf-small" tabIndex={0} aria-label="Waiver text">{props.waiverTemplateText}</div>
+      <div className="sf-waiver-text" tabIndex={0} aria-label="Waiver text">{props.waiverTemplateText}</div>
       <label className="sf-field"><span>Your full name</span><input className="sf-input" autoComplete="name" maxLength={160} value={signerName} onChange={(event) => setSignerName(event.target.value)} /></label>
-      <div className="sf-track is-block" role="radiogroup" aria-label="Signing as">
-        <button type="button" role="radio" aria-checked={signerRole === 'customer'} className="sf-pill is-flat" onClick={() => setSignerRole('customer')}>Customer</button>
-        <button type="button" role="radio" aria-checked={signerRole === 'guardian'} className="sf-pill is-flat" onClick={() => setSignerRole('guardian')}>Parent or guardian</button>
+      <div className="sf-actions is-block" role="radiogroup" aria-label="Signing as">
+        <button type="button" role="radio" aria-checked={signerRole === 'customer'} className="sf-btn is-flat" onClick={() => setSignerRole('customer')}>Customer</button>
+        <button type="button" role="radio" aria-checked={signerRole === 'guardian'} className="sf-btn is-flat" onClick={() => setSignerRole('guardian')}>Parent or guardian</button>
       </div>
       {signerRole === 'guardian' && <label className="sf-field"><span>Guardian’s full name</span><input className="sf-input" maxLength={160} value={guardianName} onChange={(event) => setGuardianName(event.target.value)} /></label>}
       <label className="sf-check"><input type="checkbox" checked={affirmation} onChange={(event) => setAffirmation(event.target.checked)} />I have read this waiver and agree to it as the customer or their parent or guardian.</label>
-      <div className="sf-track"><button type="button" className="sf-pill is-primary" disabled={pending || !affirmation} onClick={sign}>{pending ? 'Signing…' : 'Sign waiver'}</button></div>
+      <div className="sf-actions"><button type="button" className="sf-btn is-primary" disabled={pending || !affirmation} onClick={sign}>{pending ? 'Signing…' : 'Sign waiver'}</button></div>
       {message && <p role="status" className="sf-notice">{message}</p>}
     </section>
   );
@@ -131,13 +131,13 @@ export function AppointmentSelfService(props: { timeZone: string; appointmentId:
 
   return (
     <section className="sf-block" aria-labelledby="change-heading">
-      <h2 id="change-heading" className="sf-eyebrow">Change this visit</h2>
+      <h2 id="change-heading" className="sf-subtitle">Change this visit</h2>
       <label className="sf-field"><span>New time ({props.timeZone})</span><input className="sf-input sf-mono" type="datetime-local" value={startsAt} onChange={(event) => { setStartsAt(event.target.value); setReview(null); }} /></label>
       <label className="sf-field"><span>Reason (required)</span><input className="sf-input" value={reason} required minLength={2} maxLength={1000} onChange={(event) => { setReason(event.target.value); setReview(null); }} /></label>
       {!review ? (
-        <div className="sf-track">
-          <button type="button" className="sf-pill is-primary" disabled={pending || !startsAt || reason.trim().length < 2} onClick={() => startReview('reschedule')}>Review new time</button>
-          <button type="button" className="sf-pill is-danger" disabled={pending || reason.trim().length < 2} onClick={() => startReview('cancel')}>Review cancellation</button>
+        <div className="sf-actions">
+          <button type="button" className="sf-btn is-primary" disabled={pending || !startsAt || reason.trim().length < 2} onClick={() => startReview('reschedule')}>Review new time</button>
+          <button type="button" className="sf-btn is-danger" disabled={pending || reason.trim().length < 2} onClick={() => startReview('cancel')}>Review cancellation</button>
         </div>
       ) : (
         <div className="sf-card-dark sf-on-dark" role="status">
@@ -147,9 +147,9 @@ export function AppointmentSelfService(props: { timeZone: string; appointmentId:
             {depositMessage(review.depositConsequence) ? <div><dt>Deposit</dt><dd>{depositMessage(review.depositConsequence)}</dd></div> : null}
             {review.policyName ? <div><dt>Policy</dt><dd>{review.policyName}{review.policyVersion ? ` · v${review.policyVersion}` : ''}</dd></div> : null}
           </dl>
-          <div className="sf-track">
-            <button type="button" className="sf-pill is-primary" disabled={pending} onClick={confirm}>{review.action === 'cancel' ? 'Confirm cancellation' : 'Confirm new time'}</button>
-            <button type="button" className="sf-pill" disabled={pending} onClick={() => setReview(null)}>Go back</button>
+          <div className="sf-actions">
+            <button type="button" className="sf-btn is-primary" disabled={pending} onClick={confirm}>{review.action === 'cancel' ? 'Confirm cancellation' : 'Confirm new time'}</button>
+            <button type="button" className="sf-btn" disabled={pending} onClick={() => setReview(null)}>Go back</button>
           </div>
         </div>
       )}

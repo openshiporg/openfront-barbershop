@@ -1,0 +1,505 @@
+/* Take a number: the walk-in ticket dispenser and its "Now serving" board.
+ * Enamel-white sign ground (cool), black sign panels, and ticket stock in the
+ * merchant's colour as the one saturated field. Square corners; perforations
+ * and ticket notches are the only shaped edges. Replaces barbershop.css +
+ * tokens.css (renamed so the build cannot serve the old compile).
+ */
+
+/* ---------- Tokens ---------- */
+[data-storefront] {
+  --enamel: oklch(96.6% 0.005 230);
+  --enamel-2: oklch(92.6% 0.007 230);
+  --enamel-3: oklch(87.5% 0.009 230);
+  --ink: oklch(16% 0.012 240);
+  --ink-2: oklch(30% 0.012 240);
+  --ink-muted: oklch(42% 0.012 240);
+  --rule: oklch(82% 0.009 230);
+  --rule-strong: oklch(16% 0.012 240);
+
+  --sign: oklch(0% 0 0);
+  --sign-2: oklch(19% 0.004 240);
+  --sign-3: oklch(31% 0.006 240);
+  --sign-ink: oklch(97% 0.004 230);
+  --sign-muted: oklch(76% 0.008 230);
+
+  /* Ticket stock: the merchant hue held at a depth where white type always reads. */
+  --ticket: oklch(from var(--color-accent, oklch(50% 0.2 263)) 46% min(c, 0.2) h);
+  --ticket-press: oklch(from var(--color-accent, oklch(50% 0.2 263)) 40% min(c, 0.19) h);
+  --ticket-ink: oklch(from var(--color-accent, oklch(50% 0.2 263)) 98.5% 0.008 h);
+  --ticket-soft: oklch(from var(--color-accent, oklch(50% 0.2 263)) 93% 0.035 h);
+  --ticket-perf: oklch(from var(--color-accent, oklch(50% 0.2 263)) 98.5% 0.008 h / 0.55);
+
+  /* The board's LED: lit in the merchant hue, unlit segments drawn as ghosts. */
+  --led: oklch(from var(--color-accent, oklch(50% 0.2 263)) 84% calc(c * 0.7 + 0.04) h);
+  --led-ghost: oklch(from var(--color-accent, oklch(50% 0.2 263)) 21% calc(c * 0.18) h);
+  --led-ghost-edge: oklch(from var(--color-accent, oklch(50% 0.2 263)) 30% calc(c * 0.22) h);
+
+  --live: oklch(50% 0.13 150);
+  --live-on-sign: oklch(82% 0.17 150);
+  --wait: oklch(55% 0.13 70);
+  --alert: oklch(48% 0.18 27);
+  --alert-on-sign: oklch(76% 0.15 27);
+  --alert-soft: oklch(94.5% 0.03 27);
+  --focus: oklch(from var(--color-accent, oklch(50% 0.2 263)) 52% 0.2 h);
+
+  --font-display: var(--font-big-shoulders), 'Arial Narrow', sans-serif;
+  --font-body: var(--font-public-sans), ui-sans-serif, system-ui, sans-serif;
+
+  --text-numeral: clamp(4.25rem, 19vw, 8.5rem);
+  --text-h1: clamp(2.9rem, 10vw, 5.75rem);
+  --text-title: clamp(2.1rem, 5.6vw, 3.4rem);
+  --text-sub: clamp(1.4rem, 3vw, 1.75rem);
+  --text-lead: clamp(1.06rem, 1.5vw, 1.2rem);
+  --text-body: 1rem;
+  --text-small: 0.9rem;
+  --text-label: 0.8125rem;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --dur-press: 140ms;
+  --dur-med: 220ms;
+  --space-xl: 2.5rem;
+  --space-2xl: 4rem;
+  --space-3xl: 6rem;
+  --measure: 40rem;
+  --measure-wide: 78rem;
+  --z-sticky: 200;
+  --head-h: 3.5rem;
+
+  color: var(--ink);
+  background: var(--enamel);
+  color-scheme: light;
+  accent-color: var(--ticket);
+  caret-color: var(--ticket);
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  scrollbar-color: var(--ink-muted) var(--enamel-2);
+}
+
+html:has([data-storefront]),
+html:has([data-storefront]) body { overflow-x: clip; background: oklch(96.6% 0.005 230); }
+
+/* ---------- Element resets (zero specificity so component classes win) ---------- */
+:where([data-storefront]) { min-width: 0; }
+:where([data-storefront]) :where(*, *::before, *::after) { box-sizing: border-box; }
+:where([data-storefront]) :where(img) { display: block; }
+:where([data-storefront]) :where(a) { color: inherit; }
+:where([data-storefront]) :where(h1, h2, h3, p, dl, dd, ol, ul, figure) { margin: 0; }
+:where([data-storefront]) :where(ol, ul) { padding: 0; list-style: none; }
+:where([data-storefront]) ::selection { background: var(--ticket); color: var(--ticket-ink); }
+[data-storefront] :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+[data-storefront] .sf-on-dark :focus-visible, [data-storefront] .sf-sign :focus-visible { outline-color: var(--led); }
+
+/* ---------- Type ---------- */
+[data-storefront] .sf-display { font-family: var(--font-display); font-weight: 850; font-optical-sizing: auto; text-transform: uppercase; letter-spacing: -0.005em; line-height: 0.86; overflow-wrap: anywhere; min-width: 0; text-wrap: balance; }
+[data-storefront] .sf-h1 { font-size: var(--text-h1); }
+[data-storefront] .sf-title { font-family: var(--font-display); font-weight: 850; text-transform: uppercase; font-size: var(--text-title); line-height: 0.9; overflow-wrap: anywhere; text-wrap: balance; }
+[data-storefront] .sf-subtitle { font-family: var(--font-display); font-weight: 780; text-transform: uppercase; font-size: var(--text-sub); line-height: 0.95; letter-spacing: 0.005em; overflow-wrap: anywhere; }
+/* A field label: plain small bold text, never tracked caps above a heading. */
+[data-storefront] .sf-eyebrow { font-size: var(--text-label); font-weight: 700; color: var(--ink-muted); }
+[data-storefront] .sf-mono { font-variant-numeric: tabular-nums; }
+[data-storefront] .sf-lead { max-width: var(--measure); color: var(--ink-2); font-size: var(--text-lead); line-height: 1.5; }
+[data-storefront] .sf-muted { color: var(--ink-muted); }
+[data-storefront] .sf-small { font-size: var(--text-small); }
+[data-storefront] .sf-link { color: inherit; font-weight: 650; text-decoration: underline; text-decoration-thickness: 2px; text-decoration-color: var(--ticket); text-underline-offset: 0.22em; }
+[data-storefront] .sf-arrow-link { display: inline-flex; min-height: 2.75rem; align-items: center; gap: 0.4rem; font-weight: 700; text-decoration: none; white-space: nowrap; }
+[data-storefront] .sf-arrow-link svg { width: 1.05rem; height: 1.05rem; transition: transform var(--dur-med) var(--ease-out); }
+[data-storefront] .sf-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+[data-storefront] .sf-container { width: min(calc(100% - 2rem), var(--measure-wide)); margin-inline: auto; }
+[data-storefront] .sf-container-narrow { width: min(calc(100% - 2rem), var(--measure)); margin-inline: auto; }
+[data-storefront] .sf-section { padding-block: clamp(3rem, 7vw, 5.5rem); }
+[data-storefront] .sf-section.is-tight { padding-top: 1.75rem; }
+[data-storefront] .sf-section.pt-0 { padding-top: 0; }
+[data-storefront] .sf-rule { border: 0; border-top: 1px solid var(--rule); margin: 0; }
+
+[data-storefront] .sf-skip-link { position: fixed; inset-block-start: 0.5rem; inset-inline-start: 0.5rem; z-index: calc(var(--z-sticky) + 2); transform: translateY(-200%); background: var(--sign); color: var(--sign-ink); padding: 0.75rem 1rem; font-weight: 700; }
+[data-storefront] .sf-skip-link:focus { transform: none; }
+
+/* Status lamp: a small square lamp, sits on the line it describes. */
+[data-storefront] .sf-dot { display: inline-block; flex: none; width: 0.6em; height: 0.6em; margin-inline-end: 0.5em; background: var(--ink-muted); vertical-align: 0.08em; }
+[data-storefront] .sf-dot.is-live { background: var(--live); }
+[data-storefront] .sf-dot.is-wait { background: var(--wait); }
+[data-storefront] .sf-dot.is-accent { background: var(--ticket); }
+[data-storefront] .sf-dot.is-alert { background: var(--alert); }
+[data-storefront] .sf-sign .sf-dot.is-live, [data-storefront] .sf-on-dark .sf-dot.is-live { background: var(--live-on-sign); }
+[data-storefront] .sf-sign .sf-dot.is-alert, [data-storefront] .sf-on-dark .sf-dot.is-alert { background: var(--alert-on-sign); }
+[data-storefront] .sf-sign .sf-dot, [data-storefront] .sf-on-dark .sf-dot { background: var(--sign-muted); }
+
+/* ---------- Buttons: square sign plates ---------- */
+[data-storefront] .sf-actions { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0.5rem; max-width: 100%; }
+[data-storefront] .sf-actions.is-block > * { flex: 1 1 auto; }
+[data-storefront] .sf-btn { display: inline-flex; min-height: 3rem; min-width: 0; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.55rem 1.25rem; border: 2px solid var(--ink); border-radius: 0; background: transparent; color: var(--ink); font: 700 1rem/1.15 var(--font-body); text-align: center; text-decoration: none; white-space: nowrap; cursor: pointer; transition: background-color var(--dur-med) ease, color var(--dur-med) ease, transform var(--dur-press) var(--ease-out); }
+[data-storefront] .sf-btn svg { width: 1.05rem; height: 1.05rem; flex: none; }
+[data-storefront] .sf-btn.is-primary { background: var(--sign); border-color: var(--sign); color: var(--sign-ink); }
+[data-storefront] .sf-btn.is-accent { background: var(--ticket); border-color: var(--ticket); color: var(--ticket-ink); font-family: var(--font-display); font-size: 1.35rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.01em; }
+[data-storefront] .sf-btn.is-danger { color: var(--alert); border-color: var(--alert); }
+[data-storefront] .sf-btn.is-quiet { border-color: transparent; padding-inline: 0.25rem; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.25em; }
+/* Segmented choice (sign in / create account): square segments in one frame. */
+[data-storefront] .sf-actions:has(> .sf-btn.is-flat) { gap: 0; border: 2px solid var(--ink); }
+[data-storefront] .sf-btn.is-flat { flex: 1 1 0; border: 0; color: var(--ink-2); }
+[data-storefront] .sf-btn.is-flat[aria-pressed='true'], [data-storefront] .sf-btn.is-flat[aria-checked='true'] { background: var(--sign); color: var(--sign-ink); }
+[data-storefront] .sf-btn:active:not(:disabled) { transform: scale(0.97); }
+[data-storefront] .sf-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+[data-storefront] .sf-on-dark .sf-btn { border-color: var(--sign-ink); color: var(--sign-ink); }
+[data-storefront] .sf-on-dark .sf-btn.is-primary { background: var(--sign-ink); color: var(--sign); }
+[data-storefront] .sf-on-dark .sf-btn.is-accent { border-color: var(--ticket); color: var(--ticket-ink); }
+[data-storefront] .sf-on-dark .sf-btn.is-danger { border-color: var(--alert-on-sign); color: var(--alert-on-sign); }
+
+[data-storefront] .sf-on-dark { background: var(--sign); color: var(--sign-ink); }
+[data-storefront] .sf-on-dark .sf-eyebrow, [data-storefront] .sf-on-dark .sf-muted { color: var(--sign-muted); }
+[data-storefront] .sf-on-dark .sf-rule { border-top-color: var(--sign-3); }
+
+/* ---------- Header: the black sign band ---------- */
+[data-storefront] .sf-nav { position: sticky; top: 0; z-index: var(--z-sticky); background: var(--sign); color: var(--sign-ink); }
+[data-storefront] .sf-nav-bar { min-height: var(--head-h); display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+[data-storefront] .sf-brand { display: inline-flex; min-width: 0; min-height: 2.75rem; align-items: center; gap: 0.6rem; text-decoration: none; }
+[data-storefront] .sf-brand-name { min-width: 0; font-family: var(--font-display); font-size: 1.45rem; font-weight: 850; line-height: 0.95; text-transform: uppercase; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+[data-storefront] .sf-brand [data-store-logo] { width: 1.75rem; height: 1.75rem; }
+[data-storefront] .sf-nav-status { display: none; align-items: center; font-size: var(--text-label); font-weight: 650; color: var(--sign-muted); white-space: nowrap; }
+[data-storefront] .sf-nav-status strong { color: var(--sign-ink); font-weight: 700; }
+[data-storefront] .sf-nav-links { display: none; }
+[data-storefront] .sf-nav-link { position: relative; display: inline-flex; min-height: var(--head-h); align-items: center; font-size: var(--text-small); font-weight: 650; color: var(--sign-muted); text-decoration: none; white-space: nowrap; }
+[data-storefront] .sf-nav-link[aria-current='page'] { color: var(--sign-ink); }
+[data-storefront] .sf-nav-link[aria-current='page']::after { content: ''; position: absolute; inset-inline: 0; bottom: 0; height: 4px; background: var(--ticket); }
+[data-storefront] .sf-nav-actions { display: flex; align-items: center; gap: 0.25rem; flex: none; }
+[data-storefront] .sf-nav-book { display: inline-flex; min-height: 2.75rem; align-items: center; padding-inline: 1rem; background: var(--ticket); color: var(--ticket-ink); font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; text-transform: uppercase; text-decoration: none; transition: transform var(--dur-press) var(--ease-out); }
+[data-storefront] .sf-nav-book:active { transform: scale(0.97); }
+[data-storefront] .sf-nav-toggle { display: inline-flex; width: 2.75rem; height: 2.75rem; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--sign-ink); cursor: pointer; }
+[data-storefront] .sf-nav-toggle svg { width: 1.4rem; height: 1.4rem; }
+[data-storefront] .sf-nav-sheet { border-top: 1px solid var(--sign-3); padding-block: 0.25rem 1.25rem; }
+[data-storefront] .sf-nav-sheet a { display: flex; min-height: 3.25rem; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--sign-2); font-family: var(--font-display); font-size: 1.75rem; font-weight: 800; text-transform: uppercase; text-decoration: none; }
+[data-storefront] .sf-nav-sheet a[aria-current='page'] { color: var(--led); }
+[data-storefront] .sf-nav-sheet a svg { width: 1.25rem; height: 1.25rem; }
+[data-storefront] .sf-nav-sheet-status { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; padding-top: 1rem; color: var(--sign-muted); font-size: var(--text-small); }
+
+/* Home: the header grows into the shop's sign. */
+[data-storefront] .sf-sign-band { background: var(--sign); color: var(--sign-ink); }
+[data-storefront] .sf-sign { display: grid; gap: 0.5rem; padding-block: 0.75rem 1.25rem; border-top: 1px solid var(--sign-2); }
+[data-storefront] .sf-sign h1 { font-size: clamp(2.6rem, 11vw, 6.5rem); }
+[data-storefront] .sf-sign-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 1.25rem; color: var(--sign-muted); font-size: var(--text-small); }
+[data-storefront] .sf-sign-meta strong { color: var(--sign-ink); font-weight: 700; }
+
+/* ---------- Seven-segment numerals ---------- */
+[data-storefront] .sf-seg { display: inline-flex; gap: 0.12em; height: 1em; font-size: var(--text-numeral); line-height: 1; }
+[data-storefront] .sf-seg svg { height: 1em; width: auto; overflow: visible; transform: skewX(-6deg); }
+[data-storefront] .sf-seg .is-lit { fill: var(--led); }
+[data-storefront] .sf-seg .is-ghost { fill: var(--led-ghost); stroke: var(--led-ghost-edge); stroke-width: 1; }
+[data-storefront] .sf-seg.is-dim .is-lit { fill: var(--led-ghost-edge); }
+
+/* ---------- Now serving board ---------- */
+[data-storefront] .sf-board-panel { display: grid; gap: 1.25rem; padding: 1.25rem 1.25rem 1.4rem; background: var(--sign); color: var(--sign-ink); }
+[data-storefront] .sf-board-plate { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.25rem 1rem; padding-bottom: 0.9rem; border-bottom: 1px solid var(--sign-3); }
+[data-storefront] .sf-board-plate h2 { font-family: var(--font-display); font-size: 1.6rem; font-weight: 850; text-transform: uppercase; line-height: 1; }
+[data-storefront] .sf-board-plate p { font-size: var(--text-small); font-weight: 650; color: var(--sign-muted); }
+[data-storefront] .sf-board-readouts { display: grid; grid-template-columns: repeat(2, minmax(0, auto)); justify-content: start; gap: 1rem clamp(1.5rem, 6vw, 3.5rem); }
+[data-storefront] .sf-readout { display: grid; gap: 0.6rem; min-width: 0; }
+[data-storefront] .sf-readout-label { font-size: var(--text-small); font-weight: 650; color: var(--sign-muted); }
+[data-storefront] .sf-readout-label strong { color: var(--sign-ink); font-weight: 700; }
+[data-storefront] .sf-board-note { display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; padding-top: 0.9rem; border-top: 1px solid var(--sign-3); font-size: var(--text-small); color: var(--sign-muted); }
+[data-storefront] .sf-board-note strong { color: var(--sign-ink); font-weight: 700; }
+[data-storefront] .sf-board-note a { color: var(--sign-ink); }
+
+/* ---------- Tickets: torn stock with a perforated stub ---------- */
+[data-storefront] .sf-tix {
+  --notch: 0.7rem;
+  --stub: 5.75rem;
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--stub) minmax(0, 1fr);
+  min-height: 6.5rem;
+  background: var(--ticket);
+  color: var(--ticket-ink);
+  text-decoration: none;
+  -webkit-mask: radial-gradient(circle var(--notch) at var(--stub) 0, #0000 98%, #000) top / 100% 51% no-repeat, radial-gradient(circle var(--notch) at var(--stub) 100%, #0000 98%, #000) bottom / 100% 51% no-repeat;
+  mask: radial-gradient(circle var(--notch) at var(--stub) 0, #0000 98%, #000) top / 100% 51% no-repeat, radial-gradient(circle var(--notch) at var(--stub) 100%, #0000 98%, #000) bottom / 100% 51% no-repeat;
+  transition: background-color var(--dur-med) ease, transform var(--dur-press) var(--ease-out);
+}
+[data-storefront] .sf-tix.is-sign { background: var(--sign); color: var(--sign-ink); }
+[data-storefront] .sf-tix-stub { display: grid; place-items: center; align-content: center; gap: 0.2rem; padding: 0.75rem 0.5rem; background: radial-gradient(circle, var(--ticket-perf) 1.5px, transparent 2px) right center / 4px 9px repeat-y; text-align: center; }
+[data-storefront] .sf-tix.is-sign .sf-tix-stub { background-image: radial-gradient(circle, oklch(97% 0.004 230 / 0.45) 1.5px, transparent 2px); }
+[data-storefront] .sf-tix-numeral { font-family: var(--font-display); font-size: 3.4rem; font-weight: 900; line-height: 0.82; font-variant-numeric: tabular-nums; }
+[data-storefront] .sf-tix-numeral.is-word { font-size: 2.1rem; }
+[data-storefront] .sf-tix-unit { font-size: 0.8rem; font-weight: 700; }
+[data-storefront] .sf-tix-body { display: grid; align-content: center; gap: 0.3rem; min-width: 0; padding: 1rem 1.25rem 1rem 1.25rem; }
+[data-storefront] .sf-tix-title { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; font-family: var(--font-display); font-size: clamp(1.9rem, 7vw, 2.6rem); font-weight: 850; line-height: 0.9; text-transform: uppercase; }
+[data-storefront] .sf-tix-title svg { width: 1.6rem; height: 1.6rem; flex: none; transition: transform var(--dur-med) var(--ease-out); }
+[data-storefront] .sf-tix-sub { font-size: 1.02rem; font-weight: 600; line-height: 1.35; }
+[data-storefront] .sf-tix:active { transform: scale(0.985); }
+/* The tear: the stub rips away along the perforation, then the page moves on. */
+[data-storefront] .sf-tix[data-torn='true'] .sf-tix-body { animation: sf-tear 260ms var(--ease-out) forwards; }
+@keyframes sf-tear {
+  0% { transform: none; }
+  40% { transform: translate(0.35rem, -0.15rem) rotate(1.2deg); }
+  100% { transform: translate(0.9rem, 0.45rem) rotate(3deg); opacity: 0.7; }
+}
+
+/* Home first viewport: board beside the tickets, photo band below. */
+[data-storefront] .sf-dispenser { display: grid; gap: 0.75rem; padding-block: 1rem 0; }
+[data-storefront] .sf-dispenser-tickets { display: grid; gap: 0.75rem; align-content: start; }
+[data-storefront] .sf-photo-band { position: relative; height: clamp(13rem, 34vw, 24rem); margin-top: 0.75rem; overflow: hidden; background: var(--sign); }
+[data-storefront] .sf-photo-band .sf-image { position: absolute; inset: 0; }
+[data-storefront] .sf-photo-band img { filter: saturate(0.85) contrast(1.04); }
+
+/* ---------- Price board: fixed rail (name · duration · price) ---------- */
+[data-storefront] .sf-board-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+[data-storefront] .sf-board-group + .sf-board-group { margin-top: 2.25rem; }
+[data-storefront] .sf-board-group > h3 { padding-bottom: 0.5rem; border-bottom: 3px solid var(--ink); font-family: var(--font-display); font-size: 1.35rem; font-weight: 800; text-transform: uppercase; color: var(--ink); }
+[data-storefront] .sf-rail { --rail: minmax(0, 1fr) 4.25rem 5.25rem; --rail-gap: 0.75rem; }
+[data-storefront] .sf-board-row { display: grid; grid-template-columns: var(--rail); column-gap: var(--rail-gap); align-items: baseline; row-gap: 0.2rem; padding-block: 0.85rem; border-bottom: 1px solid var(--rule); text-decoration: none; }
+[data-storefront] .sf-board-name { min-width: 0; font-family: var(--font-display); font-size: clamp(1.45rem, 3.6vw, 2.1rem); font-weight: 780; text-transform: uppercase; line-height: 1; overflow-wrap: anywhere; }
+[data-storefront] .sf-board-dur { justify-self: end; font-size: var(--text-small); font-weight: 600; color: var(--ink-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+[data-storefront] .sf-board-price { justify-self: end; font-family: var(--font-display); font-size: clamp(1.45rem, 3.6vw, 2.1rem); font-weight: 850; font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap; }
+[data-storefront] .sf-board-meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0.15rem 1rem; color: var(--ink-muted); font-size: var(--text-label); font-weight: 600; }
+[data-storefront] .sf-board-meta .is-deposit { color: var(--ink); }
+[data-storefront] .sf-board-desc { grid-column: 1 / -1; max-width: 46rem; color: var(--ink-2); font-size: var(--text-small); }
+[data-storefront] .sf-group-desc { max-width: 46rem; margin-top: 0.6rem; color: var(--ink-2); font-size: var(--text-small); }
+
+/* ---------- Chairs (barbers) ---------- */
+[data-storefront] .sf-section-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; }
+[data-storefront] .sf-chair-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2.25rem 1.25rem; }
+[data-storefront] .sf-chair { display: grid; min-width: 0; align-content: start; gap: 0.75rem; color: var(--ink); text-decoration: none; }
+[data-storefront] .sf-chair-photo { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: var(--enamel-2); }
+[data-storefront] .sf-chair-photo.is-tall { aspect-ratio: 4 / 5; }
+[data-storefront] .sf-chair-photo .sf-image { position: absolute; inset: 0; }
+[data-storefront] .sf-chair-photo img { transition: transform 600ms var(--ease-out); }
+[data-storefront] .sf-chair-no { position: absolute; inset-block-start: 0; inset-inline-start: 0; display: grid; place-items: center; min-width: 3.25rem; padding: 0.35rem 0.6rem 0.4rem; background: var(--sign); color: var(--sign-ink); font-family: var(--font-display); font-size: 1.05rem; font-weight: 800; line-height: 1; text-transform: uppercase; }
+[data-storefront] .sf-chair-no b { display: block; font-size: 1.9rem; font-weight: 900; }
+[data-storefront] .sf-chair-name { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+[data-storefront] .sf-chair-name svg { width: 1.3rem; height: 1.3rem; flex: none; margin-top: 0.1rem; transition: transform var(--dur-med) var(--ease-out); }
+[data-storefront] .sf-chair-tags { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+[data-storefront] .sf-tag { display: inline-flex; align-items: center; min-height: 1.6rem; padding: 0.1rem 0.5rem; border: 1px solid var(--rule); background: var(--enamel); color: var(--ink-2); font-size: var(--text-label); font-weight: 650; }
+[data-storefront] .sf-on-dark .sf-tag { border-color: var(--sign-3); background: transparent; color: var(--sign-ink); }
+
+/* ---------- Visit ---------- */
+[data-storefront] .sf-visit { display: grid; gap: 2.5rem; }
+[data-storefront] .sf-hours li { display: flex; justify-content: space-between; gap: 1rem; padding-block: 0.7rem; border-bottom: 1px solid var(--rule); font-size: var(--text-small); font-variant-numeric: tabular-nums; }
+[data-storefront] .sf-hours li.is-today { font-weight: 800; color: var(--ink); background: linear-gradient(var(--ticket-soft), var(--ticket-soft)) 0 0 / 100% 100% no-repeat; padding-inline: 0.5rem; margin-inline: -0.5rem; }
+[data-storefront] .sf-facts { display: grid; gap: 1.25rem; }
+[data-storefront] .sf-facts dt { margin-bottom: 0.25rem; }
+[data-storefront] .sf-facts dd { font-size: var(--text-lead); overflow-wrap: anywhere; }
+
+/* ---------- Page heads ---------- */
+[data-storefront] .sf-page-head { display: grid; gap: 1rem; padding-block: clamp(2rem, 5vw, 3.75rem) clamp(1.25rem, 3vw, 2rem); border-bottom: 3px solid var(--ink); }
+[data-storefront] .sf-page-head h1 { font-size: var(--text-h1); }
+[data-storefront] .sf-page-head-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1.25rem; }
+[data-storefront] .sf-page-head .sf-lead { margin-top: -0.25rem; }
+
+[data-storefront] .sf-image { position: relative; overflow: hidden; background: var(--enamel-2); }
+
+/* ---------- Forms ---------- */
+[data-storefront] .sf-field { display: grid; gap: 0.4rem; min-width: 0; font-size: var(--text-small); font-weight: 700; }
+[data-storefront] .sf-field > span:first-child { color: var(--ink-2); }
+[data-storefront] .sf-input, [data-storefront] .sf-textarea, [data-storefront] .sf-select { width: 100%; min-height: 3rem; padding: 0.7rem 0.85rem; border: 2px solid var(--ink-2); border-radius: 0; background: oklch(99.5% 0.002 230); color: var(--ink); font: 400 1rem/1.35 var(--font-body); }
+[data-storefront] .sf-input::placeholder, [data-storefront] .sf-textarea::placeholder { color: var(--ink-muted); }
+[data-storefront] .sf-select { appearance: none; padding-inline-end: 2.5rem; background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%); background-position: calc(100% - 1.15rem) 55%, calc(100% - 0.8rem) 55%; background-size: 0.35rem 0.35rem; background-repeat: no-repeat; }
+[data-storefront] .sf-textarea { min-height: 6.5rem; resize: vertical; }
+[data-storefront] .sf-input:focus-visible, [data-storefront] .sf-textarea:focus-visible, [data-storefront] .sf-select:focus-visible { border-color: var(--ticket); outline-offset: 0; }
+[data-storefront] .sf-input[aria-invalid='true'] { border-color: var(--alert); }
+[data-storefront] .sf-on-dark .sf-input, [data-storefront] .sf-on-dark .sf-select { border-color: var(--sign-muted); background-color: var(--sign-2); color: var(--sign-ink); color-scheme: dark; }
+[data-storefront] .sf-check { display: flex; align-items: flex-start; gap: 0.6rem; font-size: var(--text-small); font-weight: 500; }
+[data-storefront] .sf-check input { width: 1.2rem; height: 1.2rem; margin-top: 0.15rem; flex: none; accent-color: var(--ticket); }
+[data-storefront] .sf-form { display: grid; gap: 1rem; }
+
+/* Option rows (choose a service / barber): rows on the rail, the chosen one turns to ticket stock. */
+[data-storefront] .sf-options { display: grid; border-top: 2px solid var(--ink); }
+[data-storefront] .sf-option { display: grid; width: 100%; min-height: 3.5rem; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.2rem 1rem; padding: 0.8rem 0.9rem; border: 0; border-bottom: 1px solid var(--rule); border-radius: 0; background: transparent; color: var(--ink); text-align: start; font: inherit; cursor: pointer; transition: background-color var(--dur-med) ease, color var(--dur-med) ease; }
+[data-storefront] .sf-option[aria-pressed='true'] { background: var(--ticket); color: var(--ticket-ink); }
+[data-storefront] .sf-option[aria-pressed='true'] .sf-option-meta { color: var(--ticket-ink); }
+[data-storefront] .sf-option.is-phone { cursor: default; background: var(--enamel-2); }
+[data-storefront] .sf-option-title { min-width: 0; font-weight: 750; overflow-wrap: anywhere; }
+[data-storefront] .sf-option-meta { grid-column: 1 / -1; color: var(--ink-muted); font-size: var(--text-label); font-weight: 550; font-variant-numeric: tabular-nums; }
+[data-storefront] .sf-option-price { font-weight: 750; font-variant-numeric: tabular-nums; }
+[data-storefront] .sf-option-why { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; font-size: var(--text-small); font-weight: 600; color: var(--ink); }
+[data-storefront] .sf-option-why a { display: inline-flex; min-height: 2.75rem; align-items: center; }
+[data-storefront] .sf-input, [data-storefront] .sf-textarea, [data-storefront] .sf-select, [data-storefront] .sf-step { scroll-margin-top: 5rem; }
+
+/* Time slots: grouped by part of day, earliest first. */
+[data-storefront] .sf-slots { display: grid; gap: 1.25rem; }
+[data-storefront] .sf-slots > p { padding: 0.85rem 0; color: var(--ink-2); font-size: var(--text-small); }
+[data-storefront] .sf-slot-earliest { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--rule); font-size: var(--text-small); font-weight: 650; }
+[data-storefront] .sf-slot-group { display: grid; gap: 0.5rem; }
+[data-storefront] .sf-slot-group h3 { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding-bottom: 0.35rem; border-bottom: 2px solid var(--ink); font-family: var(--font-display); font-size: 1.3rem; font-weight: 800; text-transform: uppercase; line-height: 1; }
+[data-storefront] .sf-slot-group h3 span { font-family: var(--font-body); font-size: var(--text-label); font-weight: 600; text-transform: none; color: var(--ink-muted); }
+[data-storefront] .sf-slot-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr)); gap: 0.4rem; }
+[data-storefront] .sf-slot { min-height: 2.9rem; border: 1px solid var(--ink-2); border-radius: 0; background: oklch(99.5% 0.002 230); color: var(--ink); font: 650 0.95rem/1 var(--font-body); font-variant-numeric: tabular-nums; cursor: pointer; transition: background-color var(--dur-med) ease, color var(--dur-med) ease, transform var(--dur-press) var(--ease-out); }
+[data-storefront] .sf-slot:active { transform: scale(0.96); }
+[data-storefront] .sf-slot[aria-pressed='true'] { border-color: var(--ticket); background: var(--ticket); color: var(--ticket-ink); }
+[data-storefront] .sf-slot-earliest .sf-slot { padding-inline: 1rem; }
+
+/* ---------- Booking layout ---------- */
+[data-storefront] .sf-book { display: grid; gap: 2.5rem; padding-block: 1.5rem 3rem; }
+[data-storefront] .sf-step { display: grid; gap: 0.9rem; min-width: 0; margin: 0; padding: 0; border: 0; }
+[data-storefront] .sf-step legend { display: flex; width: 100%; align-items: baseline; gap: 0.75rem; margin-bottom: 0.9rem; padding: 0; }
+[data-storefront] .sf-step-no { display: inline-grid; place-items: center; min-width: 2.1rem; height: 2.1rem; background: var(--sign); color: var(--sign-ink); font-family: var(--font-display); font-size: 1.25rem; font-weight: 900; font-variant-numeric: tabular-nums; align-self: center; }
+[data-storefront] .sf-step-title { font-family: var(--font-display); font-size: 2rem; font-weight: 850; text-transform: uppercase; line-height: 1; }
+[data-storefront] .sf-book-main { display: grid; gap: 2.5rem; min-width: 0; }
+[data-storefront] .sf-summary { display: none; gap: 1rem; align-self: start; min-width: 0; padding: 1.25rem; background: var(--sign); color: var(--sign-ink); }
+[data-storefront] .sf-summary > h2 { font-family: var(--font-display); font-size: 1.6rem; font-weight: 850; text-transform: uppercase; line-height: 1; }
+[data-storefront] .sf-summary dl > div { display: grid; grid-template-columns: 4.75rem minmax(0, 1fr); gap: 0.75rem; padding-block: 0.65rem; border-top: 1px solid var(--sign-3); font-size: var(--text-small); }
+[data-storefront] .sf-summary dt { color: var(--sign-muted); font-weight: 600; }
+[data-storefront] .sf-summary dd { overflow-wrap: anywhere; font-weight: 600; }
+[data-storefront] .sf-summary-total { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding-top: 0.8rem; border-top: 3px solid var(--sign-ink); }
+[data-storefront] .sf-summary-total strong { font-family: var(--font-display); font-size: 2.4rem; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1; }
+
+/* Phone: "your ticket" docks at the bottom with the submit. */
+[data-storefront] .sf-dock { position: sticky; bottom: 0; z-index: calc(var(--z-sticky) - 1); display: grid; gap: 0.6rem; margin-inline: -1rem; padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom)); background: var(--sign); color: var(--sign-ink); }
+[data-storefront] .sf-dock-ticket { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; }
+[data-storefront] .sf-dock-ticket p { min-width: 0; font-size: var(--text-small); font-weight: 600; line-height: 1.3; }
+[data-storefront] .sf-dock-ticket p strong { display: block; overflow: hidden; font-family: var(--font-display); font-size: 1.35rem; font-weight: 850; text-transform: uppercase; text-overflow: ellipsis; white-space: nowrap; }
+[data-storefront] .sf-dock-ticket .sf-dock-total { font-family: var(--font-display); font-size: 1.9rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+[data-storefront] .sf-dock[data-docked='true'] { animation: sf-dock 280ms var(--ease-out); }
+@keyframes sf-dock {
+  from { transform: translateY(0.9rem) rotate(-0.6deg); opacity: 0.6; }
+  to { transform: none; opacity: 1; }
+}
+
+/* ---------- Notices ---------- */
+[data-storefront] .sf-notice { padding: 0.85rem 1rem; border: 1px solid var(--rule); background: var(--enamel-2); font-size: var(--text-small); overflow-wrap: anywhere; }
+[data-storefront] .sf-notice.is-error { border-color: var(--alert); background: var(--alert-soft); color: var(--alert); font-weight: 650; }
+[data-storefront] .sf-on-dark .sf-notice { border-color: var(--sign-3); background: var(--sign-2); color: var(--sign-ink); }
+[data-storefront] .sf-on-dark .sf-notice.is-error { border-color: var(--alert-on-sign); background: var(--sign-2); color: var(--alert-on-sign); }
+[data-storefront] .sf-empty { display: grid; gap: 0.75rem; justify-items: start; padding: 2rem 0; border-top: 1px solid var(--rule); }
+
+/* ---------- Ticket documents (your walk-in ticket, booking request) ---------- */
+[data-storefront] .sf-ticket { --notch: 0.85rem; position: relative; display: grid; gap: 1.1rem; padding: 1.5rem 1.4rem 1.6rem; background: var(--ticket); color: var(--ticket-ink); }
+[data-storefront] .sf-ticket.is-sign { background: var(--sign); color: var(--sign-ink); }
+[data-storefront] .sf-ticket-head { position: relative; display: flex; min-height: calc(var(--tear) - 1.5rem); align-items: flex-start; justify-content: space-between; gap: 1rem; padding-bottom: 1.1rem; background: radial-gradient(circle, var(--ticket-perf) 1.5px, transparent 2px) bottom left / 9px 4px repeat-x; }
+/* Notches cut where the stub tears off (the page's enamel shows through). */
+[data-storefront] .sf-ticket-head::before, [data-storefront] .sf-ticket-head::after { content: ''; position: absolute; bottom: calc(-1 * var(--notch)); width: calc(2 * var(--notch)); height: calc(2 * var(--notch)); border-radius: 50%; background: var(--enamel); }
+[data-storefront] .sf-ticket-head::before { left: calc(-1.4rem - var(--notch)); }
+[data-storefront] .sf-ticket-head::after { right: calc(-1.4rem - var(--notch)); }
+[data-storefront] .sf-ticket .sf-eyebrow, [data-storefront] .sf-ticket .sf-muted { color: var(--ticket-ink); }
+[data-storefront] .sf-ticket-wait { font-family: var(--font-display); font-size: var(--text-numeral); font-weight: 900; line-height: 0.8; font-variant-numeric: tabular-nums; }
+[data-storefront] .sf-ticket-wait small { font-size: 0.35em; font-weight: 800; }
+[data-storefront] .sf-ticket dl > div { display: flex; justify-content: space-between; gap: 1rem; padding-block: 0.55rem; border-top: 1px solid var(--ticket-perf); font-size: var(--text-body); }
+[data-storefront] .sf-ticket dl > div:first-child { border-top: 0; }
+[data-storefront] .sf-ticket dt { font-weight: 600; }
+[data-storefront] .sf-ticket dd { text-align: end; font-weight: 750; overflow-wrap: anywhere; }
+[data-storefront] .sf-ticket .sf-btn { border-color: var(--ticket-ink); color: var(--ticket-ink); }
+[data-storefront] .sf-ticket .sf-btn.is-primary { background: var(--ticket-ink); color: var(--ticket); }
+[data-storefront] .sf-ticket .sf-btn.is-accent { background: var(--sign); border-color: var(--sign); color: var(--sign-ink); }
+
+/* Appointment progress: five lamps on a rail. */
+[data-storefront] .sf-progress { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.25rem; }
+[data-storefront] .sf-progress li { display: grid; gap: 0.45rem; font-size: 0.75rem; font-weight: 650; color: var(--sign-muted); overflow-wrap: anywhere; }
+[data-storefront] .sf-progress li::before { content: ''; height: 6px; background: var(--sign-3); }
+[data-storefront] .sf-progress li.is-done { color: var(--sign-ink); }
+[data-storefront] .sf-progress li.is-done::before { background: var(--led); }
+
+[data-storefront] .sf-ledger > li { padding-block: 0.75rem; border-top: 1px solid var(--rule); font-size: var(--text-small); }
+[data-storefront] .sf-ledger > li > a { display: flex; min-height: 2.75rem; align-items: center; text-decoration: none; }
+[data-storefront] .sf-ledger > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.25rem 1rem; padding-block: 0.75rem; border-top: 1px solid var(--rule); font-size: var(--text-small); }
+[data-storefront] .sf-ledger dt { color: var(--ink-muted); font-weight: 600; }
+[data-storefront] .sf-ledger dd { font-weight: 700; text-align: end; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+[data-storefront] .sf-on-dark .sf-ledger > div, [data-storefront] .sf-on-dark .sf-ledger > li { border-top-color: var(--sign-3); }
+[data-storefront] .sf-on-dark .sf-ledger dt { color: var(--sign-muted); }
+
+[data-storefront] .sf-block { display: grid; gap: 1rem; padding-block: 1.5rem; border-top: 1px solid var(--rule); }
+[data-storefront] .sf-card { display: grid; gap: 1rem; padding: 1.4rem; border: 2px solid var(--ink); background: oklch(99.5% 0.002 230); }
+[data-storefront] .sf-card-dark { display: grid; gap: 1.25rem; padding: 1.4rem; background: var(--sign); color: var(--sign-ink); }
+[data-storefront] .sf-waiver-text { max-height: 12rem; overflow: auto; white-space: pre-wrap; padding: 0.75rem; border: 1px solid var(--rule); background: var(--enamel-2); font-size: var(--text-small); }
+
+/* ---------- Account ---------- */
+[data-storefront] .sf-booking-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.35rem 1rem; padding-block: 1rem; border-bottom: 1px solid var(--rule); text-decoration: none; }
+[data-storefront] .sf-list-top { border-top: 2px solid var(--ink); }
+[data-storefront] .sf-next-step { display: grid; gap: 0.75rem; padding: 1.5rem 0; }
+[data-storefront] .sf-next-step .sf-dispenser-tickets { max-width: 34rem; }
+
+/* ---------- Shop ---------- */
+[data-storefront] .sf-product-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.75rem 1rem; }
+[data-storefront] .sf-product { display: grid; align-content: start; gap: 0.6rem; min-width: 0; text-decoration: none; }
+[data-storefront] .sf-product-art { position: relative; aspect-ratio: 4 / 3; overflow: hidden; border: 1px solid var(--rule); background: var(--enamel-2); }
+[data-storefront] .sf-product-art .sf-image { position: absolute; inset: 0; background: transparent; }
+[data-storefront] .sf-product-art img { object-fit: contain; }
+[data-storefront] .sf-product-label { display: grid; place-content: center; height: 100%; padding: 1rem; background: var(--sign); color: var(--sign-ink); font-family: var(--font-display); font-size: clamp(1.5rem, 5vw, 2.4rem); font-weight: 850; line-height: 0.9; text-align: center; text-transform: uppercase; overflow-wrap: anywhere; }
+[data-storefront] .sf-product-name { display: grid; gap: 0.15rem; }
+[data-storefront] .sf-product-name h3 { font-family: var(--font-display); font-size: clamp(1.3rem, 3vw, 1.6rem); font-weight: 800; text-transform: uppercase; line-height: 0.95; overflow-wrap: anywhere; }
+[data-storefront] .sf-product-price { font-family: var(--font-display); font-size: 1.5rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+[data-storefront] .sf-counter-note { display: grid; gap: 0.75rem; padding: 1.25rem; background: var(--sign); color: var(--sign-ink); }
+
+/* ---------- Footer: a quiet black plate ---------- */
+[data-storefront] .sf-footer { background: var(--sign); color: var(--sign-ink); }
+[data-storefront] .sf-footer-main { display: grid; gap: 2rem; padding-block: 2.5rem 1.75rem; }
+[data-storefront] .sf-footer-mark { display: flex; align-items: center; gap: 0.6rem; font-family: var(--font-display); font-size: clamp(1.9rem, 6vw, 3rem); font-weight: 850; line-height: 0.9; text-transform: uppercase; overflow-wrap: anywhere; }
+[data-storefront] .sf-footer-mark [data-store-logo] { width: 0.85em; height: 0.85em; }
+[data-storefront] .sf-footer-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1.5rem; align-content: start; }
+[data-storefront] .sf-footer-nav a { display: flex; min-height: 2.75rem; align-items: center; border-top: 1px solid var(--sign-2); color: var(--sign-ink); font-size: var(--text-small); font-weight: 600; text-decoration: none; }
+[data-storefront] .sf-footer-base { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 1.5rem; padding-block: 1rem 1.5rem; border-top: 1px solid var(--sign-2); color: var(--sign-muted); font-size: var(--text-label); }
+[data-storefront] .sf-footer-base address { font-style: normal; }
+[data-storefront] .sf-footer-base a { display: inline-flex; min-height: 2.75rem; align-items: center; }
+
+/* ---------- Centered states ---------- */
+[data-storefront] .sf-state, [data-storefront].sf-state { display: grid; min-height: 100svh; place-items: center; padding: 1.5rem; }
+[data-storefront] .sf-state > main, [data-storefront].sf-state > main { display: grid; width: 100%; max-width: 32rem; gap: 1rem; justify-items: start; }
+
+/* ---------- Hover (fine pointers only) ---------- */
+@media (hover: hover) and (pointer: fine) {
+  [data-storefront] .sf-btn:hover:not(:disabled) { background: var(--enamel-3); }
+  [data-storefront] .sf-btn.is-primary:hover:not(:disabled) { background: var(--sign-2); }
+  [data-storefront] .sf-btn.is-accent:hover:not(:disabled) { background: var(--ticket-press); }
+  [data-storefront] .sf-btn.is-quiet:hover:not(:disabled) { background: transparent; text-decoration-thickness: 2px; }
+  [data-storefront] .sf-btn.is-flat:hover:not(:disabled):not([aria-pressed='true']):not([aria-checked='true']) { background: var(--enamel-2); color: var(--ink); }
+  [data-storefront] .sf-on-dark .sf-btn:hover:not(:disabled) { background: var(--sign-2); }
+  [data-storefront] .sf-on-dark .sf-btn.is-primary:hover:not(:disabled) { background: var(--enamel-2); }
+  [data-storefront] .sf-ticket .sf-btn:hover:not(:disabled) { background: var(--ticket-press); }
+  [data-storefront] .sf-ticket .sf-btn.is-primary:hover:not(:disabled) { background: var(--ticket-soft); }
+  [data-storefront] .sf-nav-link:hover { color: var(--sign-ink); }
+  [data-storefront] .sf-nav-book:hover { background: var(--ticket-press); }
+  [data-storefront] .sf-tix:hover { background: var(--ticket-press); }
+  [data-storefront] .sf-tix.is-sign:hover { background: var(--sign-2); }
+  [data-storefront] .sf-tix:hover .sf-tix-title svg, [data-storefront] .sf-chair:hover .sf-chair-name svg, [data-storefront] .sf-arrow-link:hover svg { transform: translateX(3px); }
+  [data-storefront] .sf-option:hover:not([aria-pressed='true']):not(.is-phone) { background: var(--enamel-2); }
+  [data-storefront] .sf-slot:hover:not([aria-pressed='true']) { background: var(--enamel-3); }
+  [data-storefront] .sf-board-row:hover .sf-board-name { text-decoration: underline; text-decoration-thickness: 3px; text-decoration-color: var(--ticket); text-underline-offset: 0.12em; }
+  [data-storefront] .sf-chair:hover img, [data-storefront] .sf-product:hover img { transform: scale(1.03); }
+  [data-storefront] .sf-product img { transition: transform 600ms var(--ease-out); }
+  [data-storefront] .sf-booking-row:hover .sf-subtitle { text-decoration: underline; text-decoration-color: var(--ticket); text-decoration-thickness: 3px; }
+}
+
+/* ---------- Breakpoints ---------- */
+@media (min-width: 40rem) {
+  [data-storefront] .sf-container { width: min(calc(100% - 3rem), var(--measure-wide)); }
+  [data-storefront] .sf-container-narrow { width: min(calc(100% - 3rem), var(--measure)); }
+  [data-storefront] .sf-chair-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-storefront] .sf-rail { --rail: minmax(0, 1fr) 6rem 7rem; --rail-gap: 1.25rem; }
+  [data-storefront] .sf-footer-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  [data-storefront] .sf-ticket { padding-inline: 2rem; }
+  [data-storefront] .sf-ticket-head::before { left: calc(-2rem - var(--notch)); }
+  [data-storefront] .sf-ticket-head::after { right: calc(-2rem - var(--notch)); }
+  [data-storefront] .sf-board-panel { padding: 1.5rem 1.75rem 1.6rem; }
+  [data-storefront] .sf-dock { margin-inline: -1.5rem; padding-inline: 1.5rem; }
+  [data-storefront] .sf-product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.25rem 1.5rem; }
+  [data-storefront] .sf-tix { --stub: 7rem; min-height: 7.5rem; }
+  [data-storefront] .sf-tix-numeral { font-size: 4.25rem; }
+}
+
+@media (min-width: 64rem) {
+  [data-storefront] { --head-h: 4rem; }
+  [data-storefront] .sf-nav-links { display: flex; align-items: center; gap: 1.5rem; }
+  [data-storefront] .sf-nav-toggle { display: none; }
+  [data-storefront] .sf-sign { grid-template-columns: minmax(0, 1fr) auto; align-items: end; padding-block: 1rem 1.75rem; }
+  [data-storefront] .sf-dispenser { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 1rem; padding-top: 1.25rem; }
+  [data-storefront] .sf-dispenser-tickets { grid-template-rows: 1fr 1fr; gap: 1rem; }
+  [data-storefront] .sf-chair-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  [data-storefront] .sf-visit { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  [data-storefront] .sf-book { grid-template-columns: minmax(0, 1fr) minmax(19rem, 23rem); align-items: start; padding-bottom: 5rem; }
+  [data-storefront] .sf-summary { display: grid; position: sticky; top: calc(var(--head-h) + 1.5rem); }
+  [data-storefront] .sf-dock { display: none; }
+  [data-storefront] .sf-footer-main { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: end; }
+}
+
+@media (min-width: 80rem) {
+  [data-storefront] .sf-nav-status { display: inline-flex; margin-inline-end: 0.75rem; }
+}
+
+@media (pointer: coarse) {
+  [data-storefront] .sf-btn, [data-storefront] .sf-slot, [data-storefront] .sf-nav-link { min-height: 3rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-storefront] *, [data-storefront] *::before, [data-storefront] *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  [data-storefront] .sf-tix[data-torn='true'] .sf-tix-body { animation: none; }
+}

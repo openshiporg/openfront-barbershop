@@ -1,0 +1,540 @@
+[
+  {
+    "vp": "desktop",
+    "name": "home",
+    "route": "/",
+    "status": 200,
+    "finalPath": "/",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "services",
+    "route": "/services",
+    "status": 200,
+    "finalPath": "/services",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "service-detail",
+    "route": "/services/cmvocvwsw000bp53za8fcdaka",
+    "status": 200,
+    "finalPath": "/services/cmvocvwsw000bp53za8fcdaka",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "barbers",
+    "route": "/barbers",
+    "status": 200,
+    "finalPath": "/barbers",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "barber-detail",
+    "route": "/barbers/cmvocvxb6000yp53z59zht9ky",
+    "status": 200,
+    "finalPath": "/barbers/cmvocvxb6000yp53z59zht9ky",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "book",
+    "route": "/book",
+    "status": 200,
+    "finalPath": "/book",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "queue",
+    "route": "/queue",
+    "status": 200,
+    "finalPath": "/queue",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "shop",
+    "route": "/shop",
+    "status": 200,
+    "finalPath": "/shop",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "product-detail",
+    "route": "/shop/cmvocvxii0018p53z4q8q3x9c",
+    "status": 200,
+    "finalPath": "/shop/cmvocvxii0018p53z4q8q3x9c",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "memberships",
+    "route": "/memberships",
+    "status": 200,
+    "finalPath": "/memberships",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "account",
+    "route": "/account",
+    "status": 200,
+    "finalPath": "/account",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "appointment",
+    "route": "/appointment",
+    "status": 200,
+    "finalPath": "/appointment",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-barbershop",
+    "route": "/dashboard/platform/barbershop",
+    "status": 200,
+    "finalPath": "/dashboard/platform/barbershop",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-booking",
+    "route": "/dashboard/platform/booking",
+    "status": 200,
+    "finalPath": "/dashboard/platform/booking",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-queue",
+    "route": "/dashboard/platform/queue",
+    "status": 200,
+    "finalPath": "/dashboard/platform/queue",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-pos",
+    "route": "/dashboard/platform/pos",
+    "status": 200,
+    "finalPath": "/dashboard/platform/pos",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-customers",
+    "route": "/dashboard/platform/customers",
+    "status": 200,
+    "finalPath": "/dashboard/platform/customers",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-customers-new",
+    "route": "/dashboard/platform/customers/new",
+    "status": 200,
+    "finalPath": "/dashboard/platform/customers/new",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-services",
+    "route": "/dashboard/platform/services",
+    "status": 200,
+    "finalPath": "/dashboard/platform/services",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-service-detail",
+    "route": "/dashboard/platform/services/categories",
+    "status": 200,
+    "finalPath": "/dashboard/platform/services/categories",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-services-categories",
+    "route": "/dashboard/platform/services/categories",
+    "status": 200,
+    "finalPath": "/dashboard/platform/services/categories",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-services-new",
+    "route": "/dashboard/platform/services/new",
+    "status": 200,
+    "finalPath": "/dashboard/platform/services/new",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-staff",
+    "route": "/dashboard/platform/staff",
+    "status": 200,
+    "finalPath": "/dashboard/platform/staff",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-staff-detail",
+    "route": "/dashboard/platform/staff/chairs",
+    "status": 200,
+    "finalPath": "/dashboard/platform/staff/chairs",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-staff-chairs",
+    "route": "/dashboard/platform/staff/chairs",
+    "status": 200,
+    "finalPath": "/dashboard/platform/staff/chairs",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-team",
+    "route": "/dashboard/platform/team",
+    "status": 500,
+    "finalPath": "/dashboard/platform/team",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-inventory",
+    "route": "/dashboard/platform/inventory",
+    "status": 500,
+    "finalPath": "/dashboard/platform/inventory",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-inventory-detail",
+    "status": "no-detail-link"
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-inventory-suppliers",
+    "route": "/dashboard/platform/inventory/suppliers",
+    "status": 200,
+    "finalPath": "/dashboard/platform/inventory/suppliers",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-payments",
+    "route": "/dashboard/platform/payments",
+    "status": 200,
+    "finalPath": "/dashboard/platform/payments",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-payroll",
+    "route": "/dashboard/platform/payroll",
+    "status": 500,
+    "finalPath": "/dashboard/platform/payroll",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-policies",
+    "route": "/dashboard/platform/policies",
+    "status": 200,
+    "finalPath": "/dashboard/platform/policies",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-reports",
+    "route": "/dashboard/platform/reports",
+    "status": 200,
+    "finalPath": "/dashboard/platform/reports",
+    "overflowX": 0
+  },
+  {
+    "vp": "desktop",
+    "name": "platform-store-settings",
+    "route": "/dashboard/platform/store-settings",
+    "status": 200,
+    "finalPath": "/dashboard/platform/store-settings",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "home",
+    "route": "/",
+    "status": 200,
+    "finalPath": "/",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "services",
+    "route": "/services",
+    "status": 200,
+    "finalPath": "/services",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "service-detail",
+    "route": "/services/cmvocvwsw000bp53za8fcdaka",
+    "status": 200,
+    "finalPath": "/services/cmvocvwsw000bp53za8fcdaka",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "barbers",
+    "route": "/barbers",
+    "status": 200,
+    "finalPath": "/barbers",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "barber-detail",
+    "route": "/barbers/cmvocvxb6000yp53z59zht9ky",
+    "status": 200,
+    "finalPath": "/barbers/cmvocvxb6000yp53z59zht9ky",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "book",
+    "route": "/book",
+    "status": 200,
+    "finalPath": "/book",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "queue",
+    "route": "/queue",
+    "status": 200,
+    "finalPath": "/queue",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "shop",
+    "route": "/shop",
+    "status": 200,
+    "finalPath": "/shop",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "product-detail",
+    "route": "/shop/cmvocvxii0018p53z4q8q3x9c",
+    "status": 200,
+    "finalPath": "/shop/cmvocvxii0018p53z4q8q3x9c",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "memberships",
+    "route": "/memberships",
+    "status": 200,
+    "finalPath": "/memberships",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "account",
+    "route": "/account",
+    "status": 200,
+    "finalPath": "/account",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "appointment",
+    "route": "/appointment",
+    "status": 200,
+    "finalPath": "/appointment",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-barbershop",
+    "route": "/dashboard/platform/barbershop",
+    "status": 200,
+    "finalPath": "/dashboard/platform/barbershop",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-booking",
+    "route": "/dashboard/platform/booking",
+    "status": 200,
+    "finalPath": "/dashboard/platform/booking",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-queue",
+    "route": "/dashboard/platform/queue",
+    "status": 200,
+    "finalPath": "/dashboard/platform/queue",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-pos",
+    "route": "/dashboard/platform/pos",
+    "status": 200,
+    "finalPath": "/dashboard/platform/pos",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-customers",
+    "route": "/dashboard/platform/customers",
+    "status": 200,
+    "finalPath": "/dashboard/platform/customers",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-customers-new",
+    "route": "/dashboard/platform/customers/new",
+    "status": 200,
+    "finalPath": "/dashboard/platform/customers/new",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-services",
+    "route": "/dashboard/platform/services",
+    "status": 200,
+    "finalPath": "/dashboard/platform/services",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-service-detail",
+    "route": "/dashboard/platform/services/categories",
+    "status": 200,
+    "finalPath": "/dashboard/platform/services/categories",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-services-categories",
+    "route": "/dashboard/platform/services/categories",
+    "status": 200,
+    "finalPath": "/dashboard/platform/services/categories",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-services-new",
+    "route": "/dashboard/platform/services/new",
+    "status": 200,
+    "finalPath": "/dashboard/platform/services/new",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-staff",
+    "route": "/dashboard/platform/staff",
+    "status": 200,
+    "finalPath": "/dashboard/platform/staff",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-staff-detail",
+    "route": "/dashboard/platform/staff/chairs",
+    "status": 200,
+    "finalPath": "/dashboard/platform/staff/chairs",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-staff-chairs",
+    "route": "/dashboard/platform/staff/chairs",
+    "status": 200,
+    "finalPath": "/dashboard/platform/staff/chairs",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-team",
+    "route": "/dashboard/platform/team",
+    "status": 500,
+    "finalPath": "/dashboard/platform/team",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-inventory",
+    "route": "/dashboard/platform/inventory",
+    "status": 500,
+    "finalPath": "/dashboard/platform/inventory",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-inventory-detail",
+    "status": "no-detail-link"
+  },
+  {
+    "vp": "phone",
+    "name": "platform-inventory-suppliers",
+    "route": "/dashboard/platform/inventory/suppliers",
+    "status": 200,
+    "finalPath": "/dashboard/platform/inventory/suppliers",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-payments",
+    "route": "/dashboard/platform/payments",
+    "status": 200,
+    "finalPath": "/dashboard/platform/payments",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-payroll",
+    "route": "/dashboard/platform/payroll",
+    "status": 500,
+    "finalPath": "/dashboard/platform/payroll",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-policies",
+    "route": "/dashboard/platform/policies",
+    "status": 200,
+    "finalPath": "/dashboard/platform/policies",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-reports",
+    "route": "/dashboard/platform/reports",
+    "status": 200,
+    "finalPath": "/dashboard/platform/reports",
+    "overflowX": 0
+  },
+  {
+    "vp": "phone",
+    "name": "platform-store-settings",
+    "route": "/dashboard/platform/store-settings",
+    "status": 200,
+    "finalPath": "/dashboard/platform/store-settings",
+    "overflowX": 0
+  }
+]

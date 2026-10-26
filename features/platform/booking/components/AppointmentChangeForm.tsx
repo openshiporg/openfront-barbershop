@@ -8,6 +8,7 @@ import { useCommandKey } from '@/features/platform/lib/useCommandKey';
 import { manageStaffAppointmentAction } from '../actions/appointments';
 import { parseShopDateTime } from '../lib/shopTimeInput';
 import { Pill, selectClass, Track } from '@/features/platform/lib/ui';
+import { Segmented } from './FloorKit';
 
 type BarberOption = { id: string; displayName?: string | null; bookingEnabled?: boolean | null };
 
@@ -70,14 +71,11 @@ export function AppointmentChangeForm({ appointmentId, startsAt, barberId, barbe
 
   return (
     <div className="mt-3 space-y-3 border-t pt-3">
-      <Track label="Change type">
-        <Pill size="sm" variant="flat" aria-pressed={action === 'reschedule'} onClick={() => setAction('reschedule')}>Reschedule</Pill>
-        <Pill size="sm" variant="flat" aria-pressed={action === 'cancel'} onClick={() => setAction('cancel')}>Cancel</Pill>
-      </Track>
+      <Segmented label="Change type" value={action} onChange={setAction} options={[{ value: 'reschedule', label: 'Reschedule' }, { value: 'cancel', label: 'Cancel' }]} />
       {action === 'reschedule' && (
         <div className="grid gap-2 sm:grid-cols-3">
-          <div className="grid gap-1"><Label htmlFor={`${id}-date`}>Date</Label><Input id={`${id}-date`} type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div>
-          <div className="grid gap-1"><Label htmlFor={`${id}-time`}>Time ({timeZone})</Label><Input id={`${id}-time`} type="time" step={300} value={time} onChange={(event) => setTime(event.target.value)} /></div>
+          <div className="grid gap-1"><Label htmlFor={`${id}-date`}>Date</Label><Input className="rounded-[6px]" id={`${id}-date`} type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div>
+          <div className="grid gap-1"><Label htmlFor={`${id}-time`}>Time ({timeZone})</Label><Input className="rounded-[6px]" id={`${id}-time`} type="time" step={300} value={time} onChange={(event) => setTime(event.target.value)} /></div>
           <div className="grid gap-1">
             <Label htmlFor={`${id}-barber`}>Barber</Label>
             <select id={`${id}-barber`} value={nextBarberId} onChange={(event) => setNextBarberId(event.target.value)} className={selectClass}>
@@ -87,7 +85,7 @@ export function AppointmentChangeForm({ appointmentId, startsAt, barberId, barbe
           </div>
         </div>
       )}
-      <div className="grid gap-1"><Label htmlFor={`${id}-reason`}>Reason</Label><Input id={`${id}-reason`} value={reason} maxLength={1000} onChange={(event) => setReason(event.target.value)} /></div>
+      <div className="grid gap-1"><Label htmlFor={`${id}-reason`}>Reason</Label><Input className="rounded-[6px]" id={`${id}-reason`} value={reason} maxLength={1000} onChange={(event) => setReason(event.target.value)} /></div>
       <Track>
         <Pill size="sm" variant={action === 'cancel' ? 'danger' : 'primary'} disabled={pending} onClick={submit}>{pending ? 'Saving…' : action === 'cancel' ? 'Cancel appointment' : 'Save change'}</Pill>
         <Pill size="sm" disabled={pending} onClick={onClose}>Close</Pill>

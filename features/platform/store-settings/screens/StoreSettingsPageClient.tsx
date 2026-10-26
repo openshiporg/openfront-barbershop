@@ -16,7 +16,7 @@ import { LogoPicker } from '../components/LogoPicker';
 import { DEFAULT_STORE_LOGO_ICON } from '../lib/store-logo';
 import { StoreLogo } from '@/features/storefront/components/StoreLogo';
 import { hoursTextToTimes, parseHoursRange, SHOP_HOURS_DAYS, timesToHoursText } from '@/features/shared/shop-hours';
-import { Notice, PageHeader, Pill, PillLink, selectClass, StatusDot, Track } from '@/features/platform/lib/ui';
+import { Notice, PageHeader, Pill, PillLink, selectClass, StatusDot } from '@/features/platform/lib/ui';
 import {
   updateActiveShopStorefrontSettingsAction,
   type ActiveShopStorefrontSettings,
@@ -127,7 +127,7 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
   if (initialError || !initialData || !form || !saved) {
     return (
       <div className="max-w-2xl space-y-6 px-4 py-6 md:px-6">
-        <PageHeader title="Store Settings" tone="alert" />
+        <PageHeader title="Store settings" tone="alert" />
         {shopSelector}
         <Notice tone="alert">{initialError || 'Select an active shop to edit its settings.'}</Notice>
       </div>
@@ -149,6 +149,7 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
 
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!dirty) { setError(null); setStatus('No changes to save.'); return; }
     if (hoursInvalid) { setError('Fix the highlighted hours before saving.'); return; }
     if (!safeLogo) {
       setError('The logo SVG is invalid. Fix it or choose a library icon before saving.');
@@ -179,22 +180,22 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
   const swatch = STOREFRONT_BRAND_COLOR_OPTIONS.find((option) => option.value === form.brandColor)?.swatch;
 
   return (
-    <div className="flex min-w-0 flex-col gap-6 px-4 py-6 md:px-6">
+    <div className="flex min-w-0 flex-col gap-6 px-4 pb-24 pt-6 md:px-6">
       <PageHeader
-        title="Store Settings"
+        title="Store settings"
         tone={saved.isPublic ? 'live' : 'off'}
         meta={saved.isPublic ? 'Storefront published' : 'Storefront unpublished'}
-        actions={<Track><PillLink href="/">View storefront</PillLink></Track>}
+        actions={<div className="flex flex-wrap items-center gap-1.5"><PillLink href="/">View storefront</PillLink><Pill type="submit" form="store-settings-form" variant="primary" disabled={isLoading}>{isLoading ? 'Saving…' : dirty ? 'Save changes' : 'Save'}</Pill></div>}
       />
       {shopSelector}
 
-      <form onSubmit={handleSave} className="grid min-w-0 gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]" noValidate={false}>
+      <form id="store-settings-form" onSubmit={handleSave} className="grid min-w-0 gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]" noValidate={false}>
         <div className="min-w-0 space-y-8">
           <section aria-labelledby="settings-identity" className="space-y-4">
             <h2 id="settings-identity" className="border-b pb-2 text-sm font-semibold">Identity</h2>
             <div>
-              <Label htmlFor="store-name">Shop Name</Label>
-              <Input id="store-name" value={form.name} maxLength={120} required onChange={(e) => update({ name: e.target.value })} className="mt-2" />
+              <Label htmlFor="store-name">Shop name</Label>
+              <Input id="store-name" value={form.name} maxLength={120} required onChange={(e) => update({ name: e.target.value })} className="mt-2 h-9 rounded-[6px]" />
             </div>
             <div className="flex flex-wrap gap-6">
               <LogoPicker
@@ -207,17 +208,38 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
             </div>
             <div>
               <Label htmlFor="tagline">Tagline</Label>
-              <Textarea id="tagline" value={form.tagline} maxLength={240} onChange={(e) => update({ tagline: e.target.value })} className="mt-2" />
+              <Textarea id="tagline" value={form.tagline} maxLength={240} onChange={(e) => update({ tagline: e.target.value })} className="mt-2 h-9 rounded-[6px]" />
             </div>
             <div>
-              <Label id="brand-color-label">Storefront Color</Label>
-              <Track label="Storefront Color" className="mt-2">
-                {STOREFRONT_BRAND_COLOR_OPTIONS.map((option) => (
-                  <Pill key={option.value} size="sm" variant="flat" role="radio" aria-checked={form.brandColor === option.value} disabled={isLoading} onClick={() => update({ brandColor: option.value as StorefrontBrandColor })}>
-                    <span className="size-3.5 rounded-full ring-1 ring-black/10" style={{ backgroundColor: option.swatch }} aria-hidden="true" />{option.label}
-                  </Pill>
-                ))}
-              </Track>
+              <Label id="brand-color-label">Storefront colour</Label>
+              <div role="radiogroup" aria-labelledby="brand-color-label" className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                {STOREFRONT_BRAND_COLOR_OPTIONS.map((option, index) => {
+                  const on = form.brandColor === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      tabIndex={on ? 0 : -1}
+                      disabled={isLoading}
+                      onClick={() => update({ brandColor: option.value as StorefrontBrandColor })}
+                      onKeyDown={(event) => {
+                        if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(event.key)) return;
+                        event.preventDefault();
+                        const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1;
+                        const next = STOREFRONT_BRAND_COLOR_OPTIONS[(index + step + STOREFRONT_BRAND_COLOR_OPTIONS.length) % STOREFRONT_BRAND_COLOR_OPTIONS.length];
+                        update({ brandColor: next.value as StorefrontBrandColor });
+                        (event.currentTarget.parentElement?.children[STOREFRONT_BRAND_COLOR_OPTIONS.indexOf(next)] as HTMLElement | undefined)?.focus();
+                      }}
+                      className={`flex h-10 min-w-0 items-center gap-2.5 rounded-[6px] border px-3 text-left text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${on ? 'border-foreground bg-muted/50 font-medium' : 'hover:border-foreground/30 hover:bg-muted/40'}`}
+                    >
+                      <span className="size-4 shrink-0 rounded-[4px] ring-1 ring-black/10" style={{ backgroundColor: option.swatch }} aria-hidden="true" />
+                      <span className="truncate">{option.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </section>
 
@@ -225,22 +247,22 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
             <h2 id="settings-shop" className="border-b pb-2 text-sm font-semibold">Shop</h2>
             <div>
               <Label htmlFor="address">Address</Label>
-              <Input id="address" value={form.address} maxLength={300} onChange={(e) => update({ address: e.target.value })} className="mt-2" />
+              <Input id="address" value={form.address} maxLength={300} onChange={(e) => update({ address: e.target.value })} className="mt-2 h-9 rounded-[6px]" />
             </div>
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
                 <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" value={form.phone} maxLength={40} onChange={(e) => update({ phone: e.target.value })} className="mt-2 font-mono" />
+                <Input id="phone" value={form.phone} maxLength={40} onChange={(e) => update({ phone: e.target.value })} className="mt-2 h-9 rounded-[6px] tabular-nums" />
               </div>
               <div>
                 <Label htmlFor="timezone">Timezone</Label>
-                <select id="timezone" value={form.timezone} required onChange={(e) => update({ timezone: e.target.value })} className={`${selectClass} mt-2 font-mono`}>
+                <select id="timezone" value={form.timezone} required onChange={(e) => update({ timezone: e.target.value })} className={`${selectClass} mt-2`}>
                   {(zones.length ? zones : [form.timezone]).map((zone) => <option key={zone} value={zone}>{zone}</option>)}
                 </select>
               </div>
               <div>
                 <Label htmlFor="currency">Currency</Label>
-                <Input id="currency" value={form.currencyCode} readOnly aria-describedby="currency-help" className="mt-2 font-mono uppercase" />
+                <Input id="currency" value={form.currencyCode} readOnly aria-describedby="currency-help" className="mt-2 h-9 rounded-[6px] uppercase" />
                 <p id="currency-help" className="mt-1 text-xs text-muted-foreground">USD only</p>
               </div>
             </div>
@@ -257,9 +279,9 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
                   <Switch id={`hours-${day}`} aria-label={`Open ${DAY_LABELS[day]}`} checked={draft.open} disabled={isLoading} onCheckedChange={(open) => setDraft(day, { open })} />
                   {draft.open ? (
                     <span className="flex min-w-0 items-center gap-2">
-                      <Input type="time" aria-label={`${DAY_LABELS[day]} opens`} aria-invalid={invalid} value={draft.start} step={900} disabled={isLoading} onChange={(e) => e.target.value && setDraft(day, { start: e.target.value })} className="w-32 font-mono" />
+                      <Input type="time" aria-label={`${DAY_LABELS[day]} opens`} aria-invalid={invalid} value={draft.start} step={900} disabled={isLoading} onChange={(e) => e.target.value && setDraft(day, { start: e.target.value })} className="h-9 w-32 rounded-[6px] tabular-nums" />
                       <span className="text-muted-foreground">–</span>
-                      <Input type="time" aria-label={`${DAY_LABELS[day]} closes`} aria-invalid={invalid} value={draft.end} step={900} disabled={isLoading} onChange={(e) => e.target.value && setDraft(day, { end: e.target.value })} className="w-32 font-mono" />
+                      <Input type="time" aria-label={`${DAY_LABELS[day]} closes`} aria-invalid={invalid} value={draft.end} step={900} disabled={isLoading} onChange={(e) => e.target.value && setDraft(day, { end: e.target.value })} className="h-9 w-32 rounded-[6px] tabular-nums" />
                     </span>
                   ) : <span className="text-sm text-muted-foreground">Closed</span>}
                   {invalid ? <span role="alert" className="w-full text-xs text-destructive">Closing time must be after opening</span> : null}
@@ -271,37 +293,35 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
           <section aria-labelledby="settings-publish" className="space-y-1">
             <h2 id="settings-publish" className="border-b pb-2 text-sm font-semibold">Publication</h2>
             <div className="flex items-center justify-between gap-4 border-b py-3">
-              <Label htmlFor="published"><StatusDot tone={form.isPublic ? 'live' : 'off'} />Published Storefront</Label>
+              <Label htmlFor="published"><StatusDot tone={form.isPublic ? 'live' : 'off'} />Published storefront</Label>
               <Switch id="published" checked={form.isPublic} disabled={isLoading} onCheckedChange={(isPublic) => update({ isPublic })} />
             </div>
             <div className="flex items-center justify-between gap-4 py-3">
-              <Label htmlFor="demo" className="grid gap-0.5"><span><StatusDot tone={form.isDemo ? 'wait' : 'off'} />Sample Shop</span><span className="text-xs font-normal text-muted-foreground">{form.isDemo ? 'Hidden from search engines' : 'Listed for search engines'}</span></Label>
+              <Label htmlFor="demo" className="grid gap-0.5"><span><StatusDot tone={form.isDemo ? 'wait' : 'off'} />Sample shop</span><span className="text-xs font-normal text-muted-foreground">{form.isDemo ? 'Hidden from search engines' : 'Listed for search engines'}</span></Label>
               <Switch id="demo" checked={form.isDemo} disabled={isLoading} onCheckedChange={(isDemo) => update({ isDemo })} />
             </div>
           </section>
         </div>
 
         <aside className="min-w-0 space-y-4 xl:sticky xl:top-6 xl:self-start" aria-label="Preview and save">
-          <div className="overflow-hidden rounded-2xl ring-1 ring-border">
+          <div className="overflow-hidden rounded-[6px] ring-1 ring-border">
             <div className="flex items-center justify-between gap-2 bg-zinc-900 px-3 py-1.5 text-[11px] text-zinc-300"><span className="truncate"><StatusDot tone={form.isPublic ? 'live' : 'off'} />{form.address || 'Address'}</span><span className="font-mono">{form.phone}</span></div>
             <div className="flex items-center gap-2.5 bg-[#f6f3ee] px-4 py-4 text-[#111a33]">
-              {safeLogo ? <StoreLogo svg={safeLogo} color={form.logoColor} className="size-7" /> : <span className="size-7 rounded bg-red-200" aria-hidden="true" />}
+              {safeLogo ? <StoreLogo svg={safeLogo} color={form.logoColor} className="size-7" /> : <span className="size-7 rounded-[4px] bg-red-200" aria-hidden="true" />}
               <span className="min-w-0 truncate text-xl font-extrabold uppercase tracking-tight">{form.name || 'Shop name'}</span>
-              <span className="ml-auto shrink-0 rounded-full bg-[#111a33] px-3 py-1 text-xs font-semibold text-white">Book</span>
+              <span className="ml-auto shrink-0 rounded-[4px] bg-[#111a33] px-3 py-1 text-xs font-semibold text-white">Book</span>
             </div>
             <div className="h-1.5" style={{ background: `repeating-linear-gradient(-45deg, #c62f2a 0 6px, #f6f3ee 6px 12px, ${swatch || '#155eef'} 12px 18px, #f6f3ee 18px 24px)` }} aria-hidden="true" />
             {form.tagline ? <p className="bg-[#f6f3ee] px-4 pb-4 pt-3 text-xs text-[#4b5268]">{form.tagline}</p> : null}
           </div>
 
-          <div aria-live="polite" role="status" className="font-mono text-xs text-muted-foreground">
-            {isLoading ? 'Saving…' : status || (dirty ? 'Unsaved changes' : 'Saved')}
+          <div aria-live="polite" role="status" className="text-xs text-muted-foreground">
+            <StatusDot tone={dirty ? 'wait' : 'live'} />{isLoading ? 'Saving…' : status || (dirty ? 'Unsaved changes' : 'All changes saved')}
           </div>
           {error && <Notice tone="alert">{error}</Notice>}
-          <Track block>
-            <Pill type="submit" variant="primary" disabled={isLoading || !safeLogo || !dirty || hoursInvalid}>
-              {isLoading ? 'Saving…' : 'Save Settings'}
-            </Pill>
-          </Track>
+          <Pill type="submit" variant="primary" className="w-full" disabled={isLoading}>
+            {isLoading ? 'Saving…' : 'Save settings'}
+          </Pill>
         </aside>
       </form>
     </div>

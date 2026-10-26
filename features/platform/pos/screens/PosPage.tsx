@@ -15,9 +15,18 @@ const breadcrumbs = [
   { type: 'page' as const, label: 'POS checkout' },
 ];
 
-const header = (
-  <PageHeader title="Checkout" actions={<Track><PillLink href="/dashboard/platform/booking">Booking board</PillLink><PillLink href="/dashboard/platform/queue">Walk-ins</PillLink></Track>} />
-);
+const money = (cents?: number | null) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((cents || 0) / 100);
+
+function header(metrics?: { ready: number; outstanding: number; paidToday: number }) {
+  return (
+    <PageHeader
+      title="Checkout"
+      tone={metrics ? (metrics.ready ? 'wait' : undefined) : 'alert'}
+      meta={metrics ? `${metrics.ready ? `${metrics.ready} open ticket${metrics.ready === 1 ? '' : 's'} · ${money(metrics.outstanding)} to collect` : 'No open tickets'} · ${metrics.paidToday} paid today` : undefined}
+      actions={<Track><PillLink href="/dashboard/platform/booking">Booking board</PillLink><PillLink href="/dashboard/platform/queue">Walk-ins</PillLink></Track>}
+    />
+  );
+}
 
 function param(value: string | string[] | undefined) {
   return typeof value === 'string' ? value : '';
@@ -41,7 +50,7 @@ export default async function PosPage({ searchParams }: PageProps) {
   const response = await getPosCheckoutData(query);
 
   return (
-    <PageContainer title="POS checkout" header={header} breadcrumbs={breadcrumbs}>
+    <PageContainer title="POS checkout" header={header(response.success ? response.data.metrics : undefined)} breadcrumbs={breadcrumbs}>
       {response.success ? (
         <PosPageClient data={response.data} query={query} />
       ) : (

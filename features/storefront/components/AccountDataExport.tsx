@@ -20,7 +20,7 @@ export function AccountDataExport() {
     finally { setPending(false); }
   }
   return <div className="grid gap-2">
-    <div className="sf-track"><button type="button" className="sf-pill" disabled={pending} onClick={download}>{pending ? 'Preparing…' : 'Download my data'}</button></div>
+    <div className="sf-actions"><button type="button" className="sf-btn" disabled={pending} onClick={download}>{pending ? 'Preparing…' : 'Download my data'}</button></div>
     {message ? <p role="status" className="sf-small">{message}</p> : null}
   </div>;
 }

@@ -4,10 +4,9 @@ export default function StorefrontError({ reset }: { error: Error & { digest?: s
   return (
     <div data-storefront className="sf-state">
       <main id="main-content" role="alert">
-        <p className="sf-eyebrow"><span className="sf-dot is-alert" aria-hidden="true" />Temporarily unavailable</p>
-        <h1 className="sf-display text-[var(--text-display-s)]">This page couldn’t load</h1>
-        <p className="sf-muted">Nothing was changed. Try again in a moment.</p>
-        <div className="sf-track"><button type="button" onClick={reset} className="sf-pill is-primary">Try again</button></div>
+        <h1 className="sf-display sf-h1">This page couldn’t load</h1>
+        <p className="sf-lead"><span className="sf-dot is-alert" aria-hidden="true" />Temporarily unavailable. Nothing was changed; try again in a moment.</p>
+        <div className="sf-actions"><button type="button" onClick={reset} className="sf-btn is-primary">Try again</button></div>
       </main>
     </div>
   );

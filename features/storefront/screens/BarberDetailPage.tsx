@@ -30,18 +30,20 @@ export default async function BarberDetailPage({ params }: { params: Promise<{ i
       <main id="main-content" className="sf-container pb-[var(--space-3xl)]">
         <Link href="/barbers" className="sf-arrow-link mt-4"><ArrowLeft aria-hidden="true" /> Barbers</Link>
         <div className="mt-4 grid gap-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-12">
-          <StorefrontImage src={photo.src} fallbackSrc={photo.fallback} alt={barber.displayName} className="aspect-[4/5] rounded-[var(--radius-lg)]" priority sizes="(max-width: 1024px) 100vw, 45vw" />
+          <div className="sf-chair-photo is-tall">
+            <StorefrontImage src={photo.src} fallbackSrc={photo.fallback} alt={barber.displayName} priority sizes="(max-width: 1024px) 100vw, 45vw" />
+            {barber.chairNumber ? <span className="sf-chair-no">Chair<b>{barber.chairNumber}</b></span> : null}
+          </div>
           <div className="grid content-start gap-6">
-            {barber.chairNumber ? <p className="sf-eyebrow">Chair {barber.chairNumber}</p> : null}
-            <h1 className="sf-display text-[var(--text-display-s)]">{barber.displayName}</h1>
+            <h1 className="sf-display sf-h1">{barber.displayName}</h1>
             {barber.bio ? <p className="sf-lead">{barber.bio}</p> : null}
-            <div className="sf-track">
-              <Link href={`/book?barber=${encodeURIComponent(barber.id)}`} className="sf-pill is-primary">Book with {barber.displayName.split(' ')[0]}</Link>
-              <Link href="/queue" className="sf-pill">Join walk-ins</Link>
+            <div className="sf-actions">
+              <Link href={`/book?barber=${encodeURIComponent(barber.id)}`} className="sf-btn is-accent">Book with {barber.displayName.split(' ')[0]}</Link>
+              <Link href="/queue" className="sf-btn">Join the line</Link>
             </div>
             {week.length ? (
               <section aria-labelledby="barber-week" className="grid gap-2">
-                <h2 id="barber-week" className="sf-eyebrow">In the chair</h2>
+                <h2 id="barber-week" className="sf-subtitle">In the chair</h2>
                 <dl className="sf-ledger">
                   {DAYS.map(([day, label]) => {
                     const hours = byDay.get(day);
@@ -52,11 +54,11 @@ export default async function BarberDetailPage({ params }: { params: Promise<{ i
             ) : null}
             {offered.length ? (
               <section aria-labelledby="barber-services" className="grid gap-2">
-                <h2 id="barber-services" className="sf-eyebrow">Services</h2>
+                <h2 id="barber-services" className="sf-subtitle">Services</h2>
                 <ul className="sf-ledger">
                   {offered.map((service) => (
                     <li key={service.id}>
-                      <Link href={service.depositRequired ? `/services/${service.id}` : `/book?service=${encodeURIComponent(service.id)}&barber=${encodeURIComponent(barber.id)}`} className="flex w-full justify-between gap-3">
+                      <Link href={service.depositRequired ? `/services/${service.id}` : `/book?service=${encodeURIComponent(service.id)}&barber=${encodeURIComponent(barber.id)}`} className="w-full justify-between gap-3">
                         <span>{service.name} <span className="sf-muted sf-mono">· {formatDuration(service.durationMinutes)}</span></span>
                         <span className="sf-mono">{formatMoney(service.price)}</span>
                       </Link>

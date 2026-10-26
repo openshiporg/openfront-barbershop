@@ -14,24 +14,24 @@ export default async function MembershipsPage() {
     <StorefrontShell>
       <main id="main-content">
         <section className="sf-container sf-page-head">
-          <p className="sf-eyebrow">Bought in the shop</p>
           <div className="sf-page-head-row">
             <h1 className="sf-display">Memberships</h1>
-            <div className="sf-track"><Link href="/account" className="sf-pill">Your balances</Link><Link href="/book" className="sf-pill is-primary">Book a chair</Link></div>
+            <div className="sf-actions"><Link href="/account" className="sf-btn">Your balances</Link><Link href="/book" className="sf-btn is-primary">Book a time</Link></div>
           </div>
+          <p className="sf-lead">Bought in the shop, used when you book.</p>
         </section>
-        <section className="sf-container sf-section grid gap-[var(--space-2xl)] pt-[var(--space-xl)] lg:grid-cols-2">
+        <section className="sf-container sf-section is-tight grid gap-[var(--space-2xl)] lg:grid-cols-2">
           {offers === null ? <p role="alert" className="sf-notice is-error lg:col-span-2">Memberships couldn’t load. Try again in a moment.</p> : null}
           {offers ? (
             <section aria-labelledby="plans">
-              <h2 id="plans" className="sf-title mb-4">Memberships</h2>
+              <h2 id="plans" className="sf-title mb-4">Plans</h2>
               {!offers.plans.length ? <p className="sf-muted">No memberships offered.</p> : (
                 <ul className="grid gap-4">
                   {offers.plans.map((plan) => (
                     <li key={plan.id} className="sf-card-dark sf-on-dark grid gap-2">
-                      <div className="flex items-baseline justify-between gap-3"><h3 className="sf-subtitle">{plan.name}</h3><span className="sf-mono">{formatMoney(plan.price)}/{INTERVAL[plan.billingInterval] || plan.billingInterval}</span></div>
+                      <div className="flex items-baseline justify-between gap-3"><h3 className="sf-subtitle">{plan.name}</h3><span className="sf-product-price whitespace-nowrap">{formatMoney(plan.price)}<span className="sf-small font-semibold">/{INTERVAL[plan.billingInterval] || plan.billingInterval}</span></span></div>
                       <p className="sf-small">{plan.includedVisits ? `${plan.includedVisits} ${plan.includedVisits === 1 ? 'visit' : 'visits'} included` : 'No visits included'}{plan.discountPercent ? ` · ${plan.discountPercent}% off other services` : ''}</p>
-                      {plan.description ? <p className="sf-small text-[var(--color-inverse-muted)]">{plan.description}</p> : null}
+                      {plan.description ? <p className="sf-small sf-muted">{plan.description}</p> : null}
                     </li>
                   ))}
                 </ul>
@@ -45,7 +45,7 @@ export default async function MembershipsPage() {
                 <ul className="grid gap-4">
                   {offers.packages.map((item) => (
                     <li key={item.id} className="sf-card grid gap-2">
-                      <div className="flex items-baseline justify-between gap-3"><h3 className="sf-subtitle">{item.name}</h3><span className="sf-mono">{formatMoney(item.price)}</span></div>
+                      <div className="flex items-baseline justify-between gap-3"><h3 className="sf-subtitle">{item.name}</h3><span className="sf-product-price">{formatMoney(item.price)}</span></div>
                       <ul className="sf-small sf-muted">{item.items.map((line) => <li key={line.serviceId}>{line.quantity} × <Link className="sf-link" href={`/services/${line.serviceId}`}>{line.serviceName}</Link></li>)}</ul>
                       {item.description ? <p className="sf-small sf-muted">{item.description}</p> : null}
                     </li>

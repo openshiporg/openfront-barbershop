@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { PageContainer } from '@/features/dashboard/components/PageContainer';
 import { basePath } from '@/features/dashboard/lib/config';
 import { formatShopDateTime } from '@/features/shared/shop-time';
-import { Empty, PageHeader, PillLink, Readouts, Section, StatusDot, Track, type Tone } from '@/features/platform/lib/ui';
+import { DataTable, Empty, PageHeader, PillLink, Readouts, Section, StatusCell, Td, type Tone } from '@/features/platform/lib/ui';
 import { getProductDetailAction } from '../actions/inventory';
 import { AdjustStockButton, ReceiveDeliveryButton } from '../components/InventoryControls';
 
@@ -23,11 +23,11 @@ export default async function ProductStockPage({ params }: { params: Promise<{ i
   ];
   const header = (
     <PageHeader title={product.name} tone={tone} meta={`${product.sku || 'No SKU'} · ${money(product.price)} · ${product.status === 'active' ? 'for sale' : product.status}`}
-      actions={<Track><PillLink href={`/dashboard/platform/services/products/${product.id}`}>Edit details</PillLink><AdjustStockButton productId={product.id} lots={activeLots} /><ReceiveDeliveryButton productId={product.id} suppliers={data.suppliers} cost={product.cost} /></Track>} />
+      actions={<div className="flex flex-wrap items-center gap-1.5"><PillLink href={`/dashboard/platform/services/products/${product.id}`}>Edit details</PillLink><AdjustStockButton productId={product.id} lots={activeLots} /><ReceiveDeliveryButton productId={product.id} suppliers={data.suppliers} cost={product.cost} /></div>} />
   );
   return (
     <PageContainer title={product.name} header={header} breadcrumbs={breadcrumbs}>
-      <div className="flex min-w-0 flex-col gap-8 px-4 pb-8 md:px-6">
+      <div className="flex min-w-0 flex-col gap-8 px-4 pb-24 md:px-6">
         <Readouts items={[
           { label: 'On hand', value: product.inventoryTracked ? product.onHand : '—', tone: product.low ? 'wait' : undefined },
           { label: 'Sold, 30 days', value: product.soldLast30 },
@@ -38,27 +38,51 @@ export default async function ProductStockPage({ params }: { params: Promise<{ i
 
         <Section id="product-lots" title="Lots" count={data.lots.length}>
           {!data.lots.length ? <Empty>No deliveries received.</Empty> : (
-            <ul>
+            <DataTable label="Lots" className="relative" head={[
+              { label: 'Lot' },
+              { label: 'Supplier', className: 'hidden sm:table-cell' },
+              { label: 'Received', className: 'hidden md:table-cell' },
+              { label: 'Expires', className: 'hidden md:table-cell' },
+              { label: 'Unit cost', className: 'hidden text-right sm:table-cell' },
+              { label: 'Left / received', className: 'text-right' },
+              { label: 'Status', className: 'hidden sm:table-cell' },
+            ]}>
               {data.lots.map((lot) => (
-                <li key={lot.id} className="flex flex-wrap items-baseline justify-between gap-3 border-b py-2.5 text-sm last:border-b-0">
-                  <span className="min-w-0"><span className="font-mono"><StatusDot tone={lot.status === 'active' ? 'live' : 'off'} />{lot.lotNumber}</span><span className="block text-xs text-muted-foreground">{lot.supplier?.name || 'No supplier'} · received {lot.receivedAt ? formatShopDateTime(lot.receivedAt, timezone) : '—'}{lot.expiresAt ? ` · expires ${formatShopDateTime(lot.expiresAt, timezone)}` : ''} · {money(lot.unitCost)} each</span></span>
-                  <span className="font-mono tabular-nums">{lot.quantityRemaining ?? 0} / {lot.quantityReceived ?? 0}</span>
-                </li>
+                <tr key={lot.id}>
+                  <Td className="font-mono text-xs">{lot.lotNumber}</Td>
+                  <Td className="hidden sm:table-cell">{lot.supplier?.name || <span className="text-muted-foreground">No supplier</span>}</Td>
+                  <Td className="hidden whitespace-nowrap tabular-nums md:table-cell">{lot.receivedAt ? formatShopDateTime(lot.receivedAt, timezone) : '—'}</Td>
+                  <Td className="hidden whitespace-nowrap tabular-nums md:table-cell">{lot.expiresAt ? formatShopDateTime(lot.expiresAt, timezone) : '—'}</Td>
+                  <Td className="hidden text-right tabular-nums sm:table-cell">{money(lot.unitCost)}</Td>
+                  <Td className="text-right tabular-nums">{lot.quantityRemaining ?? 0} / {lot.quantityReceived ?? 0}</Td>
+                  <Td className="hidden sm:table-cell"><StatusCell tone={lot.status === 'active' ? 'live' : 'off'}>{lot.status === 'active' ? 'In stock' : lot.status.replaceAll('_', ' ')}</StatusCell></Td>
+                </tr>
               ))}
-            </ul>
+            </DataTable>
           )}
         </Section>
 
         <Section id="product-ledger" title="Stock ledger" count={data.movements.length}>
           {!data.movements.length ? <Empty>No stock movements yet.</Empty> : (
-            <ul>
+            <DataTable label="Stock ledger" className="relative" head={[
+              { label: 'When' },
+              { label: 'Movement' },
+              { label: 'Lot', className: 'hidden sm:table-cell' },
+              { label: 'Reason', className: 'hidden md:table-cell' },
+              { label: 'Change', className: 'text-right' },
+              { label: 'After', className: 'hidden text-right sm:table-cell' },
+            ]}>
               {data.movements.map((movement) => (
-                <li key={movement.id} className="flex flex-wrap items-baseline justify-between gap-3 border-b py-2.5 text-sm last:border-b-0">
-                  <span className="min-w-0"><span className="font-medium">{MOVEMENT[movement.movementType] || movement.movementType}</span><span className="block text-xs text-muted-foreground">{formatShopDateTime(movement.occurredAt, timezone)}{movement.inventoryLot ? ` · ${movement.inventoryLot.lotNumber}` : ''}{movement.reason ? ` · ${movement.reason}` : ''}</span></span>
-                  <span className={`font-mono tabular-nums ${movement.quantityDelta < 0 ? 'text-destructive' : ''}`}>{movement.quantityDelta > 0 ? '+' : ''}{movement.quantityDelta}{movement.quantityAfter != null ? <span className="text-xs text-muted-foreground"> → {movement.quantityAfter}</span> : null}</span>
-                </li>
+                <tr key={movement.id}>
+                  <Td className="whitespace-nowrap tabular-nums">{formatShopDateTime(movement.occurredAt, timezone)}</Td>
+                  <Td>{MOVEMENT[movement.movementType] || movement.movementType}</Td>
+                  <Td className="hidden font-mono text-xs sm:table-cell">{movement.inventoryLot?.lotNumber || '—'}</Td>
+                  <Td className="hidden max-w-64 truncate text-muted-foreground md:table-cell">{movement.reason || '—'}</Td>
+                  <Td className={`text-right tabular-nums ${movement.quantityDelta < 0 ? 'text-destructive' : ''}`}>{movement.quantityDelta > 0 ? '+' : ''}{movement.quantityDelta}</Td>
+                  <Td className="hidden text-right tabular-nums text-muted-foreground sm:table-cell">{movement.quantityAfter ?? '—'}</Td>
+                </tr>
               ))}
-            </ul>
+            </DataTable>
           )}
         </Section>
       </div>

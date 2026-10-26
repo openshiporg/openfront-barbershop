@@ -2,12 +2,15 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
+import { Search } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCommandKey } from '@/features/platform/lib/useCommandKey';
 import { shopDateKey } from '@/features/shared/shop-time';
-import { Empty, Notice, Pager as KitPager, Pill, PillLink, Section, selectClass, StatusDot, Track } from '@/features/platform/lib/ui';
+import { cn } from '@/lib/utils';
+import { Empty, Notice, Pager as KitPager, Pill, PillLink, selectClass, StatusCell, StatusDot, Track, type Tone } from '@/features/platform/lib/ui';
+import { LocalTabs, Segmented } from '@/features/platform/booking/components/FloorKit';
 import { checkoutAppointmentAction, recordProductSaleAction, refundCashCheckoutAction, returnProductSaleAction, type PosQuery } from '../actions/checkout';
 import type { Paging, PosAppointment, PosCustomerSummary, PosProjectionData, PosReceipt, ProductLineSummary } from '../lib/posTypes';
 
@@ -67,6 +70,23 @@ function hrefWith(query: PosQuery, changes: Partial<Record<'appointment' | 'tick
   return `/dashboard/platform/pos${text ? `?${text}` : ''}`;
 }
 
+/** Search that submits on Enter; no separate button. */
+function SearchField({ id, name, label, defaultValue, placeholder, hidden, mono = false }: { id: string; name: string; label: string; defaultValue: string; placeholder: string; hidden?: Record<string, string>; mono?: boolean }) {
+  return (
+    <form action="/dashboard/platform/pos" role="search" className="relative w-full sm:max-w-sm">
+      {Object.entries(hidden || {}).filter(([, value]) => value).map(([key, value]) => <input key={key} type="hidden" name={key} value={value} />)}
+      <label htmlFor={id} className="sr-only">{label}</label>
+      <Search aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+      <input id={id} name={name} type="search" defaultValue={defaultValue} placeholder={placeholder} className={cn('h-9 w-full rounded-[6px] border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', mono && 'tabular-nums')} />
+    </form>
+  );
+}
+
+function ticketTone(appointment: PosAppointment, earlierDay: boolean): Tone {
+  if (earlierDay) return 'alert';
+  return appointment.status === 'in_chair' ? 'live' : appointment.status === 'checked_in' ? 'wait' : 'off';
+}
+
 function Pager({ paging, label, href }: { paging: Paging; label: string; href: (page: number) => string }) {
   if (paging.total <= paging.pageSize) return null;
   const pages = Math.ceil(paging.total / paging.pageSize);
@@ -85,8 +105,11 @@ export function PosPageClient({ data, query }: { data: PosProjectionData; query:
     || null;
   const requestedClosed = Boolean(requestedAppointment && (['paid', 'refunded'].includes(String(requestedAppointment.paymentStatus)) || !checkoutStatuses.includes(String(requestedAppointment.status))));
 
+  const initialTab: CounterTab = query.receiptId || (query.receiptPage || 1) > 1 ? 'receipts' : query.saleSearch || (query.salePage || 1) > 1 ? 'returns' : 'retail';
+  const [tab, setTab] = useState<CounterTab>(initialTab);
+
   return (
-    <div className="flex min-w-0 flex-col gap-8 px-4 pb-8 md:px-6">
+    <div className="flex min-w-0 flex-col gap-8 px-4 pb-24 md:px-6">
 
       {requestedAppointmentId && !requestedAppointment && (
         <Notice tone="alert">The appointment sent to checkout was not found in this shop.</Notice>
@@ -95,56 +118,83 @@ export function PosPageClient({ data, query }: { data: PosProjectionData; query:
         <Notice>This appointment is {statusLabel(requestedAppointment.status)}, payment {statusLabel(requestedAppointment.paymentStatus)}. Already closed; see receipts below.</Notice>
       )}
 
-      <div className="grid min-w-0 gap-8 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <Section id="pos-queue-heading" title="Open tickets" tone={data.tickets.total ? 'wait' : undefined} count={data.tickets.total}>
-          <form action="/dashboard/platform/pos" role="search" className="mb-3 flex items-end gap-2">
-            <div className="grid min-w-0 flex-1 gap-1">
-              <Label htmlFor="ticket-search" className="sr-only">Find a ticket</Label>
-              <Input id="ticket-search" name="ticketQ" defaultValue={data.tickets.search} placeholder="Customer, phone, service or barber" />
+      <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+        <section aria-labelledby="pos-queue-heading" className="min-w-0 space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h2 id="pos-queue-heading" className="text-sm font-semibold">Open tickets<span className="ml-2 text-xs font-normal tabular-nums text-muted-foreground">{data.tickets.total}</span></h2>
+            <SearchField id="ticket-search" name="ticketQ" label="Find a ticket" defaultValue={data.tickets.search} placeholder="Customer, phone, service or barber" />
+          </div>
+          <div className="relative overflow-hidden rounded-[6px] border bg-background">
+            <div aria-hidden="true" className="hidden h-9 grid-cols-[minmax(0,1fr)_7.5rem_6rem] items-center gap-3 border-b bg-muted/40 px-3 text-xs font-medium text-muted-foreground sm:grid">
+              <span>Ticket</span><span>Status</span><span className="text-right">Amount</span>
             </div>
-            <Track><Pill type="submit">Search</Pill></Track>
-          </form>
-          <div className="space-y-1 rounded-2xl bg-muted/50 p-1 ring-1 ring-inset ring-black/5 dark:ring-white/5">
-            {appointments.map((appointment) => (
-              <button
-                key={appointment.id}
-                type="button"
-                aria-pressed={selected?.id === appointment.id}
-                aria-controls="pos-tender"
-                onClick={() => setSelectedId(appointment.id)}
-                className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 rounded-xl px-3 py-2.5 text-left transition aria-pressed:bg-background aria-pressed:shadow-sm aria-pressed:ring-1 aria-pressed:ring-black/5 hover:bg-background/60 dark:aria-pressed:bg-zinc-800"
-              >
-                <span className="min-w-0 truncate font-medium"><StatusDot tone={earlier(appointment) ? 'alert' : appointment.status === 'in_chair' ? 'live' : appointment.status === 'checked_in' ? 'wait' : 'off'} />{customerName(appointment.customer)}</span>
-                <span className="font-mono text-sm tabular-nums">{formatMoney(appointment.price)}</span>
-                <span className="col-span-2 truncate pl-4 text-xs text-muted-foreground">{serviceLabel(appointment)} · {barberLabel(appointment)} · {formatDateTime(appointment.startsAt, timeZone)}</span>
-                <span className="col-span-2 pl-4 text-xs text-muted-foreground">{earlier(appointment) ? <span className="font-medium text-destructive">Earlier day · </span> : null}{statusLabel(appointment.status)}{appointment.paymentStatus && appointment.paymentStatus !== 'not_required' ? ` · ${statusLabel(appointment.paymentStatus)}` : ''}{(appointment.customer?.packageBalances?.length ?? 0) > 0 ? ' · package balance' : ''}</span>
-              </button>
-            ))}
-            {!appointments.length && <p className="px-3 py-4 text-sm text-muted-foreground">{data.tickets.search ? `No open tickets match “${data.tickets.search}”.` : 'No checked-in or in-chair visits.'}</p>}
+            <ul aria-label="Open tickets">
+              {appointments.map((appointment) => {
+                const earlierDay = earlier(appointment);
+                const isSelected = selected?.id === appointment.id;
+                return (
+                  <li key={appointment.id} className="border-b last:border-b-0">
+                    <button
+                      type="button"
+                      aria-pressed={isSelected}
+                      aria-controls="pos-tender"
+                      onClick={() => setSelectedId(appointment.id)}
+                      className={cn('grid min-h-11 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 px-3 py-2.5 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[minmax(0,1fr)_7.5rem_6rem]', isSelected && 'bg-muted hover:bg-muted')}
+                    >
+                      <span className="min-w-0">
+                        <span className={cn('block truncate', isSelected ? 'font-semibold' : 'font-medium')}>{customerName(appointment.customer)}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{serviceLabel(appointment)} · {barberLabel(appointment)} · {formatDateTime(appointment.startsAt, timeZone)}{(appointment.customer?.packageBalances?.length ?? 0) > 0 ? ' · package balance' : ''}</span>
+                      </span>
+                      <span className="col-start-1 row-start-2 sm:col-start-2 sm:row-start-1">
+                        <StatusCell tone={ticketTone(appointment, earlierDay)}>{earlierDay ? 'Earlier day' : statusLabel(appointment.status)}</StatusCell>
+                        {appointment.paymentStatus && appointment.paymentStatus !== 'not_required' && appointment.paymentStatus !== 'unpaid' ? <span className="block text-xs text-muted-foreground sm:pl-3.5">{statusLabel(appointment.paymentStatus)}</span> : null}
+                      </span>
+                      <span className="row-span-2 text-right font-semibold tabular-nums sm:row-span-1">{formatMoney(appointment.price)}</span>
+                    </button>
+                  </li>
+                );
+              })}
+              {!appointments.length && <li className="px-3 py-6 text-sm text-muted-foreground">{data.tickets.search ? `No open tickets match “${data.tickets.search}”.` : 'No checked-in or in-chair visits.'} <Link className="font-medium text-foreground underline underline-offset-4" href="/dashboard/platform/booking">Booking board</Link></li>}
+            </ul>
           </div>
           <Pager paging={data.tickets} label="Ticket pages" href={(page) => hrefWith(query, { tickets: page, appointment: null })} />
-        </Section>
+        </section>
 
-        <section id="pos-tender" aria-labelledby="pos-tender-heading" className="min-w-0">
-          <h2 id="pos-tender-heading" className="border-b pb-2 text-sm font-semibold">Take payment</h2>
-          <div className="pt-3">
-            {selected
-              ? <TenderPanel key={selected.id} appointment={selected} closed={requestedClosed && selected.id === requestedAppointment?.id} timeZone={timeZone} />
-              : <Empty>Select a ticket.</Empty>}
-          </div>
+        <section id="pos-tender" aria-labelledby="pos-tender-heading" className="min-w-0 xl:sticky xl:top-4">
+          <h2 id="pos-tender-heading" className="sr-only">Take payment</h2>
+          {selected
+            ? <TenderPanel key={selected.id} appointment={selected} closed={requestedClosed && selected.id === requestedAppointment?.id} timeZone={timeZone} />
+            : <div className="rounded-[6px] border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">{appointments.length ? 'Choose a ticket to take payment.' : 'Nothing to check out.'}</div>}
         </section>
       </div>
 
-      <RetailSale data={data} />
-      <RetailReturns data={data} query={query} />
-      <Receipts data={data} query={query} />
+      <section aria-label="Retail, returns and receipts" className="min-w-0 space-y-4">
+        <LocalTabs
+          idBase="counter"
+          label="Counter"
+          value={tab}
+          onChange={setTab}
+          tabs={[
+            { value: 'retail', label: 'Retail sale' },
+            { value: 'returns', label: 'Returns', count: data.sales.total },
+            { value: 'receipts', label: 'Receipts', count: data.receiptPaging.total },
+          ]}
+        />
+        <div role="tabpanel" id={`counter-panel-${tab}`} aria-labelledby={`counter-tab-${tab}`}>
+          {tab === 'retail' && <RetailSale data={data} />}
+          {tab === 'returns' && <RetailReturns data={data} query={query} />}
+          {tab === 'receipts' && <Receipts data={data} query={query} />}
+        </div>
+      </section>
     </div>
   );
 }
 
+type CounterTab = 'retail' | 'returns' | 'receipts';
+
 // Keyed by appointment id: tender drafts belong to exactly this ticket.
 function TenderPanel({ appointment, closed, timeZone }: { appointment: PosAppointment; closed: boolean; timeZone: string }) {
-  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [paymentMethod, setPaymentMethod] = useState<string>('cash');
   const [packageBalanceId, setPackageBalanceId] = useState('');
   const [tipAmount, setTipAmount] = useState('0');
   const [discountAmount, setDiscountAmount] = useState('0');
@@ -190,34 +240,41 @@ function TenderPanel({ appointment, closed, timeZone }: { appointment: PosAppoin
   };
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-2xl bg-zinc-950 p-5 text-zinc-50 shadow-[inset_0_1px_3px_rgb(0_0_0/0.6)] dark:bg-black">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <p className="font-semibold">{customerName(appointment.customer)}</p>
-          <p className="text-xs text-zinc-400">{formatDateTime(appointment.startsAt, timeZone)}</p>
+    <div className="space-y-4 rounded-[6px] border bg-background p-4">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+        <div className="min-w-0">
+          <p className="truncate font-semibold">{customerName(appointment.customer)}</p>
+          <p className="truncate text-sm text-muted-foreground">{serviceLabel(appointment)} · {barberLabel(appointment)}</p>
+          <p className="text-xs tabular-nums text-muted-foreground">{formatDateTime(appointment.startsAt, timeZone)}</p>
         </div>
-        <p className="text-sm text-zinc-400">{serviceLabel(appointment)} · {barberLabel(appointment)}</p>
-        <p className="mt-4 font-mono text-4xl font-semibold tabular-nums sm:text-5xl">{formatMoney(total)}</p>
-        <dl className="mt-3 grid grid-cols-4 gap-2 border-t border-zinc-800 pt-3 font-mono text-xs tabular-nums">
-          <div><dt className="text-zinc-500">Service</dt><dd>{formatMoney(subtotal)}</dd></div>
-          <div><dt className="text-zinc-500">Tip</dt><dd>{formatMoney(tip || 0)}</dd></div>
-          <div><dt className="text-zinc-500">Tax</dt><dd>{formatMoney(tax || 0)}</dd></div>
-          <div><dt className="text-zinc-500">Discount</dt><dd>−{formatMoney(appliedDiscount)}</dd></div>
-        </dl>
+        <p className="text-3xl font-semibold tabular-nums tracking-tight" aria-live="polite">{formatMoney(total)}</p>
       </div>
+      <dl className="grid grid-cols-4 gap-2 border-y py-2 text-xs tabular-nums">
+        <div><dt className="text-muted-foreground">Service</dt><dd>{formatMoney(subtotal)}</dd></div>
+        <div><dt className="text-muted-foreground">Tip</dt><dd>{formatMoney(tip || 0)}</dd></div>
+        <div><dt className="text-muted-foreground">Tax</dt><dd>{formatMoney(tax || 0)}</dd></div>
+        <div><dt className="text-muted-foreground">Discount</dt><dd>−{formatMoney(appliedDiscount)}</dd></div>
+      </dl>
       {appointment.status === 'checked_in' && !closed && <Notice>Seat this visit on the booking board before checkout.</Notice>}
       {depositPaid > 0 && !closed && <Notice>Deposit {formatMoney(depositPaid)} paid online · collect {formatMoney(collect)}</Notice>}
       {!closed && appointment.startsAt && shopDateKey(String(appointment.startsAt), timeZone) < shopDateKey(new Date(), timeZone) && <Notice tone="alert">Visit from {formatDateTime(appointment.startsAt, timeZone)}, an earlier day</Notice>}
       {paymentMethod === 'package' && total > 0 && <Notice tone="alert">A prepaid visit can’t include tip or tax. Mixed tender isn’t supported.</Notice>}
       {!amountsValid && <Notice tone="alert">Tip, discount and tax must be zero or positive amounts.</Notice>}
 
-      <div className="grid gap-1">
-        <span className="text-xs text-muted-foreground">Tender</span>
-        <Track label="Payment method">
-          <Pill size="sm" variant="flat" aria-pressed={paymentMethod === 'cash'} onClick={() => { setPaymentMethod('cash'); setPackageBalanceId(''); }}>Cash</Pill>
-          <Pill size="sm" variant="flat" aria-pressed={paymentMethod === 'card'} onClick={() => { setPaymentMethod('card'); setPackageBalanceId(''); }}>Card terminal</Pill>
-          {packageBalances.length > 0 && <Pill size="sm" variant="flat" aria-pressed={paymentMethod === 'package'} onClick={() => setPaymentMethod('package')}>Package visit</Pill>}
-        </Track>
+      <div className="grid gap-1.5">
+        <span className="text-xs font-medium text-muted-foreground">Tender</span>
+        <Segmented
+          label="Payment method"
+          size="lg"
+          block
+          value={paymentMethod}
+          onChange={(value) => { setPaymentMethod(value); if (value !== 'package') setPackageBalanceId(''); }}
+          options={[
+            { value: 'cash', label: 'Cash' },
+            { value: 'card', label: 'Card terminal' },
+            ...(packageBalances.length > 0 ? [{ value: 'package', label: 'Package visit' }] : []),
+          ]}
+        />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -236,26 +293,26 @@ function TenderPanel({ appointment, closed, timeZone }: { appointment: PosAppoin
         )}
         <div className="grid gap-1">
           <Label htmlFor={`tip-${id}`} className="text-xs text-muted-foreground">Tip ($)</Label>
-          <Input id={`tip-${id}`} className="font-mono" value={tipAmount} onChange={(event) => setTipAmount(event.target.value)} inputMode="decimal" />
+          <Input id={`tip-${id}`} className="rounded-[6px] tabular-nums" value={tipAmount} onChange={(event) => setTipAmount(event.target.value)} inputMode="decimal" />
         </div>
         <div className="grid gap-1">
           <Label htmlFor={`discount-${id}`} className="text-xs text-muted-foreground">Discount ($)</Label>
-          <Input id={`discount-${id}`} className="font-mono" value={discountAmount} onChange={(event) => setDiscountAmount(event.target.value)} inputMode="decimal" />
+          <Input id={`discount-${id}`} className="rounded-[6px] tabular-nums" value={discountAmount} onChange={(event) => setDiscountAmount(event.target.value)} inputMode="decimal" />
         </div>
         <div className="grid gap-1">
           <Label htmlFor={`tax-${id}`} className="text-xs text-muted-foreground">Tax ($)</Label>
-          <Input id={`tax-${id}`} className="font-mono" value={taxAmount} onChange={(event) => setTaxAmount(event.target.value)} inputMode="decimal" />
+          <Input id={`tax-${id}`} className="rounded-[6px] tabular-nums" value={taxAmount} onChange={(event) => setTaxAmount(event.target.value)} inputMode="decimal" />
         </div>
       </div>
 
       <div className="grid gap-1">
         <Label htmlFor={`notes-${id}`} className="text-xs text-muted-foreground">Checkout notes</Label>
-        <textarea id={`notes-${id}`} value={notes} onChange={(event) => setNotes(event.target.value)} className="min-h-20 w-full rounded-md border bg-background px-3 py-2 text-sm" />
+        <textarea id={`notes-${id}`} value={notes} onChange={(event) => setNotes(event.target.value)} className="min-h-16 w-full rounded-[6px] border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
       </div>
 
       <FeedbackMessage feedback={feedback} />
       <Track block>
-        <Pill variant="primary" disabled={pending || !eligible} onClick={submitCheckout}>
+        <Pill variant="primary" className="h-11 text-base" disabled={pending || !eligible} onClick={submitCheckout}>
           {pending ? 'Processing…' : paymentMethod === 'package' ? 'Redeem visit' : paymentMethod === 'card' ? `Record ${formatMoney(collect)} card` : `Take ${formatMoney(collect)} cash`}
         </Pill>
       </Track>
@@ -265,7 +322,8 @@ function TenderPanel({ appointment, closed, timeZone }: { appointment: PosAppoin
 
 function RetailSale({ data }: { data: PosProjectionData }) {
   const { products } = data;
-  const [productId, setProductId] = useState((products.find((item) => item.availableQuantity > 0) || products[0])?.id || '');
+  // Nothing is preselected: the counter opens clean, not on a stock error.
+  const [productId, setProductId] = useState('');
   const [retailTender, setRetailTender] = useState<'cash' | 'card'>('cash');
   const [quantity, setQuantity] = useState('1');
   const [taxRate, setTaxRate] = useState('0');
@@ -302,62 +360,54 @@ function RetailSale({ data }: { data: PosProjectionData }) {
   };
 
   return (
-    <Section id="retail-sale-heading" title="Retail sale">
+    <div>
       {products.length ? (
-        <div className="space-y-4">
+        <div className="max-w-3xl space-y-4">
           <div className="grid gap-3 md:grid-cols-3">
             <div className="grid gap-1">
               <Label htmlFor="retail-product">Product</Label>
               <select id="retail-product" className={selectClass} value={productId} onChange={(event) => setProductId(event.target.value)}>
-                {products.map((item) => <option key={item.id} value={item.id}>{item.name} · {formatMoney(item.price)} · {item.availableQuantity} available</option>)}
+                <option value="">Choose a product</option>
+                {products.map((item) => <option key={item.id} value={item.id} disabled={item.availableQuantity <= 0}>{item.name} · {formatMoney(item.price)} · {item.availableQuantity > 0 ? `${item.availableQuantity} in stock` : 'out of stock'}</option>)}
               </select>
             </div>
             <div className="grid gap-1">
               <Label htmlFor="retail-quantity">Quantity</Label>
-              <Input id="retail-quantity" inputMode="numeric" value={quantity} aria-invalid={!quantityValid} aria-describedby="retail-quantity-error" onChange={(event) => setQuantity(event.target.value)} />
+              <Input id="retail-quantity" className="rounded-[6px] tabular-nums" inputMode="numeric" value={quantity} aria-invalid={!quantityValid} aria-describedby="retail-quantity-error" onChange={(event) => setQuantity(event.target.value)} />
               <p id="retail-quantity-error" className="text-xs text-destructive">{!quantityValid ? 'Enter a whole number from 1 to 100.' : product && !enough ? `Only ${product.availableQuantity} available.` : ''}</p>
             </div>
             <div className="grid gap-1">
               <Label htmlFor="retail-tax-rate">Tax rate (%)</Label>
-              <Input id="retail-tax-rate" inputMode="decimal" value={taxRate} aria-invalid={!rateValid} aria-describedby="retail-tax-help" onChange={(event) => setTaxRate(event.target.value)} />
+              <Input id="retail-tax-rate" className="rounded-[6px] tabular-nums" inputMode="decimal" value={taxRate} aria-invalid={!rateValid} aria-describedby="retail-tax-help" onChange={(event) => setTaxRate(event.target.value)} />
               <p id="retail-tax-help" className={`text-xs ${rateValid ? 'text-muted-foreground' : 'text-destructive'}`}>{rateValid ? '' : 'Enter a rate from 0 to 100.'}</p>
             </div>
           </div>
-          <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-border font-mono text-sm tabular-nums ring-1 ring-border sm:grid-cols-4">
-            <div className="bg-background px-3 py-2"><dt className="font-sans text-[11px] uppercase tracking-wider text-muted-foreground">Unit</dt><dd>{formatMoney(unitPrice)}</dd></div>
-            <div className="bg-background px-3 py-2"><dt className="font-sans text-[11px] uppercase tracking-wider text-muted-foreground">Subtotal</dt><dd>{formatMoney(subtotal)}</dd></div>
-            <div className="bg-background px-3 py-2"><dt className="font-sans text-[11px] uppercase tracking-wider text-muted-foreground">Tax {rateValid ? parsedRate : 0}%</dt><dd>{formatMoney(taxAmount)}</dd></div>
-            <div className="bg-background px-3 py-2"><dt className="font-sans text-[11px] uppercase tracking-wider text-muted-foreground">Total</dt><dd className="font-semibold">{formatMoney(total)}</dd></div>
+          <dl className="grid grid-cols-2 gap-2 border-y py-2 text-sm tabular-nums sm:grid-cols-4">
+            <div><dt className="text-xs text-muted-foreground">Unit</dt><dd>{formatMoney(unitPrice)}</dd></div>
+            <div><dt className="text-xs text-muted-foreground">Subtotal</dt><dd>{formatMoney(subtotal)}</dd></div>
+            <div><dt className="text-xs text-muted-foreground">Tax {rateValid ? parsedRate : 0}%</dt><dd>{formatMoney(taxAmount)}</dd></div>
+            <div><dt className="text-xs text-muted-foreground">Total</dt><dd className="font-semibold">{formatMoney(total)}</dd></div>
           </dl>
           <div className="flex flex-wrap items-center gap-2">
-            <Track label="Retail tender">
-              <Pill size="sm" variant="flat" aria-pressed={retailTender === 'cash'} onClick={() => setRetailTender('cash')}>Cash</Pill>
-              <Pill size="sm" variant="flat" aria-pressed={retailTender === 'card'} onClick={() => setRetailTender('card')}>Card terminal</Pill>
-            </Track>
-            <Track><Pill variant="primary" disabled={pending || !enough || !rateValid} onClick={submit}>{retailTender === 'card' ? `Record ${formatMoney(total)} card` : `Take ${formatMoney(total)} cash`}</Pill></Track>
+            <Segmented label="Retail tender" value={retailTender} onChange={setRetailTender} options={[{ value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card terminal' }]} />
+            <Pill variant="primary" disabled={pending || !product || !enough || !rateValid} onClick={submit}>{!product ? 'Choose a product' : retailTender === 'card' ? `Record ${formatMoney(total)} card` : `Take ${formatMoney(total)} cash`}</Pill>
           </div>
         </div>
       ) : <Empty>No active products. <Link className="underline" href="/dashboard/platform/services/new-product">Add a product</Link></Empty>}
       <div className="mt-3"><FeedbackMessage feedback={feedback} /></div>
-    </Section>
+    </div>
   );
 }
 
 function RetailReturns({ data, query }: { data: PosProjectionData; query: PosQuery }) {
   const [openId, setOpenId] = useState('');
   return (
-    <Section id="retail-return-heading" title="Retail returns" count={data.sales.total}>
-      <form action="/dashboard/platform/pos" role="search" className="mb-3 flex items-end gap-2">
-        <div className="grid min-w-0 flex-1 gap-1">
-          <Label htmlFor="sale-search" className="sr-only">Find the original sale</Label>
-          <Input id="sale-search" name="saleQ" defaultValue={data.sales.search} placeholder="Product, SKU or receipt number" />
-        </div>
-        <Track><Pill type="submit">Search</Pill></Track>
-      </form>
+    <div className="space-y-3">
+      <SearchField id="sale-search" name="saleQ" label="Find the original sale" defaultValue={data.sales.search} placeholder="Product, SKU or receipt number" />
       <div className="grid gap-x-8 md:grid-cols-2 xl:grid-cols-3">
         {data.productLines.map((line) => (
           <div key={line.id} className="border-b py-2.5 text-sm">
-            <div className="flex items-baseline justify-between gap-2"><strong className="min-w-0 truncate font-medium">{line.productNameSnapshot}</strong><span className="font-mono tabular-nums">{formatMoney(line.total)}</span></div>
+            <div className="flex items-baseline justify-between gap-2"><strong className="min-w-0 truncate font-medium">{line.productNameSnapshot}</strong><span className="tabular-nums">{formatMoney(line.total)}</span></div>
             <p className="text-xs text-muted-foreground">Qty {line.quantity}{line.returnedQuantity ? ` · ${line.returnedQuantity} returned` : ''} · {statusLabel(line.paymentMethod)} · {formatDateTime(line.occurredAt, data.timeZone)}</p>
             {(line.returnedQuantity || 0) < line.quantity && (openId === line.id
               ? <ReturnForm line={line} onClose={() => setOpenId('')} />
@@ -367,7 +417,7 @@ function RetailReturns({ data, query }: { data: PosProjectionData; query: PosQue
         {!data.productLines.length && <Empty>{data.sales.search ? `No sales match “${data.sales.search}”.` : 'No retail sales recorded.'}</Empty>}
       </div>
       <Pager paging={data.sales} label="Sale pages" href={(page) => hrefWith(query, { sales: page })} />
-    </Section>
+    </div>
   );
 }
 
@@ -405,11 +455,11 @@ function ReturnForm({ line, onClose }: { line: ProductLineSummary; onClose: () =
     <div className="mt-3 space-y-2 border-t pt-3">
       <div className="grid gap-1">
         <Label htmlFor={`return-qty-${line.id}`}>Quantity to return (max {remaining})</Label>
-        <Input id={`return-qty-${line.id}`} inputMode="numeric" value={quantity} aria-invalid={!quantityValid} onChange={(event) => setQuantity(event.target.value)} />
+        <Input id={`return-qty-${line.id}`} className="rounded-[6px] tabular-nums" inputMode="numeric" value={quantity} aria-invalid={!quantityValid} onChange={(event) => setQuantity(event.target.value)} />
       </div>
       <div className="grid gap-1">
         <Label htmlFor={`return-reason-${line.id}`}>Reason</Label>
-        <Input id={`return-reason-${line.id}`} value={reason} maxLength={500} onChange={(event) => setReason(event.target.value)} />
+        <Input id={`return-reason-${line.id}`} className="rounded-[6px]" value={reason} maxLength={500} onChange={(event) => setReason(event.target.value)} />
       </div>
       <p className="text-xs">Refund {formatMoney(refund)} in {statusLabel(line.paymentMethod)}.</p>
       <div className="flex items-start gap-2">
@@ -432,18 +482,12 @@ function ReturnForm({ line, onClose }: { line: ProductLineSummary; onClose: () =
 function Receipts({ data, query }: { data: PosProjectionData; query: PosQuery }) {
   const [openId, setOpenId] = useState(data.receiptPaging.receiptId || '');
   return (
-    <Section id="receipts-heading" title="Receipts" count={data.receiptPaging.total}>
-      <form action="/dashboard/platform/pos" role="search" className="mb-3 flex items-end gap-2">
-        <div className="grid min-w-0 flex-1 gap-1">
-          <Label htmlFor="receipt-lookup" className="sr-only">Receipt number</Label>
-          <Input id="receipt-lookup" name="receipt" className="font-mono" defaultValue={data.receiptPaging.receiptId} placeholder="Receipt ID" />
-        </div>
-        <Track>
-          <Pill type="submit">Look up</Pill>
-          {data.receiptPaging.receiptId && <PillLink href={hrefWith(query, { receipt: null, receipts: null })}>All</PillLink>}
-        </Track>
-      </form>
-      <div>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <SearchField id="receipt-lookup" name="receipt" label="Receipt number" defaultValue={data.receiptPaging.receiptId} placeholder="Receipt ID, then Enter" mono />
+        {data.receiptPaging.receiptId && <PillLink size="sm" variant="flat" href={hrefWith(query, { receipt: null, receipts: null })}>All receipts</PillLink>}
+      </div>
+      <div className="rounded-[6px] border px-3">
         {data.receipts.map((receipt) => (
           <div key={receipt.id} className="border-b py-2.5 text-sm last:border-b-0">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -452,7 +496,7 @@ function Receipts({ data, query }: { data: PosProjectionData; query: PosQuery })
                 <p className="text-xs text-muted-foreground">{formatDateTime(receipt.completedAt, data.timeZone)} · {statusLabel(receipt.paymentMethod)} · {statusLabel(receipt.status)}</p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="font-mono font-semibold tabular-nums">{formatMoney(receipt.total)}</span>
+                <span className="font-semibold tabular-nums">{formatMoney(receipt.total)}</span>
                 <Track><Pill size="sm" aria-expanded={openId === receipt.id} aria-controls={`receipt-${receipt.id}`} onClick={() => setOpenId(openId === receipt.id ? '' : receipt.id)}>{openId === receipt.id ? 'Hide' : 'Details'}</Pill></Track>
               </div>
             </div>
@@ -462,7 +506,7 @@ function Receipts({ data, query }: { data: PosProjectionData; query: PosQuery })
         {!data.receipts.length && <Empty>{data.receiptPaging.receiptId ? 'No receipt with that number in this shop.' : 'No appointment receipts yet.'}</Empty>}
       </div>
       <Pager paging={data.receiptPaging} label="Receipt pages" href={(page) => hrefWith(query, { receipts: page })} />
-    </Section>
+    </div>
   );
 }
 
@@ -521,12 +565,12 @@ function ReceiptDetail({ receipt, timeZone }: { receipt: PosReceipt; timeZone: s
         <Pill size="sm" onClick={() => window.print()}>Print</Pill>
       </Track>
       {refundable && (
-        <div className="space-y-2 rounded-2xl bg-muted/50 p-3 ring-1 ring-inset ring-black/5 dark:ring-white/5">
+        <div className="space-y-2 rounded-[6px] border border-destructive/30 p-3">
           <p className="text-xs font-medium">Cash refund · owner only</p>
-          <p className="font-mono text-xs text-muted-foreground">Full {formatMoney(receipt.total)} · tax {formatMoney(receipt.taxAmount)} · tip {formatMoney(receipt.tipAmount)} · voids unpaid commissions</p>
+          <p className="text-xs tabular-nums text-muted-foreground">Full {formatMoney(receipt.total)} · tax {formatMoney(receipt.taxAmount)} · tip {formatMoney(receipt.tipAmount)} · voids unpaid commissions</p>
           <div className="grid gap-1">
             <Label htmlFor={`refund-reason-${receipt.id}`}>Reason</Label>
-            <Input id={`refund-reason-${receipt.id}`} value={reason} maxLength={1000} onChange={(event) => setReason(event.target.value)} />
+            <Input id={`refund-reason-${receipt.id}`} className="rounded-[6px]" value={reason} maxLength={1000} onChange={(event) => setReason(event.target.value)} />
           </div>
           <div className="flex items-start gap-2">
             <Checkbox id={`refund-cash-${receipt.id}`} checked={cashReturned} onCheckedChange={(value) => setCashReturned(value === true)} />

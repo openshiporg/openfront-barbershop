@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { PageContainer } from '@/features/dashboard/components/PageContainer';
 import { basePath } from '@/features/dashboard/lib/config';
 import { formatShopDateTime } from '@/features/shared/shop-time';
-import { Empty, PageHeader, PillLink, Readouts, Section, StatusDot, Tag, Track, type Tone } from '@/features/platform/lib/ui';
+import { Empty, PageHeader, PillLink, Readouts, Section, StatusDot, Tag, type Tone } from '@/features/platform/lib/ui';
 import { getBarberPageAction } from '../actions/barbers';
 import { AddCredentialButton, CredentialStatus, EditBarberButton, WeeklyHoursForm } from '../components/BarberDetailControls';
 import { WorkforceControls } from './WorkforceControls';
@@ -28,13 +28,13 @@ export default async function BarberDetailPage({ params }: { params: Promise<{ i
       title={barber.displayName}
       tone={tone}
       meta={`${chair ? `Chair ${chair}` : 'No chair'} · ${barber.status !== 'active' ? label(barber.status) : barber.bookingEnabled ? 'Books online' : 'Not booking online'}`}
-      actions={<Track><PillLink href="/dashboard/platform/staff">All barbers</PillLink><EditBarberButton data={data} /></Track>}
+      actions={<div className="flex flex-wrap items-center gap-1.5"><PillLink href="/dashboard/platform/staff">All barbers</PillLink><EditBarberButton data={data} /></div>}
     />
   );
   const activeCredentials = barber.credentials.filter((credential) => credential.status === 'active').length;
   return (
     <PageContainer title={barber.displayName} header={header} breadcrumbs={breadcrumbs}>
-      <div className="flex min-w-0 flex-col gap-8 px-4 pb-8 md:px-6">
+      <div className="flex min-w-0 flex-col gap-8 px-4 pb-24 md:px-6">
         <Readouts items={[
           { label: 'Working days', value: barber.schedules.filter((row) => row.isWorking).length },
           { label: 'Services', value: barber.specialties.length },
@@ -48,7 +48,7 @@ export default async function BarberDetailPage({ params }: { params: Promise<{ i
           <WeeklyHoursForm data={data} />
         </Section>
 
-        <Section id="barber-credentials" title="Practitioner credentials" count={barber.credentials.length} actions={<Track><AddCredentialButton data={data} /></Track>}>
+        <Section id="barber-credentials" title="Practitioner credentials" count={barber.credentials.length} actions={<AddCredentialButton data={data} />}>
           {!barber.credentials.length ? <Empty>No credentials. Only services marked licensed need one.</Empty> : (
             <ul>
               {barber.credentials.map((credential) => (
@@ -65,7 +65,9 @@ export default async function BarberDetailPage({ params }: { params: Promise<{ i
         </Section>
 
         <Section id="barber-shifts" title="Shifts and time off">
-          <WorkforceControls timeZone={shop.timezone} barberId={barber.id} chairId={barber.chair?.id} shifts={barber.shifts} exceptions={barber.scheduleExceptions} />
+          <div className="max-w-2xl">
+          <WorkforceControls bare timeZone={shop.timezone} barberId={barber.id} chairId={barber.chair?.id} chairLabel={chair ? `Chair ${chair}` : undefined} shifts={barber.shifts} exceptions={barber.scheduleExceptions} />
+          </div>
         </Section>
 
         <Section id="barber-visits" title="Recent visits" count={barber.appointments.length}>

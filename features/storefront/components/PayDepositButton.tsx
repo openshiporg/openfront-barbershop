@@ -8,8 +8,8 @@ export function PayDepositButton({ appointmentId, label }: { appointmentId: stri
   const [error, setError] = useState<string | null>(null);
   return (
     <div className="grid gap-2">
-      <div className="sf-track">
-        <button type="button" className="sf-pill is-accent" disabled={pending} onClick={() => { setError(null); startTransition(async () => { const result = await payDepositAction(appointmentId); if (result?.error) setError(result.error); }); }}>{pending ? 'Opening checkout…' : label}</button>
+      <div className="sf-actions">
+        <button type="button" className="sf-btn is-accent" disabled={pending} onClick={() => { setError(null); startTransition(async () => { const result = await payDepositAction(appointmentId); if (result?.error) setError(result.error); }); }}>{pending ? 'Opening checkout…' : label}</button>
       </div>
       {error ? <p role="alert" className="sf-notice is-error">{error}</p> : null}
     </div>

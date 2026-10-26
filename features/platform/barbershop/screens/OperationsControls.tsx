@@ -43,7 +43,7 @@ export function CommissionControls({ commission }: { commission: Commission }) {
   return <div className="mt-2 flex flex-wrap items-center gap-2">
     {commission.status === 'approved' && <>
       <Label htmlFor={`${id}-reference`} className="sr-only">Payout reference for {commission.commissionNumber || 'this commission'}</Label>
-      <Input id={`${id}-reference`} value={payoutReference} onChange={(event) => setPayoutReference(event.target.value)} placeholder="Payout reference" className="h-8 min-w-36 flex-1 text-xs" />
+      <Input id={`${id}-reference`} value={payoutReference} onChange={(event) => setPayoutReference(event.target.value)} placeholder="Payout reference" className="rounded-[6px] h-8 min-w-36 flex-1 text-xs" />
     </>}
     {['projected', 'approved'].includes(commission.status) && <Track>
       {commission.status === 'projected' && <Pill size="sm" variant="primary" disabled={pending} onClick={() => run('approve', { status: 'approved' }, (key) => transitionCommissionAction(commission.id, 'approved', key), 'Commission approved.')}>Approve</Pill>}

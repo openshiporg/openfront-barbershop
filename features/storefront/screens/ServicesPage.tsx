@@ -19,17 +19,17 @@ export default async function ServicesPage() {
     <StorefrontShell>
       <main id="main-content">
         <section className="sf-container sf-page-head">
-          <p className="sf-eyebrow">{serviceCount} {serviceCount === 1 ? 'service' : 'services'} · {categories.filter((category) => category.services.length).length} categories</p>
           <div className="sf-page-head-row">
             <h1 className="sf-display">Services</h1>
-            <div className="sf-track">
-              <Link href="/book" className="sf-pill is-primary">Book a chair</Link>
-              <Link href="/queue" className="sf-pill">Join walk-ins</Link>
+            <div className="sf-actions">
+              <Link href="/queue" className="sf-btn">Join the line</Link>
+              <Link href="/book" className="sf-btn is-primary">Book a time</Link>
             </div>
           </div>
+          <p className="sf-lead">{serviceCount} {serviceCount === 1 ? 'service' : 'services'}. Deposits are listed where a service takes one.</p>
         </section>
 
-        <section className="sf-board sf-on-dark sf-section" aria-label="Price board">
+        <section className="sf-section is-tight" aria-label="Price board">
           <div className="sf-container">
             {serviceCount ? (
               <MenuList categories={categories} barberCount={barbers.length} showDescriptions />

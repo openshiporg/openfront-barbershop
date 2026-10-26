@@ -3,8 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PageContainer } from '@/features/dashboard/components/PageContainer';
 import { basePath } from '@/features/dashboard/lib/config';
-import { formatShopDateTime } from '@/features/shared/shop-time';
-import { Empty, PageHeader, Pill, Readouts, Section, Track, type Tone } from '@/features/platform/lib/ui';
+import { DataTable, Empty, PageHeader, Pill, Section, Td, type Tone } from '@/features/platform/lib/ui';
 import { getReportsSummary } from '../actions/reports';
 import type { PerformanceRow } from '../lib/reportsTypes';
 
@@ -27,36 +26,51 @@ function RangeForm({ startDate, endDate }: { startDate?: string; endDate?: strin
     <form action={`${basePath}/platform/reports`} className="flex flex-wrap items-end gap-2">
       <div className="grid gap-1">
         <Label htmlFor="report-start" className="text-xs text-muted-foreground">From</Label>
-        <Input id="report-start" type="date" name="start" defaultValue={startDate} className="w-40 font-mono" />
+        <Input id="report-start" type="date" name="start" defaultValue={startDate} className="h-9 w-40 rounded-[6px] tabular-nums" />
       </div>
       <div className="grid gap-1">
         <Label htmlFor="report-end" className="text-xs text-muted-foreground">To</Label>
-        <Input id="report-end" type="date" name="end" defaultValue={endDate} className="w-40 font-mono" />
+        <Input id="report-end" type="date" name="end" defaultValue={endDate} className="h-9 w-40 rounded-[6px] tabular-nums" />
       </div>
-      <Track><Pill type="submit">Update</Pill></Track>
+      <Pill type="submit">Show range</Pill>
     </form>
   );
 }
 
-function Performance({ id, title, rows, money }: { id: string; title: string; rows: PerformanceRow[]; money: (cents: number) => string }) {
-  const top = Math.max(1, ...rows.map((row) => row.revenue));
+/** "Oct 1 – 25, 2026": one format for the whole page, read from the shop-day keys. */
+function rangeLabel(startDate: string, endDate: string) {
+  const parse = (key: string) => new Date(`${key}T12:00:00Z`);
+  try {
+    return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).formatRange(parse(startDate), parse(endDate));
+  } catch { return `${startDate} – ${endDate}`; }
+}
+
+function Performance({ id, title, noun, rows, money }: { id: string; title: string; noun: string; rows: PerformanceRow[]; money: (cents: number) => string }) {
+  const total = rows.reduce((sum, row) => sum + row.revenue, 0);
   return (
     <Section id={id} title={title} count={rows.length}>
-      <ul>
-        {rows.map((row) => (
-          <li key={row.key} className="border-b py-2.5 last:border-b-0">
-            <div className="flex items-baseline justify-between gap-3 text-sm">
-              <span className="min-w-0 truncate font-medium">{row.name}{!row.linked && <span className="ml-2 text-xs font-normal text-muted-foreground">no linked record</span>}{row.linked && row.duplicateName && <span className="ml-2 text-xs font-normal text-muted-foreground">separate record, same name</span>}</span>
-              <span className="shrink-0 font-mono tabular-nums">{money(row.revenue)}</span>
-            </div>
-            <div className="mt-1.5 flex items-center gap-3">
-              <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-foreground/70" style={{ width: `${Math.max(2, Math.round((row.revenue / top) * 100))}%` }} /></span>
-              <span className="w-20 shrink-0 text-right font-mono text-xs tabular-nums text-muted-foreground">{row.appointments} {row.appointments === 1 ? 'visit' : 'visits'}</span>
-            </div>
-          </li>
-        ))}
-      </ul>
-      {!rows.length ? <Empty>No settled service lines in this range.</Empty> : null}
+      {!rows.length ? <Empty>No settled service lines in this range.</Empty> : (
+        <DataTable label={title} className="relative" head={[
+          { label: noun },
+          { label: 'Visits', className: 'text-right' },
+          { label: 'Revenue', className: 'text-right' },
+          { label: 'Share', className: 'hidden w-40 sm:table-cell' },
+        ]}>
+          {rows.map((row) => {
+            const share = total ? Math.round((row.revenue / total) * 100) : 0;
+            return (
+              <tr key={row.key}>
+                <Td className="align-middle"><span className="font-medium">{row.name}</span>{!row.linked ? <span className="block text-xs text-muted-foreground">No linked record</span> : row.duplicateName ? <span className="block text-xs text-muted-foreground">Separate record, same name</span> : null}</Td>
+                <Td className="align-middle text-right tabular-nums">{row.appointments}</Td>
+                <Td className="align-middle text-right font-medium tabular-nums">{money(row.revenue)}</Td>
+                <Td className="hidden align-middle sm:table-cell">
+                  <span className="flex items-center gap-2"><span className="h-1.5 flex-1 overflow-hidden rounded-[2px] bg-muted"><span className="block h-full bg-foreground/70" style={{ width: `${Math.max(share ? 2 : 0, share)}%` }} /></span><span className="w-9 text-right text-xs tabular-nums text-muted-foreground">{share}%</span></span>
+                </Td>
+              </tr>
+            );
+          })}
+        </DataTable>
+      )}
     </Section>
   );
 }
@@ -108,30 +122,23 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   return (
     <PageContainer
       title="Reports"
-      header={header(<><span className="font-mono tabular-nums">{range.startDate} → {range.endDate}</span> · {range.days} shop days · {range.timeZone}</>)}
+      header={header(<><span className="tabular-nums">{rangeLabel(range.startDate, range.endDate)}</span> · {range.days} shop {range.days === 1 ? 'day' : 'days'} · {money(summary.revenue.paidTotal)} net · {summary.appointments.completed || 0} completed</>)}
       breadcrumbs={breadcrumbs}
     >
-      <div className="flex min-w-0 flex-col gap-8 px-4 pb-8 md:px-6">
+      <div className="flex min-w-0 flex-col gap-8 px-4 pb-24 md:px-6">
         <RangeForm startDate={range.startDate} endDate={range.endDate} />
-        <Readouts items={[
-          { label: 'Net checkout', value: money(summary.revenue.paidTotal) },
-          { label: 'Completed', value: summary.appointments.completed || 0 },
-          { label: 'Walk-ins served', value: summary.queue.served || 0 },
-          { label: 'No-shows', value: summary.appointments.no_show || 0, tone: summary.appointments.no_show ? 'alert' : undefined },
-        ]} />
-        <p className="font-mono text-xs tabular-nums text-muted-foreground">{formatShopDateTime(range.start, range.timeZone)} – {formatShopDateTime(range.end, range.timeZone)}</p>
+        <div className="grid min-w-0 gap-8 xl:grid-cols-2">
+          <Performance id="rep-barbers" title="By barber" noun="Barber" rows={summary.barberPerformance} money={money} />
+          <Performance id="rep-services" title="By service" noun="Service" rows={summary.servicePerformance} money={money} />
+        </div>
         <div className="grid min-w-0 gap-8 lg:grid-cols-3">
           {groups.map((group) => (
             <Section key={group.id} id={group.id} title={group.title}>
               <dl>
-                {group.rows.map(([label, value]) => <div key={label} className="flex items-baseline justify-between gap-3 border-b py-2.5 text-sm last:border-b-0"><dt className="text-muted-foreground">{label}</dt><dd className="font-mono tabular-nums">{value}</dd></div>)}
+                {group.rows.map(([label, value]) => <div key={label} className="flex items-baseline justify-between gap-3 border-b py-2.5 text-sm last:border-b-0"><dt className="text-muted-foreground">{label}</dt><dd className="tabular-nums">{value}</dd></div>)}
               </dl>
             </Section>
           ))}
-        </div>
-        <div className="grid min-w-0 gap-8 lg:grid-cols-2">
-          <Performance id="rep-services" title="Services" rows={summary.servicePerformance} money={money} />
-          <Performance id="rep-barbers" title="Barbers" rows={summary.barberPerformance} money={money} />
         </div>
       </div>
     </PageContainer>

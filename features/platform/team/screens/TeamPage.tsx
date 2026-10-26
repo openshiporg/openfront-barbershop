@@ -1,11 +1,9 @@
 import Link from 'next/link';
 import { PageContainer } from '@/features/dashboard/components/PageContainer';
 import { basePath } from '@/features/dashboard/lib/config';
-import { StatusTabs } from '@/features/platform/lib/forms';
-import { Empty, Notice, PageHeader, Readouts, Section, StatusDot, Track, type Tone } from '@/features/platform/lib/ui';
+import { DataTable, Empty, Notice, PageHeader, StatusCell, StatusTabs, Td, type Tone } from '@/features/platform/lib/ui';
 import { getTeamAction } from '../actions/team';
-import { AddMemberButton, MemberActions } from '../components/TeamControls';
-import { ROLE_LABELS } from '../lib/roles';
+import { AddMemberButton, MemberMenu, MemberRole } from '../components/TeamControls';
 
 const breadcrumbs = [
   { type: 'link' as const, label: 'Dashboard', href: basePath },
@@ -13,51 +11,58 @@ const breadcrumbs = [
   { type: 'page' as const, label: 'Team' },
 ];
 const tone = (status: string): Tone => (status === 'active' ? 'live' : status === 'suspended' || status === 'invited' ? 'wait' : 'off');
+const STATUS: Record<string, string> = { active: 'Has access', suspended: 'Suspended', invited: 'Invited', revoked: 'Removed' };
+const since = (value: string) => new Date(value).toLocaleDateString('en-US', { dateStyle: 'medium', timeZone: 'UTC' });
 
 export default async function TeamPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const params = searchParams ? await searchParams : {};
   const status = typeof params.status === 'string' ? params.status : '';
   const team = await getTeamAction();
-  const header = <PageHeader title="Team" tone={team.ok ? 'live' : 'alert'} actions={team.ok ? <Track><AddMemberButton /></Track> : undefined} />;
   if (!team.ok) {
+    const header = <PageHeader title="Team" tone="alert" meta="Team couldn’t load" />;
     return <PageContainer title="Team" header={header} breadcrumbs={breadcrumbs}><div className="px-4 pb-8 md:px-6"><Notice tone="alert">{team.error}</Notice></div></PageContainer>;
   }
   const all = team.data.memberships;
   const count = (value: string) => all.filter((member) => member.status === value).length;
+  const owners = all.filter((member) => member.status === 'active' && member.membershipRole === 'owner').length;
   const shown = status ? all.filter((member) => member.status === status) : all;
+  const header = <PageHeader title="Team" meta={`${count('active')} with access · ${owners} ${owners === 1 ? 'owner' : 'owners'}`} actions={<AddMemberButton />} />;
   return (
     <PageContainer title="Team" header={header} breadcrumbs={breadcrumbs}>
-      <div className="flex min-w-0 flex-col gap-6 px-4 pb-8 md:px-6">
-        <Readouts items={[
-          { label: 'Active', value: count('active'), tone: 'live' },
-          { label: 'Owners', value: all.filter((member) => member.status === 'active' && member.membershipRole === 'owner').length },
-          { label: 'Suspended', value: count('suspended'), tone: count('suspended') ? 'wait' : undefined },
-          { label: 'Removed', value: count('revoked') },
-        ]} />
-        <StatusTabs current={status} hrefFor={(value) => (value ? `?status=${value}` : '?')} tabs={[
+      <div className="flex min-w-0 flex-col gap-4 px-4 pb-24 md:px-6">
+        <StatusTabs label="Access" current={status} hrefFor={(value) => (value ? `?status=${value}` : '?')} tabs={[
           { value: '', label: 'All', count: all.length },
-          { value: 'active', label: 'Active', count: count('active'), tone: 'live' },
-          { value: 'suspended', label: 'Suspended', count: count('suspended'), tone: 'wait' },
-          { value: 'revoked', label: 'Removed', count: count('revoked'), tone: 'off' },
+          { value: 'active', label: 'Has access', count: count('active') },
+          { value: 'suspended', label: 'Suspended', count: count('suspended') },
+          { value: 'revoked', label: 'Removed', count: count('revoked') },
         ]} />
-        <Section title="Members" count={shown.length}>
-          {!shown.length ? <Empty>No members here.</Empty> : (
-            <ul>
-              {shown.map((member) => {
-                const self = member.user?.id === team.data.selfId;
-                return (
-                  <li key={member.id} className="flex flex-wrap items-center justify-between gap-3 border-b py-3 last:border-b-0">
-                    <div className="min-w-0">
-                      <p className="font-medium"><StatusDot tone={tone(member.status)} />{member.user?.name || 'Unnamed account'}{self ? <span className="ml-2 text-xs font-normal text-muted-foreground">You</span> : null}</p>
-                      <p className="truncate text-xs text-muted-foreground">{member.user?.email || '—'} · {ROLE_LABELS[member.membershipRole] || member.membershipRole} · {member.status === 'revoked' ? 'removed' : member.status} · since {new Date(member.createdAt).toLocaleDateString('en-US', { dateStyle: 'medium', timeZone: 'UTC' })}{member.user?.barberProfile ? <> · <Link className="hover:underline" href={`/dashboard/platform/staff/${member.user.barberProfile.id}`}>{member.user.barberProfile.displayName}</Link></> : null}</p>
-                    </div>
-                    <MemberActions member={member} self={self} />
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Section>
+        {!shown.length ? <Empty>No members here.</Empty> : (
+          <DataTable label="Team members" className="relative" head={[
+            { label: 'Member' },
+            { label: 'Role' },
+            { label: 'Access' },
+            { label: 'Barber profile', className: 'hidden md:table-cell' },
+            { label: 'Since', className: 'hidden md:table-cell' },
+            { label: <span className="sr-only">Actions</span>, className: 'w-12' },
+          ]}>
+            {shown.map((member) => {
+              const self = member.user?.id === team.data.selfId;
+              return (
+                <tr key={member.id} className="hover:bg-muted/30">
+                  <Td className="min-w-0 align-middle">
+                    <span className="block truncate font-medium">{member.user?.name || 'Unnamed account'}{self ? <span className="ml-2 text-xs font-normal text-muted-foreground">You</span> : null}</span>
+                    <span className="block max-w-[14rem] truncate text-xs text-muted-foreground sm:max-w-none">{member.user?.email || 'No email'}</span>
+                  </Td>
+                  <Td className="align-middle"><MemberRole member={member} /></Td>
+                  <Td className="align-middle"><StatusCell tone={tone(member.status)}>{STATUS[member.status] || member.status}</StatusCell></Td>
+                  <Td className="hidden align-middle md:table-cell">{member.user?.barberProfile ? <Link className="underline-offset-4 hover:underline" href={`/dashboard/platform/staff/${member.user.barberProfile.id}`}>{member.user.barberProfile.displayName}</Link> : <span className="text-muted-foreground">—</span>}</Td>
+                  <Td className="hidden whitespace-nowrap align-middle tabular-nums text-muted-foreground md:table-cell">{since(member.createdAt)}</Td>
+                  <Td className="align-middle text-right"><MemberMenu member={member} self={self} /></Td>
+                </tr>
+              );
+            })}
+          </DataTable>
+        )}
       </div>
     </PageContainer>
   );

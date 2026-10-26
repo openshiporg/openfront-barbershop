@@ -13,7 +13,7 @@ import { StoreLogo } from '@/features/storefront/components/StoreLogo';
 import { HUE_PRESETS, LOGO_ICONS } from '../lib/icon-registry';
 import { normalizeStoreLogoColor } from '../lib/store-logo';
 
-const triggerClass = 'flex h-12 w-12 shrink-0 rounded-lg border border-input bg-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 p-0 overflow-hidden items-center justify-center';
+const triggerClass = 'flex h-12 w-12 shrink-0 rounded-[6px] border border-input bg-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 p-0 overflow-hidden items-center justify-center';
 
 type LogoPickerProps = {
   // The current logo draft exactly as edited; it is only saved when it sanitizes.
@@ -84,7 +84,7 @@ export function LogoPicker({ logoIcon, logoColor, disabled, onIconChange, onColo
                   {safe ? (
                     <>
                       <div className="text-sm text-muted-foreground">Preview:</div>
-                      <div className="flex items-center justify-center p-2 border rounded"><StoreLogo svg={safe} color={color} /></div>
+                      <div className="flex items-center justify-center p-2 border rounded-[4px]"><StoreLogo svg={safe} color={color} /></div>
                     </>
                   ) : <p role="alert" className="text-sm text-destructive">Invalid SVG format. Fix the code or choose a library icon before saving.</p>}
                 </div>
@@ -101,7 +101,7 @@ export function LogoPicker({ logoIcon, logoColor, disabled, onIconChange, onColo
           <Select value={HUE_PRESETS.some((preset) => String(preset.value) === color) ? color : undefined} disabled={disabled} onValueChange={(value) => onColorChange(value)}>
             <SelectPrimitive.Trigger aria-labelledby="logo-color-label" className={cn(triggerClass)}>
               <SelectValue>
-                <div className="w-6 h-6 rounded-full" style={{ background: `hsl(${(240 + Number(color)) % 360}, 70%, 50%)` }} />
+                <div className="size-6 rounded-[4px]" style={{ background: `hsl(${(240 + Number(color)) % 360}, 70%, 50%)` }} />
               </SelectValue>
             </SelectPrimitive.Trigger>
             <SelectContent>
@@ -113,7 +113,7 @@ export function LogoPicker({ logoIcon, logoColor, disabled, onIconChange, onColo
                     aria-label={preset.name}
                     className="cursor-pointer p-0 h-12 w-12 flex items-center justify-center [&>span:first-child]:hidden"
                   >
-                    <div className="w-6 h-6 rounded-full" style={{ background: `hsl(${(240 + preset.value) % 360}, 70%, 50%)` }} />
+                    <div className="size-6 rounded-[4px]" style={{ background: `hsl(${(240 + preset.value) % 360}, 70%, 50%)` }} />
                   </SelectItem>
                 ))}
               </div>

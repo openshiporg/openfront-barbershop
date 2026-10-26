@@ -1,14 +1,15 @@
 'use client';
 
 import { Input } from '@/components/ui/input';
-import { DrawerForm, Field, TransitionPills } from '@/features/platform/lib/forms';
+import { DrawerForm, Field } from '@/features/platform/lib/forms';
+import { RowMenu, statusItems } from '@/features/platform/records/lib/controls';
 import { saveChairAction, setChairStatusAction, type ChairRow } from '../actions/chairs';
 
 function ChairFields({ chair }: { chair?: ChairRow }) {
   return <>
-    <Field id="chair-number" label="Chair number"><Input id="chair-number" name="chairNumber" defaultValue={chair?.chairNumber} required maxLength={20} className="font-mono" /></Field>
-    <Field id="chair-station" label="Station name"><Input id="chair-station" name="stationName" defaultValue={chair?.stationName || ''} maxLength={120} /></Field>
-    <Field id="chair-note" label="Location" wide><Input id="chair-note" name="locationNote" defaultValue={chair?.locationNote || ''} maxLength={500} /></Field>
+    <Field id="chair-number" label="Chair number"><Input id="chair-number" name="chairNumber" defaultValue={chair?.chairNumber} required maxLength={20} className="h-9 rounded-[6px] font-mono" /></Field>
+    <Field id="chair-station" label="Station name"><Input id="chair-station" name="stationName" defaultValue={chair?.stationName || ''} maxLength={120} className="h-9 rounded-[6px]" /></Field>
+    <Field id="chair-note" label="Location" wide><Input id="chair-note" name="locationNote" defaultValue={chair?.locationNote || ''} maxLength={500} className="h-9 rounded-[6px]" /></Field>
   </>;
 }
 
@@ -18,9 +19,9 @@ export function NewChairButton() {
 
 export function ChairActions({ chair }: { chair: ChairRow }) {
   return (
-    <span className="flex flex-wrap items-center gap-2">
+    <span className="inline-flex items-center gap-1">
       <DrawerForm trigger="Edit" title={`Edit chair ${chair.chairNumber}`} action={(form) => saveChairAction(chair.id, form)}><ChairFields chair={chair} /></DrawerForm>
-      <TransitionPills label="Chair status" current={chair.status} options={[{ value: 'active', label: 'In service' }, { value: 'maintenance', label: 'Maintenance' }, { value: 'reserved', label: 'Reserved' }]} run={(status) => setChairStatusAction(chair.id, status)} />
+      <RowMenu label={`Status for chair ${chair.chairNumber}`} title={`Chair ${chair.chairNumber}`} items={statusItems(chair.status, [{ value: 'active', label: 'Put in service' }, { value: 'maintenance', label: 'Mark maintenance' }, { value: 'reserved', label: 'Reserve' }], (status) => setChairStatusAction(chair.id, status))} />
     </span>
   );
 }

@@ -9,7 +9,8 @@ import type { GuestBookingCommand } from '../../shared/guest-booking-command';
 import { getAvailableTimeSlots, type StorefrontTimeSlot } from '../lib/data/availability';
 import type { PublicStorefrontSettings } from '@/features/shared/storefront-settings';
 import type { StorefrontBarber, StorefrontService } from '../lib/data/services';
-import { shopDateKey, formatShopDateTime } from '../../shared/shop-time';
+import { shopDateKey, shopMinute, formatShopDateTime } from '../../shared/shop-time';
+import { phoneHref } from '@/features/shared/storefront-settings';
 import { formatDuration, formatMoney } from '../lib/format';
 import { PayDepositButton } from '../components/PayDepositButton';
 import type { PublicBookingEligibility } from '../../shared/public-booking-eligibility';
@@ -63,6 +64,23 @@ const phoneKey = (accountId: string) => `sf-booking-phone:${accountId}`;
 function rememberedPhone(accountId: string) {
   if (!accountId) return '';
   try { return window.localStorage.getItem(phoneKey(accountId)) || ''; } catch { return ''; }
+}
+
+const DAY_PARTS = [
+  { key: 'morning', label: 'Morning', until: 12 * 60 },
+  { key: 'afternoon', label: 'Afternoon', until: 17 * 60 },
+  { key: 'evening', label: 'Evening', until: 24 * 60 },
+] as const;
+
+/** Slots split into morning / afternoon / evening in the shop's own clock, earliest first. */
+function groupSlots(slots: StorefrontTimeSlot[], timeZone: string) {
+  const groups = DAY_PARTS.map((part) => ({ key: part.key as string, label: part.label as string, until: part.until as number, slots: [] as StorefrontTimeSlot[] }));
+  for (const slot of slots) {
+    let minute = 0;
+    try { minute = shopMinute(slot.startsAt, timeZone); } catch { /* keep in morning */ }
+    (groups.find((group) => minute < group.until) || groups[groups.length - 1]).slots.push(slot);
+  }
+  return groups.filter((group) => group.slots.length);
 }
 
 function barbersForService(service: StorefrontService | undefined, barbers: StorefrontBarber[]) {
@@ -245,6 +263,8 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
     return [...byInstant.values()].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   }, [slots, barberIdsToCheck]);
   const selectedSlot = mergedSlots.find((slot) => slot.startsAt === selectedStartsAt) || null;
+  const slotGroups = useMemo(() => (settings?.timezone ? groupSlots(mergedSlots, settings.timezone) : [{ key: 'all', label: 'Times', until: 0, slots: mergedSlots }]), [mergedSlots, settings?.timezone]);
+  const telephone = phoneHref(settings?.phone);
   const selectedBarber = selectedBarberId === 'any' ? null : serviceBarbers.find((barber) => barber.id === selectedBarberId);
 
   const submitBooking = (event: React.FormEvent) => {
@@ -295,13 +315,13 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
 
   const pendingPanel = savedCommand ? (
     <section className="sf-card-dark sf-on-dark mb-8" aria-labelledby="pending-booking-heading">
-      <h2 id="pending-booking-heading" className="sf-eyebrow"><span className="sf-dot is-wait" aria-hidden="true" />Earlier request unconfirmed</h2>
+      <h2 id="pending-booking-heading" className="sf-subtitle"><span className="sf-dot is-wait" aria-hidden="true" />Earlier request unconfirmed</h2>
       <p role="status">Your last booking request may have gone through. Check it before booking another time.</p>
       {error && <p role="alert" className="sf-notice">{error}</p>}
-      <div className="sf-track">
-        <button type="button" disabled={pending} onClick={() => resolveSaved('recover')} className="sf-pill is-primary">Check again</button>
-        <button type="button" disabled={pending} onClick={() => resolveSaved('retry')} className="sf-pill">Send same request</button>
-        <button type="button" disabled={pending} onClick={() => resolveSaved('close')} className="sf-pill">Cancel if not booked</button>
+      <div className="sf-actions">
+        <button type="button" disabled={pending} onClick={() => resolveSaved('recover')} className="sf-btn is-primary">Check again</button>
+        <button type="button" disabled={pending} onClick={() => resolveSaved('retry')} className="sf-btn">Send same request</button>
+        <button type="button" disabled={pending} onClick={() => resolveSaved('close')} className="sf-btn">Cancel if not booked</button>
       </div>
     </section>
   ) : null;
@@ -309,13 +329,13 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
   if (createdAppointment) {
     return (
       <main id="main-content" className="sf-container-narrow py-[var(--space-2xl)]">
-        <p className="sf-eyebrow mb-3"><span className="sf-dot is-wait" aria-hidden="true" />Requested</p>
-        <h1 className="sf-display mb-8 text-[var(--text-display-s)]">Chair held</h1>
+        <h1 className="sf-display sf-h1">Chair held</h1>
+        <p className="sf-lead mb-8 mt-3"><span className="sf-dot is-wait" aria-hidden="true" />Requested. The shop confirms it next.</p>
         <section className="sf-ticket" role="status" aria-label="Booking request">
           <div className="sf-ticket-head">
             <div className="grid gap-2">
-              <p className="sf-eyebrow text-[var(--color-inverse-muted)]">Awaiting shop confirmation</p>
-              <p className="sf-subtitle text-[2rem]">{createdAppointment.service?.name}</p>
+              <p className="sf-eyebrow">Awaiting shop confirmation</p>
+              <p className="sf-subtitle text-[2.25rem]">{createdAppointment.service?.name}</p>
             </div>
           </div>
           <dl>
@@ -325,9 +345,9 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
             {customer.email.trim() ? <div><dt>Confirmation by email</dt><dd className="break-all">{customer.email.trim()}</dd></div> : null}
           </dl>
           {createdAppointment.paymentStatus === 'deposit_due' && onlineDeposits ? <PayDepositButton appointmentId={createdAppointment.id} label={`Pay ${formatMoney(createdAppointment.depositAmount || 0)} deposit to hold it`} /> : null}
-          <div className="sf-track">
-            {createdAppointment.paymentStatus === 'deposit_due' && onlineDeposits ? null : <Link href={`/appointment?id=${encodeURIComponent(createdAppointment.id)}`} className="sf-pill is-primary">View status</Link>}
-            <Link href="/" className="sf-pill">Back to shop</Link>
+          <div className="sf-actions is-block">
+            {createdAppointment.paymentStatus === 'deposit_due' && onlineDeposits ? null : <Link href={`/appointment?id=${encodeURIComponent(createdAppointment.id)}`} className="sf-btn is-primary">View status</Link>}
+            <Link href="/" className="sf-btn">Back to shop</Link>
           </div>
         </section>
       </main>
@@ -341,8 +361,8 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
   return (
     <main id="main-content">
       <section className="sf-container sf-page-head">
-        <p className="sf-eyebrow">Times in {settings.timezone}</p>
-        <h1 className="sf-display">Book a chair</h1>
+        <h1 className="sf-display">Book a time</h1>
+        <p className="sf-lead">Times are in the shop’s time zone ({settings.timezone}).</p>
       </section>
 
       <div className="sf-container pt-[var(--space-xl)]">
@@ -359,9 +379,9 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
       ) : !firstBookable || !barbers.length ? (
         <div className="sf-container sf-empty mb-[var(--space-3xl)]">
           <p className="sf-subtitle">Online booking isn’t open yet</p>
-          <div className="sf-track">
-            <Link href="/queue" className="sf-pill is-primary">Join walk-ins</Link>
-            <Link href="/services" className="sf-pill">Services</Link>
+          <div className="sf-actions">
+            <Link href="/queue" className="sf-btn is-primary">Join the line</Link>
+            <Link href="/services" className="sf-btn">Services</Link>
           </div>
         </div>
       ) : (
@@ -370,12 +390,23 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
             <fieldset className="sf-step">
               <legend><span className="sf-step-no">01</span><span className="sf-step-title">Service</span></legend>
               <div className="sf-options">
-                {services.map((service) => (
-                  <button type="button" key={service.id} aria-pressed={selectedServiceId === service.id} disabled={!bookableOnline(service)} onClick={() => chooseService(service)} className="sf-option">
+                {services.map((service) => bookableOnline(service) ? (
+                  <button type="button" key={service.id} aria-pressed={selectedServiceId === service.id} onClick={() => chooseService(service)} className="sf-option">
                     <span className="sf-option-title">{service.name}</span>
-                    <span className="sf-mono">{formatMoney(service.price)}</span>
-                    <span className="sf-option-meta"><span className="sf-mono">{formatDuration(service.durationMinutes)}</span>{service.depositRequired && ` · Deposit ${formatMoney(service.depositAmount || 0)}${onlineDeposits ? ' paid online' : ' · Call to book'}`}</span>
+                    <span className="sf-option-price">{formatMoney(service.price)}</span>
+                    <span className="sf-option-meta">{formatDuration(service.durationMinutes)}{service.depositRequired ? ` · ${formatMoney(service.depositAmount || 0)} deposit, paid online` : ''}</span>
                   </button>
+                ) : (
+                  // Deposit services can't be booked online while the shop takes deposits by phone.
+                  <div key={service.id} className="sf-option is-phone" aria-disabled="true">
+                    <span className="sf-option-title">{service.name}</span>
+                    <span className="sf-option-price">{formatMoney(service.price)}</span>
+                    <span className="sf-option-meta">{formatDuration(service.durationMinutes)} · {formatMoney(service.depositAmount || 0)} deposit</span>
+                    <span className="sf-option-why">
+                      <span>The shop takes this deposit by phone, so it’s booked by calling.</span>
+                      {telephone && settings.phone ? <a className="sf-link" href={`tel:${telephone}`}>Call {settings.phone}</a> : null}
+                    </span>
+                  </div>
                 ))}
               </div>
             </fieldset>
@@ -425,10 +456,26 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
               {!loadingSlots && availabilityError && <p role="status" className="sf-notice">{availabilityError}</p>}
               <div role="group" aria-label="Available times" aria-busy={loadingSlots} className="sf-slots">
                 {loadingSlots && <p role="status">Checking times…</p>}
-                {!loadingSlots && mergedSlots.map((slot) => (
-                  <button type="button" key={slot.startsAt} aria-pressed={selectedStartsAt === slot.startsAt} onClick={() => setSelectedStartsAt(slot.startsAt)} className="sf-slot">
-                    {slot.label}
-                  </button>
+                {!loadingSlots && mergedSlots.length ? (
+                  <p className="sf-slot-earliest">
+                    <span>Earliest on this date</span>
+                    <button type="button" aria-pressed={selectedStartsAt === mergedSlots[0].startsAt} onClick={() => setSelectedStartsAt(mergedSlots[0].startsAt)} className="sf-slot" aria-label={`Earliest: ${mergedSlots[0].label}`}>
+                      {mergedSlots[0].label}
+                    </button>
+                    <span className="sf-muted">{mergedSlots.length} {mergedSlots.length === 1 ? 'time' : 'times'} open</span>
+                  </p>
+                ) : null}
+                {!loadingSlots && slotGroups.map((group) => (
+                  <section key={group.key} className="sf-slot-group" aria-labelledby={`slots-${group.key}`}>
+                    <h3 id={`slots-${group.key}`}>{group.label}<span>{group.slots.length} open</span></h3>
+                    <div className="sf-slot-row">
+                      {group.slots.map((slot) => (
+                        <button type="button" key={slot.startsAt} aria-pressed={selectedStartsAt === slot.startsAt} onClick={() => setSelectedStartsAt(slot.startsAt)} className="sf-slot">
+                          {slot.label}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
                 ))}
                 {!loadingSlots && !availabilityError && !mergedSlots.length && (credentialBlocked
                   ? <p>No barber is cleared to book {selectedService?.name || 'this service'} online. Call the shop{settings.phone ? <> at <span className="sf-mono">{settings.phone}</span></> : null}.</p>
@@ -455,22 +502,35 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
             </fieldset>
           </div>
 
-          <aside className="sf-summary sf-on-dark" aria-label="Visit summary">
-            <p className="sf-eyebrow">Visit</p>
+          <aside className="sf-summary sf-on-dark" aria-label="Your ticket">
+            <h2>Your ticket</h2>
             <dl>
-              <div><dt>Service</dt><dd>{selectedService?.name || '—'}{selectedService ? <span className="sf-mono block text-[var(--color-inverse-muted)]">{formatDuration(selectedService.durationMinutes)}</span> : null}</dd></div>
+              <div><dt>Service</dt><dd>{selectedService?.name || '—'}{selectedService ? <span className="sf-muted block">{formatDuration(selectedService.durationMinutes)}</span> : null}</dd></div>
               <div><dt>Barber</dt><dd>{selectedBarber?.displayName || 'First available'}</dd></div>
               <div><dt>When</dt><dd className="sf-mono">{selectedSlot ? formatShopDateTime(selectedSlot.startsAt, settings.timezone) : '—'}</dd></div>
               <div><dt>Pay</dt><dd>{selectedService?.depositRequired ? `Deposit ${formatMoney(selectedService.depositAmount || 0)}` : 'In the shop'}</dd></div>
             </dl>
             <div className="sf-summary-total"><span className="sf-eyebrow">Total</span><strong>{formatMoney(selectedService?.price)}</strong></div>
             {error && !savedCommand && <p role="alert" className="sf-notice is-error">{error}</p>}
-            {!selectedSlot && !savedCommand ? <p className="sf-small text-[var(--color-inverse-muted)]">Choose a time</p> : null}
-            <div className="sf-track is-block">
-              <button type="submit" disabled={!canSubmit} className="sf-pill is-accent">{pending ? 'Booking…' : 'Request appointment'}</button>
+            {!selectedSlot && !savedCommand ? <p className="sf-small sf-muted">Choose a time</p> : null}
+            <div className="sf-actions is-block">
+              <button type="submit" disabled={!canSubmit} className="sf-btn is-accent">{pending ? 'Booking…' : 'Request appointment'}</button>
             </div>
             {settings.phone ? <p className="sf-small sf-muted">Questions: <span className="sf-mono">{settings.phone}</span></p> : null}
           </aside>
+
+          {/* Phone: the ticket docks at the bottom, so the submit is always in reach. */}
+          <div className="sf-dock" role="region" aria-label="Your ticket" data-docked={selectedSlot ? 'true' : undefined} key={selectedSlot?.startsAt || 'none'}>
+            {error && !savedCommand && <p role="alert" className="sf-notice is-error">{error}</p>}
+            <div className="sf-dock-ticket">
+              <p>
+                <strong>{selectedService?.name || 'Choose a service'}</strong>
+                {selectedSlot ? formatShopDateTime(selectedSlot.startsAt, settings.timezone) : 'Choose a time'}{selectedBarber ? ` · ${selectedBarber.displayName}` : ''}
+              </p>
+              <span className="sf-dock-total">{formatMoney(selectedService?.price)}</span>
+            </div>
+            <button type="submit" disabled={!canSubmit} className="sf-btn is-accent">{pending ? 'Booking…' : 'Request appointment'}</button>
+          </div>
         </form>
       )}
     </main>

@@ -1,15 +1,13 @@
 import Link from 'next/link';
 
+import { ChevronRight } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PageContainer } from '@/features/dashboard/components/PageContainer';
 import { basePath } from '@/features/dashboard/lib/config';
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient';
 import { formatShopDateTime } from '@/features/shared/shop-time';
-import { Empty as EmptyLine, PageHeader, PillLink, Readouts, Restricted, Section, StatusDot, Track, type Tone } from '@/features/platform/lib/ui';
-import { InventoryReceiptControls } from './InventoryReceiptControls';
+import { DataTable, Empty, PageHeader, PillLink, Restricted, Section, StatusCell, Td, type Tone } from '@/features/platform/lib/ui';
 import { WaitlistControls } from './WaitlistControls';
-import { CommissionControls, ReconciliationControls } from './OperationsControls';
 
 type Access = 'granted' | 'restricted';
 type Named = { id: string; name: string };
@@ -44,7 +42,6 @@ type Data = {
 const query = `query BarbershopOperationsPage { platformOperations { success error data } }`;
 
 const money = (cents?: number | null) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((cents ?? 0) / 100);
-const label = (value?: string | null) => value?.replaceAll('_', ' ') || '—';
 
 const breadcrumbs = [
   { type: 'link' as const, label: 'Dashboard', href: basePath },
@@ -52,31 +49,20 @@ const breadcrumbs = [
   { type: 'page' as const, label: 'Shop operations' },
 ];
 
-const statusTone = (status?: string | null): Tone => (status === 'active' || status === 'signed' || status === 'paid' ? 'live' : status === 'inactive' || status === 'retired' || status === 'expired' || status === 'voided' ? 'off' : status === 'maintenance' || status === 'projected' || status === 'waiting' || status === 'draft' || status === 'sent' ? 'wait' : 'info');
-
-function header(shopName?: string, tone?: Tone) {
+function header(meta?: string, tone?: Tone) {
   return (
     <PageHeader
       title="Shop operations"
       tone={tone}
-      meta={shopName}
-      actions={<Track><PillLink href={`${basePath}/platform/booking`}>Booking board</PillLink><PillLink href={`${basePath}/platform/queue`}>Walk-ins</PillLink></Track>}
+      meta={meta}
+      actions={<div className="flex flex-wrap items-center gap-1.5"><PillLink href={`${basePath}/platform/queue`}>Walk-ins</PillLink><PillLink variant="primary" href={`${basePath}/platform/booking`}>Booking board</PillLink></div>}
     />
   );
 }
 
-function Empty({ span, text }: { span: number; text: string }) { return <TableRow><TableCell colSpan={span} className="py-6 text-sm text-muted-foreground">{text}</TableCell></TableRow>; }
-
-function More({ shown, total, slug, noun }: { shown: number; total: number | null | undefined; slug: string; noun: string }) {
-  if (typeof total !== 'number' || total <= shown) return null;
-  return <p className="pt-2 text-xs text-muted-foreground"><span className="font-mono tabular-nums">{shown} / {total}</span> {noun} · <Link className="font-medium text-foreground underline-offset-4 hover:underline" href={`${basePath}/${slug}`}>All</Link></p>;
-}
-
-function ViewAll({ slug }: { slug: string }) {
-  return <Link className="text-xs font-medium underline-offset-4 hover:underline" href={`${basePath}/${slug}`}>All</Link>;
-}
-
-const tableClass = 'overflow-x-auto [&_th]:h-9 [&_th]:text-[11px] [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wider';
+type Attention = { key: string; tone: Tone; state: string; item: string; detail: string; href: string; action: string };
+const DAY = 86400_000;
+const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
 
 export default async function BarbershopOperationsPage() {
   const response = await keystoneClient<{ platformOperations: { success: boolean; error?: string; data?: Data } }>(query, {}, { cache: 'no-store' });
@@ -92,115 +78,84 @@ export default async function BarbershopOperationsPage() {
 
   const data = result.data;
   const timeZone = data.shop.timezone || null;
-  const when = (value: string) => (timeZone ? formatShopDateTime(value, timeZone) : new Date(value).toISOString());
-  const notes = data.notes ?? [];
-  const waivers = data.waivers ?? [];
-  const notesAccess = data.notesAccess === 'granted' ? 'granted' : 'restricted';
-  const noteCustomerRestricted = data.notesCustomerAccess !== 'granted', noteBarberRestricted = data.notesStaffAccess !== 'granted';
-  const reorder = (data.products || []).filter((product) => product.reorderSuggested);
+  const when = (value: string) => (timeZone ? formatShopDateTime(value, timeZone) : new Date(value).toISOString().slice(0, 10));
+  const now = Date.now();
+  const items: Attention[] = [];
+
+  // Stock: what to reorder, and lots about to expire.
+  for (const product of (data.products || []).filter((row) => row.reorderSuggested).sort((a, b) => a.onHand - b.onHand)) {
+    items.push({ key: `stock-${product.id}`, tone: 'wait', state: product.onHand ? 'Low stock' : 'Out of stock', item: product.name, detail: `${product.onHand} on hand`, href: `${basePath}/platform/inventory/${product.id}`, action: 'Receive' });
+  }
+  for (const lot of (data.lots || []).filter((row) => row.status === 'active' && (row.quantityRemaining || 0) > 0 && row.expiresAt && new Date(row.expiresAt).getTime() - now < 30 * DAY)) {
+    const expired = new Date(lot.expiresAt!).getTime() < now;
+    items.push({ key: `lot-${lot.id}`, tone: expired ? 'alert' : 'wait', state: expired ? 'Expired' : 'Expiring', item: lot.product?.name || lot.lotNumber, detail: `Lot ${lot.lotNumber} · ${lot.quantityRemaining} left · ${expired ? 'expired' : 'expires'} ${when(lot.expiresAt!)}`, href: lot.product ? `${basePath}/platform/inventory/${lot.product.id}` : `${basePath}/platform/inventory`, action: 'Adjust' });
+  }
+
+  // Money owed to barbers.
+  const toApprove = data.commissions.filter((row) => row.status === 'projected');
+  const approved = data.commissions.filter((row) => row.status === 'approved');
+  if (approved.length || data.metrics.payableCommission) {
+    items.push({ key: 'payroll-approved', tone: 'info', state: 'Unpaid', item: 'Barber payouts', detail: `${money(data.metrics.payableCommission)} to pay${approved.length ? ` · ${plural(approved.length, 'approved commission')}` : ''}`, href: `${basePath}/platform/payroll?status=approved`, action: 'Pay' });
+  }
+  if (toApprove.length) {
+    items.push({ key: 'payroll-projected', tone: 'wait', state: 'To approve', item: 'Commissions', detail: `${plural(toApprove.length, 'commission')}${data.counts.commissions && data.counts.commissions > data.commissions.length ? ' (latest shown)' : ''} · ${money(toApprove.reduce((sum, row) => sum + (row.commissionAmount || 0), 0))}`, href: `${basePath}/platform/payroll`, action: 'Review' });
+  }
+
+  // Card payments still open with the processor.
+  if (data.paymentSessions.length) {
+    items.push({ key: 'payments-open', tone: 'wait', state: 'Open', item: 'Card payments', detail: `${plural(data.paymentSessions.length, 'payment')} awaiting processor status · ${money(data.paymentSessions.reduce((sum, row) => sum + row.amount, 0))}`, href: `${basePath}/platform/payments`, action: 'Check' });
+  }
+
+  // Policy gaps.
+  if (data.policies !== null && !data.policies.some((policy) => policy.status === 'active')) {
+    items.push({ key: 'policy-noshow', tone: 'alert', state: 'Missing', item: 'No-show policy', detail: data.policies.length ? 'No policy in use' : 'No-shows are recorded without a fee', href: `${basePath}/platform/policies`, action: 'Set up' });
+  }
+
+  // Chairs out of service or without a barber.
+  for (const chair of (data.chairs || []).filter((row) => row.status === 'maintenance' || (row.status === 'active' && !row.assignedBarbers?.length))) {
+    items.push({ key: `chair-${chair.id}`, tone: chair.status === 'maintenance' ? 'wait' : 'off', state: chair.status === 'maintenance' ? 'Maintenance' : 'Unassigned', item: `Chair ${chair.chairNumber}`, detail: chair.stationName || (chair.status === 'maintenance' ? 'Out of service' : 'No barber assigned'), href: `${basePath}/platform/staff/chairs`, action: 'Open' });
+  }
+
+  // Waivers waiting on a signature.
+  const unsigned = (data.waivers || []).filter((waiver) => !waiver.signedByName && ['draft', 'sent'].includes(waiver.status));
+  if (unsigned.length) {
+    items.push({ key: 'waivers', tone: 'wait', state: 'Unsigned', item: 'Waivers', detail: `${plural(unsigned.length, 'waiver')} awaiting signature${unsigned[0]?.customer?.name ? ` · ${unsigned.map((waiver) => waiver.customer?.name).filter(Boolean).slice(0, 3).join(', ')}` : ''}`, href: `${basePath}/waiver-forms`, action: 'Open' });
+  }
+
+  const waiting = (data.waitlist || []).filter((entry) => ['waiting', 'notified'].includes(entry.status));
+  const restricted = [data.lots === null || data.products === null ? 'stock' : null, data.waitlist === null ? 'waitlist' : null, data.policies === null ? 'policies' : null, data.chairs === null ? 'chairs' : null, data.waivers === null ? 'waivers' : null].filter(Boolean);
+  const meta = [items.length ? `${plural(items.length, 'item')} need attention` : 'Nothing needs attention', waiting.length ? `${waiting.length} on the waitlist` : null].filter(Boolean).join(' · ');
 
   return (
-    <PageContainer title="Shop operations" header={header(data.shop.name, 'live')} breadcrumbs={breadcrumbs}>
-      <div className="flex min-w-0 flex-col gap-8 px-4 pb-8 md:px-6">
-        <Readouts items={[
-          { label: 'Units in stock', value: data.metrics.inventoryUnits === null ? '—' : data.metrics.inventoryUnits, tone: reorder.length ? 'wait' : undefined },
-          { label: 'Commission to pay', value: money(data.metrics.payableCommission) },
-          { label: 'Tips, all time', value: money(data.metrics.tips) },
-          { label: 'Status changes', value: data.metrics.reconciliationChanges },
-        ]} />
-
-        <div className="grid min-w-0 gap-8 xl:grid-cols-2">
-          <Section id="ops-chairs" title="Chairs" count={data.counts.chairs ?? undefined} actions={<ViewAll slug="platform/staff/chairs" />}>
-            {data.chairs === null ? <Restricted>Chairs restricted for your role.</Restricted> : <>
-              <ul>
-                {data.chairs.map((chair) => (
-                  <li key={chair.id} className="flex min-w-0 items-baseline justify-between gap-3 border-b py-2.5 text-sm last:border-b-0">
-                    <Link className="min-w-0 truncate font-medium hover:underline" href="/dashboard/platform/staff/chairs"><StatusDot tone={statusTone(chair.status)} />Chair <span className="font-mono">{chair.chairNumber}</span>{chair.stationName ? <span className="ml-1.5 font-normal text-muted-foreground">{chair.stationName}</span> : null}</Link>
-                    <span className="truncate text-muted-foreground">{chair.assignedBarbers?.map((barber) => barber.name).join(', ') || 'Unassigned'}</span>
-                  </li>
-                ))}
-              </ul>
-              {!data.chairs.length && <EmptyLine>No chairs yet.</EmptyLine>}
-              <More shown={data.chairs.length} total={data.counts.chairs} slug="platform/staff/chairs" noun="chairs" />
-            </>}
-          </Section>
-
-          <Section id="ops-waitlist" title="Waitlist" tone={data.waitlist?.length ? 'wait' : undefined} count={data.counts.waitlist ?? undefined} actions={<ViewAll slug="waitlist-entries" />}>
-            {data.waitlist === null ? <Restricted>Waitlist restricted for your role.</Restricted> : <>
-              <WaitlistControls entries={data.waitlist} services={data.activeServices || []} barbers={data.activeBarbers || []} timeZone={timeZone} />
-              <More shown={data.waitlist.length} total={data.counts.waitlist} slug="waitlist-entries" noun="open requests" />
-            </>}
-          </Section>
-        </div>
-
-        <Section id="ops-inventory" title="Stock" tone={reorder.length ? 'wait' : undefined} count={data.counts.lots ?? undefined} actions={<ViewAll slug="platform/inventory" />}>
-          {data.lots === null ? <Restricted>Inventory restricted for your role.</Restricted> : <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-            <div className="min-w-0">
-              {reorder.length > 0 && <p className="mb-3 text-sm"><StatusDot tone="wait" />Reorder: {reorder.map((product) => `${product.name} (${product.onHand})`).join(', ')}</p>}
-              <div className={tableClass}><Table><TableHeader><TableRow><TableHead>Lot</TableHead><TableHead>Product</TableHead><TableHead>Supplier</TableHead><TableHead className="text-right">Left</TableHead></TableRow></TableHeader><TableBody>{data.lots.length ? data.lots.map(x => <TableRow key={x.id}><TableCell><Link className="font-mono text-xs hover:underline" href={`${basePath}/inventory-lots/${x.id}`}>{x.lotNumber}</Link><div className="text-xs text-muted-foreground">{x.status}{x.expiresAt ? ` · exp ${when(x.expiresAt)}` : ''}</div></TableCell><TableCell>{x.product?.name ?? '—'}</TableCell><TableCell>{x.supplier?.name ?? '—'}</TableCell><TableCell className="text-right font-mono tabular-nums">{x.quantityRemaining ?? 0}/{x.quantityReceived ?? 0}</TableCell></TableRow>) : <Empty span={4} text="No inventory lots yet."/>}</TableBody></Table></div>
-              <More shown={data.lots.length} total={data.counts.lots} slug="platform/inventory" noun="lots" />
-              <h3 className="mt-6 border-b pb-2 text-sm font-semibold">Suppliers <span className="ml-1 font-mono text-xs font-normal text-muted-foreground">{data.counts.suppliers ?? ''}</span></h3>
-              <ul className="grid gap-x-6 sm:grid-cols-2">{(data.suppliers || []).slice(0, 6).map(x => <li key={x.id} className="border-b py-2.5 text-sm"><Link href="/dashboard/platform/inventory/suppliers" className="font-medium hover:underline"><StatusDot tone={statusTone(x.status)} />{x.name}</Link><p className="truncate text-xs text-muted-foreground">{x.contactName ?? 'No contact'} · {x.email || x.phone || 'no details'}</p></li>)}</ul>
-              {!data.suppliers?.length && <EmptyLine>No suppliers yet.</EmptyLine>}
-              <More shown={Math.min(6, data.suppliers?.length || 0)} total={data.counts.suppliers} slug="platform/inventory/suppliers" noun="suppliers" />
-            </div>
-            <InventoryReceiptControls products={data.products || []} suppliers={data.suppliers || []} supplierTotal={data.counts.suppliers} timeZone={timeZone} />
-          </div>}
+    <PageContainer title="Shop operations" header={header(meta, items.some((item) => item.tone === 'alert') ? 'alert' : items.length ? 'wait' : undefined)} breadcrumbs={breadcrumbs}>
+      <div className="flex min-w-0 flex-col gap-8 px-4 pb-24 md:px-6">
+        <Section id="ops-attention" title="Needs attention" count={items.length}>
+          {!items.length ? <Empty>Stock, payouts, policies, chairs and waivers are all in order.</Empty> : (
+            <DataTable label="Needs attention" className="relative" head={[
+              { label: 'Status', className: 'w-32' },
+              { label: 'Item' },
+              { label: 'Detail', className: 'hidden md:table-cell' },
+              { label: <span className="sr-only">Open</span>, className: 'w-px' },
+            ]}>
+              {items.map((item) => (
+                <tr key={item.key} className="hover:bg-muted/30">
+                  <Td className="align-middle"><StatusCell tone={item.tone}>{item.state}</StatusCell></Td>
+                  <Td className="align-middle"><Link href={item.href} className="font-medium underline-offset-4 hover:underline">{item.item}</Link><span className="block text-xs text-muted-foreground md:hidden">{item.detail}</span></Td>
+                  <Td className="hidden align-middle text-muted-foreground tabular-nums md:table-cell">{item.detail}</Td>
+                  <Td className="align-middle text-right"><PillLink size="sm" href={item.href}>{item.action}<ChevronRight /></PillLink></Td>
+                </tr>
+              ))}
+            </DataTable>
+          )}
+          {restricted.length ? <Restricted>Not shown for your role: {restricted.join(', ')}.</Restricted> : null}
         </Section>
 
-        <div className="grid min-w-0 gap-8 xl:grid-cols-2">
-          <Section id="ops-commissions" title="Open commissions" count={data.counts.commissions ?? undefined} actions={<ViewAll slug="platform/payroll" />}>
-            <div className={tableClass}><Table><TableHeader><TableRow><TableHead>Visit</TableHead><TableHead>Barber</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader><TableBody>{data.commissions.length ? data.commissions.map(x => <TableRow key={x.id}><TableCell className="align-top"><span className="text-sm font-medium"><StatusDot tone={statusTone(x.status)} />{x.appointment?.serviceTitleSnapshot || 'Retail sale'}</span><div className="text-xs text-muted-foreground">{(x.appointment?.startsAt || x.transaction?.completedAt || x.createdAt) ? when(String(x.appointment?.startsAt || x.transaction?.completedAt || x.createdAt)) : '—'} · {label(x.status)} · {x.commissionRate ?? '0'}%</div><CommissionControls commission={x} /></TableCell><TableCell className="align-top">{x.barber?.name ?? '—'}</TableCell><TableCell className="text-right align-top font-mono tabular-nums">{money(x.commissionAmount)}</TableCell></TableRow>) : <Empty span={3} text="No open commissions."/>}</TableBody></Table></div>
-            <More shown={data.commissions.length} total={data.counts.commissions} slug="platform/payroll" noun="open commissions" />
-          </Section>
-
-          <Section id="ops-tips" title="Tips" count={data.counts.tips ?? undefined} actions={<ViewAll slug="platform/payroll" />}>
-            <div className={tableClass}><Table><TableHeader><TableRow><TableHead>When</TableHead><TableHead>Barber</TableHead><TableHead>Customer</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader><TableBody>{data.tips.length ? data.tips.map(x => <TableRow key={x.id}><TableCell><span className="text-sm">{x.createdAt ? when(x.createdAt) : '—'}</span><div className="text-xs capitalize text-muted-foreground">{x.paymentMethod}</div></TableCell><TableCell>{x.barber?.name ?? '—'}</TableCell><TableCell>{x.customer?.name ?? '—'}</TableCell><TableCell className="text-right font-mono tabular-nums">{money(x.amount)}</TableCell></TableRow>) : <Empty span={4} text="No tips yet."/>}</TableBody></Table></div>
-            <More shown={data.tips.length} total={data.counts.tips} slug="platform/payroll" noun="tips" />
-          </Section>
-        </div>
-
-        <Section id="ops-payouts" title="Payouts recorded" count={data.counts.payouts ?? undefined} actions={<ViewAll slug="platform/payroll" />}>
-          <div className={tableClass}><Table><TableHeader><TableRow><TableHead>Payout</TableHead><TableHead>Barber</TableHead><TableHead>Paid</TableHead><TableHead>Reference</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader><TableBody>{data.payouts.length ? data.payouts.map(x => <TableRow key={x.id}><TableCell><Link className="font-mono text-xs hover:underline" href="/dashboard/platform/payroll">{x.payoutNumber}</Link><div className="text-xs text-muted-foreground">{x.commissionCount} commission{x.commissionCount === 1 ? '' : 's'}{x.status ? ` · ${label(x.status)}` : ''}</div></TableCell><TableCell>{x.barber?.name ?? '—'}</TableCell><TableCell className="whitespace-nowrap">{when(x.paidAt)}</TableCell><TableCell className="max-w-48 truncate">{x.notes || '—'}</TableCell><TableCell className="text-right font-mono tabular-nums">{money(x.totalAmount)}</TableCell></TableRow>) : <Empty span={5} text="No payouts recorded."/>}</TableBody></Table></div>
-          <More shown={data.payouts.length} total={data.counts.payouts} slug="platform/payroll" noun="payouts" />
+        <Section id="ops-waitlist" title="Waitlist" tone={waiting.length ? 'wait' : undefined} count={data.counts.waitlist ?? undefined} actions={<Link className="text-xs font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href={`${basePath}/waitlist-entries`}>All requests</Link>}>
+          {data.waitlist === null ? <Restricted>Waitlist restricted for your role.</Restricted> : <>
+            <WaitlistControls entries={data.waitlist} services={data.activeServices || []} barbers={data.activeBarbers || []} timeZone={timeZone} />
+            {typeof data.counts.waitlist === 'number' && data.counts.waitlist > data.waitlist.length ? <p className="pt-2 text-xs text-muted-foreground"><span className="tabular-nums">{data.waitlist.length} of {data.counts.waitlist}</span> open requests shown</p> : null}
+          </>}
         </Section>
-
-        {(data.paymentSessions.length > 0 || data.reconciliations.length > 0) && (
-          <div className="grid min-w-0 gap-8 xl:grid-cols-2">
-            {data.paymentSessions.length > 0 && (
-              <Section id="ops-processor" title="Open card payments" tone="wait" count={data.paymentSessions.length}>
-                <ReconciliationControls sessions={data.paymentSessions} />
-              </Section>
-            )}
-            {data.reconciliations.length > 0 && (
-              <Section id="ops-reconciliations" title="Processor checks" count={data.counts.reconciliations ?? undefined} actions={<ViewAll slug="platform/payments" />}>
-                <div className={tableClass}><Table><TableHeader><TableRow><TableHead>Checked</TableHead><TableHead>Before</TableHead><TableHead>Processor</TableHead><TableHead>After</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader><TableBody>{data.reconciliations.map(x => <TableRow key={x.id}><TableCell className="whitespace-nowrap">{x.changed && <StatusDot tone="wait" />}{when(x.observedAt)}</TableCell><TableCell>{label(x.localStatusBefore)}</TableCell><TableCell>{label(x.remoteStatus)}</TableCell><TableCell>{label(x.localStatusAfter)}</TableCell><TableCell className="text-right font-mono tabular-nums">{money(x.amount)}</TableCell></TableRow>)}</TableBody></Table></div>
-                <More shown={data.reconciliations.length} total={data.counts.reconciliations} slug="platform/payments" noun="checks" />
-              </Section>
-            )}
-          </div>
-        )}
-
-        <div className="grid min-w-0 gap-8 xl:grid-cols-2">
-          <Section id="ops-policies" title="No-show policies" count={data.counts.policies ?? undefined} actions={<ViewAll slug="platform/policies" />}>
-            {data.policies === null ? <Restricted>No-show policies restricted for your role.</Restricted> : <>
-              <ul>{data.policies.map(x => <li key={x.id} className="flex min-w-0 items-baseline justify-between gap-3 border-b py-2.5 text-sm last:border-b-0"><Link href="/dashboard/platform/policies" className="min-w-0 truncate font-medium hover:underline"><StatusDot tone={statusTone(x.status)} />{x.name}</Link><span className="shrink-0 text-muted-foreground"><span className="font-mono tabular-nums">{money(x.feeAmount)}</span> · {x.graceMinutes ?? 0}m grace{x.appliesToMemberships ? ' · memberships' : ''}</span></li>)}</ul>
-              {!data.policies.length && <EmptyLine>No no-show policies. <Link className="underline" href="/dashboard/platform/policies">Add a policy</Link></EmptyLine>}
-              <More shown={data.policies.length} total={data.counts.policies} slug="platform/policies" noun="policies" />
-            </>}
-          </Section>
-
-          <Section id="ops-care" title="Care records" count={notes.length + waivers.length}>
-            {notesAccess === 'restricted' && <Restricted>Client notes restricted.</Restricted>}
-            {data.waivers === null && <Restricted>Waivers restricted for your role.</Restricted>}
-            <ul>
-              {notes.map(x => <li key={x.id} className="border-b py-2.5 text-sm last:border-b-0"><p className="font-medium"><StatusDot tone={x.privateToStaff ? 'off' : 'info'} />{x.title ?? 'Untitled note'}{x.privateToStaff ? <span className="ml-2 text-xs font-normal text-muted-foreground">staff only</span> : null}</p><p className="text-xs text-muted-foreground">{x.noteType ?? '—'} · {x.customer ? x.customer.name ?? 'Customer unavailable' : noteCustomerRestricted ? 'Customer restricted' : '—'} · {x.barber ? x.barber.name ?? 'Barber unavailable' : noteBarberRestricted ? 'Barber restricted' : '—'}</p></li>)}
-              {waivers.map(x => { const signed = Boolean(x.signedByName) || x.status === 'signed'; return <li key={x.id} className="border-b py-2.5 text-sm last:border-b-0"><p className="font-medium"><StatusDot tone={signed ? 'live' : 'wait'} />{x.title}</p><p className="text-xs text-muted-foreground">{label(x.waiverType)} · {signed ? 'signed' : ['draft', 'sent'].includes(x.status) ? 'awaiting signature' : label(x.status)} · {x.customer?.name ?? '—'}{x.signedByName ? ` · by ${x.signedByName}` : ''}</p></li>; })}
-            </ul>
-            {!notes.length && !waivers.length && (notesAccess === 'granted' || data.waivers !== null) && <EmptyLine>No care records yet.</EmptyLine>}
-            <More shown={waivers.length} total={data.counts.waivers} slug="waiver-forms" noun="waivers" />
-          </Section>
-        </div>
       </div>
     </PageContainer>
   );

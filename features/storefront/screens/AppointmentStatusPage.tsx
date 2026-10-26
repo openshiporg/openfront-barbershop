@@ -72,7 +72,6 @@ export default async function AppointmentStatusPage({
         {!appointment ? (
           <>
             <section className="sf-page-head">
-              <p className="sf-eyebrow">Appointment</p>
               <h1 className="sf-display">{lookup?.status === 'unavailable' ? 'Status couldn’t load' : account && !appointmentId ? 'Your visits' : appointmentId ? 'Not found here' : 'Find your visit'}</h1>
             </section>
             <div className="sf-container-narrow !mx-0 grid gap-5 pt-8" role={lookup?.status === 'unavailable' ? 'alert' : undefined}>
@@ -101,25 +100,25 @@ export default async function AppointmentStatusPage({
                     : 'Open the link from the browser you booked in, or sign in to the account you booked with.'}
                 </p>
               )}
-              <div className="sf-track">
+              <div className="sf-actions">
                 {account
-                  ? <><Link href="/book" className="sf-pill is-primary">Book a chair</Link><Link href="/account" className="sf-pill">All visits</Link></>
-                  : <Link href="/account" className="sf-pill is-primary">Sign in</Link>}
-                {telephoneHref && settings?.phone ? <a href={`tel:${telephoneHref}`} className="sf-pill">Call {settings.phone}</a> : null}
+                  ? <><Link href="/book" className="sf-btn is-primary">Book a time</Link><Link href="/account" className="sf-btn">All visits</Link></>
+                  : <Link href="/account" className="sf-btn is-primary">Sign in</Link>}
+                {telephoneHref && settings?.phone ? <a href={`tel:${telephoneHref}`} className="sf-btn">Call {settings.phone}</a> : null}
               </div>
             </div>
           </>
         ) : (
           <>
             <section className="sf-page-head">
-              <p className="sf-eyebrow">For {customerName(appointment.customer)}</p>
-              <h1 className="sf-display"><span className={`sf-dot ${statusTone[appointment.status || ''] ?? ''}`} aria-hidden="true" />{receiptLine?.title || appointment.service?.name}</h1>
+              <h1 className="sf-display">{receiptLine?.title || appointment.service?.name}</h1>
+              <p className="sf-lead"><span className={`sf-dot ${statusTone[appointment.status || ''] ?? ''}`} aria-hidden="true" />For {customerName(appointment.customer)}</p>
             </section>
 
             <div className="grid gap-8 pt-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:gap-12">
               <section className="sf-card-dark sf-on-dark content-start" aria-label="Appointment">
                 <div className="flex flex-wrap items-baseline justify-between gap-3">
-                  <p className="sf-eyebrow capitalize">{statusLabel(appointment.status)}</p>
+                  <p className="sf-subtitle capitalize">{statusLabel(appointment.status)}</p>
                   <span className="sf-tag">{paymentLabel(appointment.paymentStatus)}</span>
                 </div>
                 {isTerminal(appointment.status) ? (
@@ -135,16 +134,16 @@ export default async function AppointmentStatusPage({
                   <div><dt>Time in chair</dt><dd className="sf-mono">{receiptLine?.durationMinutes || appointment.durationMinutes ? `${receiptLine?.durationMinutes || appointment.durationMinutes} min` : '—'}</dd></div>
                   <div><dt>Price</dt><dd className="sf-mono">{formatMoney(receiptLine?.price ?? appointment.price)}</dd></div>
                 </dl>
-                <div className="sf-track">
-                  <Link href={`/book?service=${encodeURIComponent(appointment.service?.id || '')}&barber=${encodeURIComponent(appointment.barber?.id || '')}`} className="sf-pill is-primary">Rebook this visit</Link>
-                  <Link href="/services" className="sf-pill">Services</Link>
+                <div className="sf-actions">
+                  <Link href={`/book?service=${encodeURIComponent(appointment.service?.id || '')}&barber=${encodeURIComponent(appointment.barber?.id || '')}`} className="sf-btn is-primary">Rebook this visit</Link>
+                  <Link href="/services" className="sf-btn">Services</Link>
                 </div>
               </section>
 
               <aside className="grid content-start gap-0">
                 <section className="sf-block border-t-0 pt-0" aria-labelledby="payment-heading">
-                  <h2 id="payment-heading" className="sf-eyebrow">Payment</h2>
-                  {transaction ? <p className="sf-mono text-[2rem] font-semibold leading-none">{transaction.formattedTotal || formatMoney(transaction.total)}</p> : null}
+                  <h2 id="payment-heading" className="sf-subtitle">Payment</h2>
+                  {transaction ? <p className="sf-title">{transaction.formattedTotal || formatMoney(transaction.total)}</p> : null}
                   <p className="sf-small">{paymentLine}</p>
                   {depositReturn === true ? <p role="status" className="sf-notice">Deposit received</p> : null}
                   {params.deposit === 'cancelled' && depositDue ? <p role="status" className="sf-notice">Deposit not paid</p> : null}
@@ -175,7 +174,7 @@ export default async function AppointmentStatusPage({
 
                 {appointment.customer?.packageBalances?.length ? (
                   <section className="sf-block" aria-labelledby="balances-heading">
-                    <h2 id="balances-heading" className="sf-eyebrow">Packages & memberships</h2>
+                    <h2 id="balances-heading" className="sf-subtitle">Packages & memberships</h2>
                     <dl className="sf-ledger">
                       {appointment.customer.packageBalances.map((balance) => (
                         <div key={balance.id}><dt>{balance.servicePackageName || balance.membershipPlanName || 'Balance'}</dt><dd>{balance.remainingVisits} visits left · {statusLabel(balance.status)}</dd></div>

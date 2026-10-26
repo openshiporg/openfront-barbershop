@@ -10,6 +10,7 @@ import { useCommandKey } from '@/features/platform/lib/useCommandKey';
 import { createStaffAppointmentAction, searchBookingCustomersAction, type CustomerMatch, type StaffBookingInput } from '../actions/appointments';
 import { parseShopDateTime } from '../lib/shopTimeInput';
 import { Notice, Pill, selectClass, Track } from '@/features/platform/lib/ui';
+import { Segmented } from './FloorKit';
 
 type ServiceOption = { id: string; name?: string | null; durationMinutes?: number | null; depositRequired?: boolean | null; specialistIds?: string[] };
 type BarberOption = { id: string; displayName?: string | null; name?: string | null; bookingEnabled?: boolean | null };
@@ -128,23 +129,20 @@ export function StaffBookingForm(props: StaffBookingFormProps) {
 
   return (
     <div className="space-y-4">
-      <Track label="Customer">
-        <Pill size="sm" variant="flat" aria-pressed={mode === 'existing'} onClick={() => setMode('existing')}>Existing customer</Pill>
-        <Pill size="sm" variant="flat" aria-pressed={mode === 'new'} onClick={() => setMode('new')}>New customer</Pill>
-      </Track>
+      <Segmented label="Customer" value={mode} onChange={setMode} options={[{ value: 'existing', label: 'Existing customer' }, { value: 'new', label: 'New customer' }]} />
 
       {mode === 'existing' ? (
         <div className="space-y-2">
           <Label htmlFor={`${id}-search`}>Find customer</Label>
           <div className="flex gap-2">
-            <Input id={`${id}-search`} value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); runSearch(); } }} placeholder="Name, phone, or email" aria-describedby={described('customer')} />
+            <Input className="rounded-[6px]" id={`${id}-search`} value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); runSearch(); } }} placeholder="Name, phone, or email" aria-describedby={described('customer')} />
             <Track><Pill disabled={searching || search.trim().length < 2} onClick={runSearch}>{searching ? 'Searching…' : 'Search'}</Pill></Track>
           </div>
           {searchMessage && <p role="status" className="text-xs text-muted-foreground">{searchMessage}</p>}
           {matches.length > 0 && (
-            <div className="grid gap-1 rounded-xl bg-muted p-1 shadow-[inset_0_1px_2px_rgb(0_0_0/0.08)]" role="group" aria-label="Matching customers">
+            <div className="grid gap-1 rounded-[6px] border p-1" role="group" aria-label="Matching customers">
               {matches.map((match) => (
-                <Pill key={match.id} size="sm" variant="flat" aria-pressed={customerId === match.id} className="justify-start overflow-hidden text-ellipsis rounded-lg" onClick={() => { setCustomerId(match.id); setSelectedLabel(customerLabel(match)); }}>
+                <Pill key={match.id} size="sm" variant="flat" aria-pressed={customerId === match.id} className="justify-start overflow-hidden text-ellipsis" onClick={() => { setCustomerId(match.id); setSelectedLabel(customerLabel(match)); }}>
                   {customerLabel(match)}
                 </Pill>
               ))}
@@ -155,10 +153,10 @@ export function StaffBookingForm(props: StaffBookingFormProps) {
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="grid gap-1"><Label htmlFor={`${id}-first`}>First name</Label><Input id={`${id}-first`} value={firstName} maxLength={80} onChange={(event) => setFirstName(event.target.value)} aria-describedby={described('first')} />{errorFor('first')}</div>
-          <div className="grid gap-1"><Label htmlFor={`${id}-last`}>Last name</Label><Input id={`${id}-last`} value={lastName} maxLength={80} onChange={(event) => setLastName(event.target.value)} /></div>
-          <div className="grid gap-1"><Label htmlFor={`${id}-phone`}>Phone</Label><Input id={`${id}-phone`} value={phone} maxLength={40} inputMode="tel" onChange={(event) => setPhone(event.target.value)} aria-describedby={described('phone')} />{errorFor('phone')}</div>
-          <div className="grid gap-1"><Label htmlFor={`${id}-email`}>Email (optional)</Label><Input id={`${id}-email`} value={email} maxLength={200} type="email" onChange={(event) => setEmail(event.target.value)} /></div>
+          <div className="grid gap-1"><Label htmlFor={`${id}-first`}>First name</Label><Input className="rounded-[6px]" id={`${id}-first`} value={firstName} maxLength={80} onChange={(event) => setFirstName(event.target.value)} aria-describedby={described('first')} />{errorFor('first')}</div>
+          <div className="grid gap-1"><Label htmlFor={`${id}-last`}>Last name</Label><Input className="rounded-[6px]" id={`${id}-last`} value={lastName} maxLength={80} onChange={(event) => setLastName(event.target.value)} /></div>
+          <div className="grid gap-1"><Label htmlFor={`${id}-phone`}>Phone</Label><Input className="rounded-[6px]" id={`${id}-phone`} value={phone} maxLength={40} inputMode="tel" onChange={(event) => setPhone(event.target.value)} aria-describedby={described('phone')} />{errorFor('phone')}</div>
+          <div className="grid gap-1"><Label htmlFor={`${id}-email`}>Email (optional)</Label><Input className="rounded-[6px]" id={`${id}-email`} value={email} maxLength={200} type="email" onChange={(event) => setEmail(event.target.value)} /></div>
         </div>
       )}
 
@@ -179,10 +177,10 @@ export function StaffBookingForm(props: StaffBookingFormProps) {
           </select>
           {errorFor('barber')}
         </div>
-        <div className="grid gap-1"><Label htmlFor={`${id}-date`}>Date</Label><Input id={`${id}-date`} type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div>
+        <div className="grid gap-1"><Label htmlFor={`${id}-date`}>Date</Label><Input className="rounded-[6px]" id={`${id}-date`} type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div>
         <div className="grid gap-1">
           <Label htmlFor={`${id}-time`}>Time ({props.timeZone})</Label>
-          <Input id={`${id}-time`} type="time" step={300} value={time} onChange={(event) => setTime(event.target.value)} aria-describedby={described('time')} />
+          <Input className="rounded-[6px]" id={`${id}-time`} type="time" step={300} value={time} onChange={(event) => setTime(event.target.value)} aria-describedby={described('time')} />
           {errorFor('time')}
           {openTimes ? (
             openTimes.length ? (
@@ -203,7 +201,7 @@ export function StaffBookingForm(props: StaffBookingFormProps) {
             <option value="walk_in">Walk-in</option>
           </select>
         </div>
-        <div className="grid gap-1 sm:col-span-2"><Label htmlFor={`${id}-notes`}>Internal notes (optional)</Label><Textarea id={`${id}-notes`} value={notes} maxLength={2000} onChange={(event) => setNotes(event.target.value)} /></div>
+        <div className="grid gap-1 sm:col-span-2"><Label htmlFor={`${id}-notes`}>Internal notes (optional)</Label><Textarea className="rounded-[6px]" id={`${id}-notes`} value={notes} maxLength={2000} onChange={(event) => setNotes(event.target.value)} /></div>
       </div>
 
       <Track>
