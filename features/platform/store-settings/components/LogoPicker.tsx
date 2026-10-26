@@ -60,7 +60,7 @@ export function LogoPicker({ logoIcon, logoColor, disabled, onIconChange, onColo
 
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="icon" className="h-12 w-12 shrink-0" type="button" disabled={disabled} aria-label="Edit SVG code">
+              <Button variant="outline" size="icon" className="h-12 w-12 shrink-0 rounded-[6px] border-b shadow-none ring-0 focus-visible:ring-2" type="button" disabled={disabled} aria-label="Edit SVG code">
                 <Code className="h-4 w-4" />
               </Button>
             </PopoverTrigger>
