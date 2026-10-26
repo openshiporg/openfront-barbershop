@@ -67,6 +67,7 @@ Live: https://openfront-barbershop-production.up.railway.app (barbershop.openshi
 ## Commits (master, auto-deployed)
 - `691be74` Full redesign: barbershop platform as the floor, storefront as take-a-number
 - `2e13c24` Barbershop finish-review fixes: products on the price rail, full-width chair strip, roster actions in view, no labels above headings
+- `cea656e` Store settings: flat logo edit button. It was the platform's only use of the shared, bevelled shadcn `Button`.
 
 ## Screenshots
 - `before/`: 67 captures (Playwright Chromium, live). Team, Inventory and Payroll show the old 500s.
