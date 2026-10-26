@@ -1,0 +1,494 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-26T12:00:00Z",
+  "title": "Design System: Openfront Barbershop",
+  "extensions": {
+    "colorMeta": {
+      "ticket": {
+        "role": "primary",
+        "displayName": "Ticket Stock",
+        "canonical": "oklch(from var(--color-accent, oklch(50% 0.2 263)) 46% min(c, 0.2) h)",
+        "tonalRamp": [
+          "oklch(15% 0.06 263)",
+          "oklch(26% 0.12 263)",
+          "oklch(36% 0.17 263)",
+          "oklch(46% 0.2 263)",
+          "oklch(58% 0.17 263)",
+          "oklch(70% 0.12 263)",
+          "oklch(83% 0.07 263)",
+          "oklch(95% 0.02 263)"
+        ]
+      },
+      "ticket-press": {
+        "role": "primary",
+        "displayName": "Ticket Press",
+        "canonical": "oklch(from var(--color-accent, oklch(50% 0.2 263)) 40% min(c, 0.19) h)",
+        "tonalRamp": [
+          "oklch(15% 0.06 263)",
+          "oklch(26% 0.12 263)",
+          "oklch(33% 0.16 263)",
+          "oklch(40% 0.19 263)",
+          "oklch(55% 0.16 263)",
+          "oklch(68% 0.12 263)",
+          "oklch(82% 0.07 263)",
+          "oklch(95% 0.02 263)"
+        ]
+      },
+      "ticket-ink": {
+        "role": "primary",
+        "displayName": "Ticket Ink",
+        "canonical": "oklch(from var(--color-accent, oklch(50% 0.2 263)) 98.5% 0.008 h)"
+      },
+      "ticket-soft": {
+        "role": "primary",
+        "displayName": "Ticket Soft",
+        "canonical": "oklch(from var(--color-accent, oklch(50% 0.2 263)) 93% 0.035 h)"
+      },
+      "led": {
+        "role": "secondary",
+        "displayName": "Board LED",
+        "canonical": "oklch(from var(--color-accent, oklch(50% 0.2 263)) 84% calc(c * 0.7 + 0.04) h)",
+        "tonalRamp": [
+          "oklch(15% 0.05 263)",
+          "oklch(28% 0.09 263)",
+          "oklch(42% 0.13 263)",
+          "oklch(56% 0.16 263)",
+          "oklch(70% 0.18 263)",
+          "oklch(84% 0.18 263)",
+          "oklch(90% 0.1 263)",
+          "oklch(95% 0.04 263)"
+        ]
+      },
+      "led-ghost": {
+        "role": "secondary",
+        "displayName": "LED Ghost",
+        "canonical": "oklch(from var(--color-accent, oklch(50% 0.2 263)) 21% calc(c * 0.18) h)"
+      },
+      "led-ghost-edge": {
+        "role": "secondary",
+        "displayName": "LED Ghost Edge",
+        "canonical": "oklch(from var(--color-accent, oklch(50% 0.2 263)) 30% calc(c * 0.22) h)"
+      },
+      "focus": {
+        "role": "secondary",
+        "displayName": "Focus",
+        "canonical": "oklch(from var(--color-accent, oklch(50% 0.2 263)) 52% 0.2 h)"
+      },
+      "live": {
+        "role": "tertiary",
+        "displayName": "Live Green"
+      },
+      "live-on-sign": {
+        "role": "tertiary",
+        "displayName": "Live Green on Sign"
+      },
+      "wait": {
+        "role": "tertiary",
+        "displayName": "Wait Amber"
+      },
+      "alert": {
+        "role": "tertiary",
+        "displayName": "Alert Red"
+      },
+      "alert-on-sign": {
+        "role": "tertiary",
+        "displayName": "Alert Red on Sign"
+      },
+      "alert-soft": {
+        "role": "tertiary",
+        "displayName": "Alert Notice Ground"
+      },
+      "enamel": {
+        "role": "neutral",
+        "displayName": "Enamel",
+        "tonalRamp": [
+          "oklch(16% 0.012 240)",
+          "oklch(30% 0.012 240)",
+          "oklch(42% 0.012 240)",
+          "oklch(60% 0.01 235)",
+          "oklch(82% 0.009 230)",
+          "oklch(87.5% 0.009 230)",
+          "oklch(92.6% 0.007 230)",
+          "oklch(96.6% 0.005 230)"
+        ]
+      },
+      "enamel-2": {
+        "role": "neutral",
+        "displayName": "Enamel 2"
+      },
+      "enamel-3": {
+        "role": "neutral",
+        "displayName": "Enamel 3"
+      },
+      "field-white": {
+        "role": "neutral",
+        "displayName": "Field White"
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink"
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Ink 2"
+      },
+      "ink-muted": {
+        "role": "neutral",
+        "displayName": "Ink Muted"
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Rule"
+      },
+      "sign": {
+        "role": "neutral",
+        "displayName": "Sign Black",
+        "tonalRamp": [
+          "oklch(0% 0 0)",
+          "oklch(19% 0.004 240)",
+          "oklch(31% 0.006 240)",
+          "oklch(45% 0.007 235)",
+          "oklch(60% 0.008 230)",
+          "oklch(76% 0.008 230)",
+          "oklch(88% 0.006 230)",
+          "oklch(97% 0.004 230)"
+        ]
+      },
+      "sign-2": {
+        "role": "neutral",
+        "displayName": "Sign 2"
+      },
+      "sign-3": {
+        "role": "neutral",
+        "displayName": "Sign 3"
+      },
+      "sign-ink": {
+        "role": "neutral",
+        "displayName": "Sign Ink"
+      },
+      "sign-muted": {
+        "role": "neutral",
+        "displayName": "Sign Muted"
+      },
+      "floor-background": {
+        "role": "neutral",
+        "displayName": "Floor Background (shell --background)"
+      },
+      "floor-foreground": {
+        "role": "neutral",
+        "displayName": "Floor Ink (shell --foreground)"
+      },
+      "floor-muted": {
+        "role": "neutral",
+        "displayName": "Floor Muted (shell --muted)"
+      },
+      "floor-muted-foreground": {
+        "role": "neutral",
+        "displayName": "Floor Muted Text (shell --muted-foreground)"
+      },
+      "floor-border": {
+        "role": "neutral",
+        "displayName": "Floor Hairline (shell --border)"
+      },
+      "floor-live": {
+        "role": "tertiary",
+        "displayName": "Floor Live (emerald-500)"
+      },
+      "floor-wait": {
+        "role": "tertiary",
+        "displayName": "Floor Wait (amber-500)"
+      },
+      "floor-info": {
+        "role": "tertiary",
+        "displayName": "Floor Info (blue-600)"
+      },
+      "floor-alert": {
+        "role": "tertiary",
+        "displayName": "Floor Alert (red-500)"
+      },
+      "floor-off": {
+        "role": "tertiary",
+        "displayName": "Floor Off (zinc-400)"
+      },
+      "floor-now-line": {
+        "role": "tertiary",
+        "displayName": "Now-line (red-500)"
+      }
+    },
+    "typographyMeta": {
+      "numeral": {
+        "displayName": "Numeral",
+        "purpose": "The wait on a walk-in ticket; the seven-segment board renders at the same size."
+      },
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page H1s, uppercase, balanced."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Storefront section titles."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Subtitles and list-item names."
+      },
+      "lead": {
+        "displayName": "Lead",
+        "purpose": "Intro paragraphs, max 40rem."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Everything a customer reads."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Field labels beside or above a value, sentence case; never above a heading."
+      },
+      "floor-title": {
+        "displayName": "Floor Title",
+        "purpose": "Operator page title, optionally led by a status dot."
+      },
+      "floor-body": {
+        "displayName": "Floor Body",
+        "purpose": "Table cells and forms."
+      },
+      "floor-label": {
+        "displayName": "Floor Label",
+        "purpose": "Table heads, counts, chair-strip captions; tabular."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.23, 1, 0.32, 1)",
+        "purpose": "Storefront default: press, arrow nudge, tear, dock, image zoom."
+      },
+      {
+        "name": "dur-press",
+        "value": "140ms",
+        "purpose": "Press scale (0.97 buttons, 0.985 tickets, 0.96 slots)."
+      },
+      {
+        "name": "dur-med",
+        "value": "220ms",
+        "purpose": "Colour transitions and the 3px arrow nudge on hover."
+      },
+      {
+        "name": "tear",
+        "value": "sf-tear 260ms cubic-bezier(0.23, 1, 0.32, 1) forwards",
+        "purpose": "Ticket body rips along the perforation when a ticket link is pressed: translate(0.35rem,-0.15rem) rotate(1.2deg), then translate(0.9rem,0.45rem) rotate(3deg) at 0.7 opacity."
+      },
+      {
+        "name": "dock",
+        "value": "sf-dock 280ms cubic-bezier(0.23, 1, 0.32, 1)",
+        "purpose": "The phone ticket dock lands on each new time choice: from translateY(0.9rem) rotate(-0.6deg) at 0.6 opacity."
+      },
+      {
+        "name": "image-zoom",
+        "value": "transform 600ms cubic-bezier(0.23, 1, 0.32, 1)",
+        "purpose": "Chair and product images scale to 1.03 on hover (fine pointers only)."
+      },
+      {
+        "name": "floor-control",
+        "value": "150ms ease-out",
+        "purpose": "Floor buttons and segmented controls; press scales to 0.98."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "0.01ms",
+        "purpose": "All storefront animation and transition collapses; the tear is removed."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sf-sm",
+        "value": "40rem"
+      },
+      {
+        "name": "sf-lg",
+        "value": "64rem"
+      },
+      {
+        "name": "sf-xl",
+        "value": "80rem"
+      },
+      {
+        "name": "floor-sm",
+        "value": "640px"
+      },
+      {
+        "name": "floor-md",
+        "value": "768px"
+      },
+      {
+        "name": "floor-lg",
+        "value": "1024px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Ticket Link",
+      "kind": "custom",
+      "refersTo": "ticket-link",
+      "description": "The storefront primary action: ticket stock with a stub numeral, notches at the stub line and a perforated edge.",
+      "html": "<a class=\"ds-tix\" href=\"#\"><span class=\"ds-tix-stub\"><span class=\"ds-tix-num\">3</span><span class=\"ds-tix-unit\">ahead</span></span><span class=\"ds-tix-body\"><span class=\"ds-tix-title\">Join the line<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></span><span class=\"ds-tix-sub\">About 25 min wait</span></span></a>",
+      "css": ".ds-tix { --notch: 0.7rem; --stub: 5.75rem; display: grid; grid-template-columns: var(--stub) minmax(0, 1fr); min-height: 6.5rem; max-width: 26rem; background: oklch(46% 0.2 263); color: oklch(98.5% 0.008 263); text-decoration: none; font-family: 'Public Sans', ui-sans-serif, system-ui, sans-serif; -webkit-mask: radial-gradient(circle var(--notch) at var(--stub) 0, #0000 98%, #000) top / 100% 51% no-repeat, radial-gradient(circle var(--notch) at var(--stub) 100%, #0000 98%, #000) bottom / 100% 51% no-repeat; mask: radial-gradient(circle var(--notch) at var(--stub) 0, #0000 98%, #000) top / 100% 51% no-repeat, radial-gradient(circle var(--notch) at var(--stub) 100%, #0000 98%, #000) bottom / 100% 51% no-repeat; transition: background-color 220ms ease, transform 140ms cubic-bezier(0.23, 1, 0.32, 1); } .ds-tix-stub { display: grid; place-items: center; align-content: center; gap: 0.2rem; padding: 0.75rem 0.5rem; background: radial-gradient(circle, oklch(98.5% 0.008 263 / 0.55) 1.5px, transparent 2px) right center / 4px 9px repeat-y; } .ds-tix-num { font-family: 'Big Shoulders', 'Arial Narrow', sans-serif; font-size: 3.4rem; font-weight: 900; line-height: 0.82; font-variant-numeric: tabular-nums; } .ds-tix-unit { font-size: 0.8rem; font-weight: 700; } .ds-tix-body { display: grid; align-content: center; gap: 0.3rem; min-width: 0; padding: 1rem 1.25rem; } .ds-tix-title { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; font-family: 'Big Shoulders', 'Arial Narrow', sans-serif; font-size: 2.3rem; font-weight: 850; line-height: 0.9; text-transform: uppercase; } .ds-tix-title svg { width: 1.6rem; height: 1.6rem; flex: none; transition: transform 220ms cubic-bezier(0.23, 1, 0.32, 1); } .ds-tix-sub { font-size: 1.02rem; font-weight: 600; line-height: 1.35; } .ds-tix:hover { background: oklch(40% 0.19 263); } .ds-tix:hover .ds-tix-title svg { transform: translateX(3px); } .ds-tix:active { transform: scale(0.985); } .ds-tix:active .ds-tix-body { animation: ds-tear 260ms cubic-bezier(0.23, 1, 0.32, 1) forwards; } .ds-tix:focus-visible { outline: 3px solid oklch(52% 0.2 263); outline-offset: 2px; } @keyframes ds-tear { 0% { transform: none; } 40% { transform: translate(0.35rem, -0.15rem) rotate(1.2deg); } 100% { transform: translate(0.9rem, 0.45rem) rotate(3deg); opacity: 0.7; } }"
+    },
+    {
+      "name": "Now Serving Board",
+      "kind": "custom",
+      "refersTo": "board-panel",
+      "description": "Black panel with seven-segment readouts from live queue data; unlit segments drawn as ghosts.",
+      "html": "<section class=\"ds-board\"><div class=\"ds-board-plate\"><h2>Now serving</h2><p><span class=\"ds-lamp\"></span>Walk-ins open</p></div><div class=\"ds-readouts\"><div class=\"ds-readout\"><span class=\"ds-seg\"><svg viewBox=\"-1 -1 62 102\"><polygon class=\"lit\" points=\"9,6 15,0 45,0 51,6 45,12 15,12\"/><polygon class=\"lit\" points=\"54,9 60,15 60,41 54,47 48,41 48,15\"/><polygon class=\"lit\" points=\"54,53 60,59 60,85 54,91 48,85 48,59\"/><polygon class=\"lit\" points=\"9,94 15,88 45,88 51,94 45,100 15,100\"/><polygon class=\"lit\" points=\"6,53 12,59 12,85 6,91 0,85 0,59\"/><polygon class=\"lit\" points=\"6,9 12,15 12,41 6,47 0,41 0,15\"/><polygon class=\"ghost\" points=\"9,50 15,44 45,44 51,50 45,56 15,56\"/></svg><svg viewBox=\"-1 -1 62 102\"><polygon class=\"lit\" points=\"9,6 15,0 45,0 51,6 45,12 15,12\"/><polygon class=\"lit\" points=\"54,9 60,15 60,41 54,47 48,41 48,15\"/><polygon class=\"lit\" points=\"54,53 60,59 60,85 54,91 48,85 48,59\"/><polygon class=\"ghost\" points=\"9,94 15,88 45,88 51,94 45,100 15,100\"/><polygon class=\"ghost\" points=\"6,53 12,59 12,85 6,91 0,85 0,59\"/><polygon class=\"ghost\" points=\"6,9 12,15 12,41 6,47 0,41 0,15\"/><polygon class=\"ghost\" points=\"9,50 15,44 45,44 51,50 45,56 15,56\"/></svg></span><span class=\"ds-readout-label\">people waiting</span></div></div><div class=\"ds-board-note\"><span><strong>2</strong> in the chair</span><span><strong>3</strong> barbers on the floor</span></div></section>",
+      "css": ".ds-board { display: grid; gap: 1.25rem; max-width: 28rem; padding: 1.25rem 1.25rem 1.4rem; background: oklch(0% 0 0); color: oklch(97% 0.004 230); font-family: 'Public Sans', ui-sans-serif, system-ui, sans-serif; } .ds-board-plate { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.25rem 1rem; padding-bottom: 0.9rem; border-bottom: 1px solid oklch(31% 0.006 240); } .ds-board-plate h2 { margin: 0; font-family: 'Big Shoulders', 'Arial Narrow', sans-serif; font-size: 1.6rem; font-weight: 850; text-transform: uppercase; line-height: 1; } .ds-board-plate p { margin: 0; font-size: 0.9rem; font-weight: 650; color: oklch(76% 0.008 230); } .ds-lamp { display: inline-block; width: 0.6em; height: 0.6em; margin-inline-end: 0.5em; background: oklch(82% 0.17 150); } .ds-readouts { display: flex; gap: 2rem; } .ds-readout { display: grid; gap: 0.6rem; } .ds-seg { display: inline-flex; gap: 0.12em; height: 1em; font-size: 6rem; line-height: 1; } .ds-seg svg { height: 1em; width: auto; overflow: visible; transform: skewX(-6deg); } .ds-seg .lit { fill: oklch(84% 0.18 263); } .ds-seg .ghost { fill: oklch(21% 0.036 263); stroke: oklch(30% 0.044 263); stroke-width: 1; } .ds-readout-label { font-size: 0.9rem; font-weight: 650; color: oklch(76% 0.008 230); } .ds-board-note { display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; padding-top: 0.9rem; border-top: 1px solid oklch(31% 0.006 240); font-size: 0.9rem; color: oklch(76% 0.008 230); } .ds-board-note strong { color: oklch(97% 0.004 230); }"
+    },
+    {
+      "name": "Price-Board Rail",
+      "kind": "custom",
+      "refersTo": "price-board-row",
+      "description": "Services and products on a fixed name · duration · price rail, aligned across every row.",
+      "html": "<div class=\"ds-rail\"><h3>Cuts</h3><a class=\"ds-row\" href=\"#\"><span class=\"ds-name\">Classic cut</span><span class=\"ds-dur\">45 min</span><span class=\"ds-price\">$40</span></a><a class=\"ds-row\" href=\"#\"><span class=\"ds-name\">Skin fade</span><span class=\"ds-dur\">60 min</span><span class=\"ds-price\">$55</span></a></div>",
+      "css": ".ds-rail { max-width: 40rem; font-family: 'Public Sans', ui-sans-serif, system-ui, sans-serif; color: oklch(16% 0.012 240); } .ds-rail h3 { margin: 0; padding-bottom: 0.5rem; border-bottom: 3px solid oklch(16% 0.012 240); font-family: 'Big Shoulders', 'Arial Narrow', sans-serif; font-size: 1.35rem; font-weight: 800; text-transform: uppercase; } .ds-row { display: grid; grid-template-columns: minmax(0, 1fr) 6rem 7rem; column-gap: 1.25rem; align-items: baseline; padding-block: 0.85rem; border-bottom: 1px solid oklch(82% 0.009 230); color: inherit; text-decoration: none; } .ds-name { font-family: 'Big Shoulders', 'Arial Narrow', sans-serif; font-size: 2rem; font-weight: 780; text-transform: uppercase; line-height: 1; } .ds-dur { justify-self: end; font-size: 0.9rem; font-weight: 600; color: oklch(42% 0.012 240); font-variant-numeric: tabular-nums; } .ds-price { justify-self: end; font-family: 'Big Shoulders', 'Arial Narrow', sans-serif; font-size: 2rem; font-weight: 850; font-variant-numeric: tabular-nums; line-height: 1; } .ds-row:hover .ds-name { text-decoration: underline; text-decoration-thickness: 3px; text-decoration-color: oklch(46% 0.2 263); text-underline-offset: 0.12em; } .ds-row:focus-visible { outline: 3px solid oklch(52% 0.2 263); outline-offset: 2px; }"
+    },
+    {
+      "name": "Sign Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Square black sign plate, the storefront's non-ticket primary.",
+      "html": "<button class=\"ds-btn-sign\">Sign in</button>",
+      "css": ".ds-btn-sign { display: inline-flex; min-height: 3rem; align-items: center; justify-content: center; padding: 0.55rem 1.25rem; border: 2px solid oklch(0% 0 0); border-radius: 0; background: oklch(0% 0 0); color: oklch(97% 0.004 230); font: 700 1rem/1.15 'Public Sans', ui-sans-serif, system-ui, sans-serif; cursor: pointer; transition: background-color 220ms ease, transform 140ms cubic-bezier(0.23, 1, 0.32, 1); } .ds-btn-sign:hover { background: oklch(19% 0.004 240); } .ds-btn-sign:active { transform: scale(0.97); } .ds-btn-sign:focus-visible { outline: 3px solid oklch(52% 0.2 263); outline-offset: 2px; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Square 2px ink outline plate for secondary storefront actions.",
+      "html": "<button class=\"ds-btn-outline\">See all barbers</button>",
+      "css": ".ds-btn-outline { display: inline-flex; min-height: 3rem; align-items: center; justify-content: center; padding: 0.55rem 1.25rem; border: 2px solid oklch(16% 0.012 240); border-radius: 0; background: transparent; color: oklch(16% 0.012 240); font: 700 1rem/1.15 'Public Sans', ui-sans-serif, system-ui, sans-serif; cursor: pointer; transition: background-color 220ms ease, transform 140ms cubic-bezier(0.23, 1, 0.32, 1); } .ds-btn-outline:hover { background: oklch(87.5% 0.009 230); } .ds-btn-outline:active { transform: scale(0.97); } .ds-btn-outline:focus-visible { outline: 3px solid oklch(52% 0.2 263); outline-offset: 2px; }"
+    },
+    {
+      "name": "Storefront Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Square 2px field on Field White; focus turns the border to ticket stock.",
+      "html": "<label class=\"ds-field\"><span>Your name</span><input class=\"ds-input\" placeholder=\"First and last\"></label>",
+      "css": ".ds-field { display: grid; gap: 0.4rem; max-width: 22rem; font: 700 0.9rem 'Public Sans', ui-sans-serif, system-ui, sans-serif; color: oklch(30% 0.012 240); } .ds-input { width: 100%; min-height: 3rem; padding: 0.7rem 0.85rem; border: 2px solid oklch(30% 0.012 240); border-radius: 0; background: oklch(99.5% 0.002 230); color: oklch(16% 0.012 240); font: 400 1rem/1.35 'Public Sans', ui-sans-serif, system-ui, sans-serif; } .ds-input::placeholder { color: oklch(42% 0.012 240); } .ds-input:focus-visible { border-color: oklch(46% 0.2 263); outline: 3px solid oklch(52% 0.2 263); outline-offset: 0; }"
+    },
+    {
+      "name": "Sign Band Nav",
+      "kind": "nav",
+      "refersTo": "nav-band",
+      "description": "Sticky black band: brand, links with a 4px ticket-stock bar under the current page, a ticket-stock Book plate.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-brand\" href=\"#\">Openfront Barbers</a><span class=\"ds-links\"><a href=\"#\" aria-current=\"page\">Services</a><a href=\"#\">Barbers</a><a href=\"#\">Shop</a></span><a class=\"ds-book\" href=\"#\">Book</a></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; min-height: 4rem; padding-inline: 1.5rem; background: oklch(0% 0 0); color: oklch(97% 0.004 230); font-family: 'Public Sans', ui-sans-serif, system-ui, sans-serif; } .ds-brand { font-family: 'Big Shoulders', 'Arial Narrow', sans-serif; font-size: 1.45rem; font-weight: 850; line-height: 0.95; text-transform: uppercase; color: inherit; text-decoration: none; } .ds-links { display: flex; gap: 1.5rem; } .ds-links a { position: relative; display: inline-flex; min-height: 4rem; align-items: center; font-size: 0.9rem; font-weight: 650; color: oklch(76% 0.008 230); text-decoration: none; } .ds-links a:hover, .ds-links a[aria-current='page'] { color: oklch(97% 0.004 230); } .ds-links a[aria-current='page']::after { content: ''; position: absolute; inset-inline: 0; bottom: 0; height: 4px; background: oklch(46% 0.2 263); } .ds-links a:focus-visible, .ds-book:focus-visible { outline: 3px solid oklch(84% 0.18 263); outline-offset: 2px; } .ds-book { display: inline-flex; min-height: 2.75rem; align-items: center; padding-inline: 1rem; background: oklch(46% 0.2 263); color: oklch(98.5% 0.008 263); font-family: 'Big Shoulders', 'Arial Narrow', sans-serif; font-size: 1.2rem; font-weight: 800; text-transform: uppercase; text-decoration: none; transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1); } .ds-book:hover { background: oklch(40% 0.19 263); } .ds-book:active { transform: scale(0.97); }"
+    },
+    {
+      "name": "Ticket Dock",
+      "kind": "custom",
+      "refersTo": "ticket-dock",
+      "description": "Phone-only sticky black bar holding the chosen time, total and submit; lands with the dock motion on each new choice.",
+      "html": "<div class=\"ds-dock\"><div class=\"ds-dock-row\"><p><strong>Skin fade · Thu 2:30 PM</strong>with Marcus</p><span class=\"ds-dock-total\">$55</span></div><button class=\"ds-dock-submit\">Request this time</button></div>",
+      "css": ".ds-dock { display: grid; gap: 0.6rem; max-width: 24rem; padding: 0.75rem 1rem; background: oklch(0% 0 0); color: oklch(97% 0.004 230); font-family: 'Public Sans', ui-sans-serif, system-ui, sans-serif; animation: ds-dock 280ms cubic-bezier(0.23, 1, 0.32, 1); } .ds-dock-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; } .ds-dock-row p { margin: 0; min-width: 0; font-size: 0.9rem; font-weight: 600; line-height: 1.3; } .ds-dock-row strong { display: block; overflow: hidden; font-family: 'Big Shoulders', 'Arial Narrow', sans-serif; font-size: 1.35rem; font-weight: 850; text-transform: uppercase; text-overflow: ellipsis; white-space: nowrap; } .ds-dock-total { font-family: 'Big Shoulders', 'Arial Narrow', sans-serif; font-size: 1.9rem; font-weight: 900; font-variant-numeric: tabular-nums; } .ds-dock-submit { min-height: 3rem; border: 2px solid oklch(46% 0.2 263); border-radius: 0; background: oklch(46% 0.2 263); color: oklch(98.5% 0.008 263); font: 800 1.35rem/1.15 'Big Shoulders', 'Arial Narrow', sans-serif; text-transform: uppercase; cursor: pointer; transition: background-color 220ms ease, transform 140ms cubic-bezier(0.23, 1, 0.32, 1); } .ds-dock-submit:hover { background: oklch(40% 0.19 263); } .ds-dock-submit:active { transform: scale(0.97); } .ds-dock-submit:focus-visible { outline: 3px solid oklch(84% 0.18 263); outline-offset: 2px; } @keyframes ds-dock { from { transform: translateY(0.9rem) rotate(-0.6deg); opacity: 0.6; } to { transform: none; opacity: 1; } }"
+    },
+    {
+      "name": "Floor Buttons",
+      "kind": "button",
+      "refersTo": "floor-button-primary",
+      "description": "Flat 6px controls: filled ink primary and a raised hairline secondary.",
+      "html": "<span class=\"ds-floor-row\"><button class=\"ds-floor-btn ds-floor-primary\">Seat next</button><button class=\"ds-floor-btn\">Check in</button></span>",
+      "css": ".ds-floor-row { display: inline-flex; gap: 0.375rem; font-family: Geist, ui-sans-serif, system-ui, sans-serif; } .ds-floor-btn { display: inline-flex; height: 2.25rem; align-items: center; padding: 0 0.875rem; border: 1px solid oklch(0.92 0.004 286.32); border-radius: 6px; background: oklch(1 0 0); color: oklch(0.141 0.005 285.823); font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background-color 150ms ease-out, border-color 150ms ease-out, transform 150ms ease-out; } .ds-floor-btn:hover { border-color: oklch(0.141 0.005 285.823 / 0.25); background: oklch(0.967 0.001 286.375 / 0.6); } .ds-floor-primary { border-color: transparent; background: oklch(0.141 0.005 285.823); color: oklch(1 0 0); } .ds-floor-primary:hover { background: oklch(0.141 0.005 285.823 / 0.85); } .ds-floor-btn:active { transform: scale(0.98); } .ds-floor-btn:focus-visible { outline: none; outline: 2px solid oklch(0.705 0.015 286.067); outline-offset: 1px; }"
+    },
+    {
+      "name": "Status Tabs",
+      "kind": "nav",
+      "refersTo": "floor-status-tabs",
+      "description": "Flat underline tabs with tabular counts; never a pill track.",
+      "html": "<nav class=\"ds-tabs\"><a href=\"#\" aria-current=\"page\">All <span>14</span></a><a href=\"#\"><i class=\"ds-dot\"></i>Waiting <span>4</span></a><a href=\"#\">In chair <span>3</span></a><a href=\"#\">Done <span>7</span></a></nav>",
+      "css": ".ds-tabs { display: flex; align-items: flex-end; gap: 1.25rem; border-bottom: 1px solid oklch(0.92 0.004 286.32); font-family: Geist, ui-sans-serif, system-ui, sans-serif; } .ds-tabs a { margin-bottom: -1px; display: inline-flex; height: 2.25rem; align-items: center; gap: 0.375rem; border-bottom: 2px solid transparent; color: oklch(0.552 0.016 285.938); font-size: 0.875rem; font-weight: 500; text-decoration: none; white-space: nowrap; transition: color 150ms, border-color 150ms; } .ds-tabs a span { font-size: 0.75rem; font-variant-numeric: tabular-nums; opacity: 0.8; } .ds-tabs a:hover { border-color: oklch(0.92 0.004 286.32); color: oklch(0.141 0.005 285.823); } .ds-tabs a[aria-current='page'] { border-color: oklch(0.141 0.005 285.823); color: oklch(0.141 0.005 285.823); } .ds-tabs a:focus-visible { outline: 2px solid oklch(0.705 0.015 286.067); } .ds-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: oklch(76.9% 0.188 70.08); }"
+    },
+    {
+      "name": "Chair Strip",
+      "kind": "custom",
+      "refersTo": "floor-chair-strip",
+      "description": "One cell per chair (barber, occupant, since when) in one 6px hairline frame, full-width rows.",
+      "html": "<ul class=\"ds-chairs\"><li><p class=\"ds-cap\"><span><i class=\"ds-dot live\"></i>Marcus</span><span>Chair 1</span></p><p class=\"ds-occ\">Dee Morales</p><p class=\"ds-sub\">Skin fade</p><p class=\"ds-sub\">since 2:10 PM · 24 min</p></li><li class=\"free\"><p class=\"ds-cap\"><span><i class=\"ds-dot off\"></i>Jules</span><span>Chair 2</span></p><p class=\"ds-occ muted\">Free</p></li><li><p class=\"ds-cap\"><span><i class=\"ds-dot live\"></i>Ana</span><span>Chair 3</span></p><p class=\"ds-occ\">Sam Okafor</p><p class=\"ds-sub\">since 2:32 PM · 2 min</p></li></ul>",
+      "css": ".ds-chairs { display: flex; flex-wrap: wrap; gap: 1px; margin: 0; padding: 0; list-style: none; overflow: hidden; max-width: 40rem; border: 1px solid oklch(0.92 0.004 286.32); border-radius: 6px; background: oklch(0.92 0.004 286.32); font-family: Geist, ui-sans-serif, system-ui, sans-serif; color: oklch(0.141 0.005 285.823); } .ds-chairs li { flex: 1 1 calc(33.333% - 1px); min-width: 0; padding: 0.625rem 0.75rem; background: oklch(1 0 0); } .ds-chairs li.free { background: oklch(0.967 0.001 286.375); } .ds-chairs p { margin: 0; } .ds-cap { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.75rem; color: oklch(0.552 0.016 285.938); font-variant-numeric: tabular-nums; } .ds-occ { margin-top: 0.25rem !important; font-size: 0.875rem; font-weight: 600; } .ds-occ.muted { font-weight: 400; color: oklch(0.552 0.016 285.938); } .ds-sub { font-size: 0.75rem; color: oklch(0.552 0.016 285.938); font-variant-numeric: tabular-nums; } .ds-dot { display: inline-block; width: 8px; height: 8px; margin-right: 0.375rem; border-radius: 50%; } .ds-dot.live { background: oklch(69.6% 0.17 162.48); } .ds-dot.off { background: oklch(70.5% 0.015 286.067); }"
+    },
+    {
+      "name": "Floor Table with Status Cell",
+      "kind": "card",
+      "refersTo": "floor-table-cell",
+      "description": "Dense 40px rows in a 6px hairline wrapper; status as dot plus word; tabular right-aligned money.",
+      "html": "<div class=\"ds-table-wrap\"><table class=\"ds-table\"><thead><tr><th>Time</th><th>Customer</th><th>Status</th><th class=\"r\">Price</th></tr></thead><tbody><tr><td>2:30 PM</td><td>Dee Morales</td><td><span class=\"ds-status\"><i class=\"live\"></i>In chair</span></td><td class=\"r\">$55.00</td></tr><tr><td>3:15 PM</td><td>Sam Okafor</td><td><span class=\"ds-status\"><i class=\"info\"></i>Confirmed</span></td><td class=\"r\">$40.00</td></tr></tbody></table></div>",
+      "css": ".ds-table-wrap { overflow-x: auto; max-width: 40rem; border: 1px solid oklch(0.92 0.004 286.32); border-radius: 6px; background: oklch(1 0 0); font-family: Geist, ui-sans-serif, system-ui, sans-serif; color: oklch(0.141 0.005 285.823); } .ds-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; } .ds-table th { height: 2.25rem; padding: 0 0.75rem; border-bottom: 1px solid oklch(0.92 0.004 286.32); background: oklch(0.967 0.001 286.375 / 0.4); text-align: left; font-size: 0.75rem; font-weight: 500; color: oklch(0.552 0.016 285.938); white-space: nowrap; } .ds-table td { padding: 0.625rem 0.75rem; border-bottom: 1px solid oklch(0.92 0.004 286.32); font-variant-numeric: tabular-nums; } .ds-table tr:last-child td { border-bottom: 0; } .ds-table .r { text-align: right; } .ds-table tbody tr:hover td { background: oklch(0.967 0.001 286.375 / 0.5); } .ds-status { display: inline-flex; align-items: center; font-size: 13px; font-weight: 500; white-space: nowrap; } .ds-status i { display: inline-block; width: 8px; height: 8px; margin-right: 0.375rem; border-radius: 50%; } .ds-status i.live { background: oklch(69.6% 0.17 162.48); } .ds-status i.info { background: oklch(54.6% 0.245 262.881); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Take a number",
+    "overview": "Two worlds share one shop. Out front, the storefront is the shop's walk-in system made into a page: a cool enamel sign ground, black sign panels, a \"Now serving\" board drawn in seven-segment numerals, and primary actions printed as torn tickets in the merchant's colour. A passer-by on a phone in daylight learns the line right now and is handed a ticket (join the line) or a time (book). Hierarchy is carried by the width and weight of one condensed display face, never by labels stacked above headings.\n\nBehind the counter, the platform is \"the floor\": every operator screen opens on what is happening at the chairs and in the line, inside the shared dashboard shell. It is neutral, dense and flat: the shell's own palette, status colour only where it carries meaning (a dot plus a word), tabular numerals for times, waits and money, 40px rows, flat 6px controls with a filled ink primary, underline tabs with counts, and hairline panels. The shared dashboard shell (sidebar, header, theme tokens in `app/dashboard/globals.css`, `components/ui`) is untouched by this system; neither shipping commit (691be74, 2e13c24) edits it, and the floor kit sets explicit pixel radii instead of changing the shell's 10px `--radius`.\n\nThe storefront replaced the earlier navy felt letter-board world. It refuses the dark wood-and-whisky barbershop page and the barber-pole stripe as wallpaper.",
+    "keyCharacteristics": [
+      "Ticket stock in the merchant's colour is the one saturated field, placed as whole areas (tickets, the selected option, the chosen slot), never as scattered accents.",
+      "Square corners everywhere on the storefront; perforations and ticket notches are its only shaped edges.",
+      "Unlit seven-segment ghosts are designed, not empty: the board always shows every segment.",
+      "Truthful numbers only: board readouts come from live queue data or show ghost dashes, never a guess.",
+      "The floor is table-first: chair strip, then a time-ordered table, then a record only when needed.",
+      "Status is a dot plus a word on both surfaces; never a coloured pill."
+    ],
+    "rules": [
+      {
+        "name": "The One Stock Rule",
+        "body": "The merchant colour exists only as ticket stock and its LED. It fills whole fields; it is never a border tint, icon colour or decorative stripe. The one exception is a 2-4px underline marking the current or hovered link.",
+        "section": "colors"
+      },
+      {
+        "name": "The Derived Hue Rule",
+        "body": "Never hard-code the ticket colour. Derive every ticket and LED value from `--color-accent` with relative colour syntax at fixed lightness, so every preset reads.",
+        "section": "colors"
+      },
+      {
+        "name": "The Meaning-Only Status Rule",
+        "body": "On the floor, colour appears only as status: a dot beside a word, a lane block's state, the now-line. Everything else is the shell's neutrals.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Face Hierarchy Rule",
+        "body": "Storefront hierarchy is width and weight of Big Shoulders alone. No tracked-caps labels above headings, no second display face.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Rule",
+        "body": "Every time, wait, count and price on either surface sets `tabular-nums` so columns of numbers align.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Sign Rule",
+        "body": "No `box-shadow`, no blur, no gradient surfaces. Separate planes by black-on-enamel contrast (storefront) or a hairline (floor).",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do derive ticket and LED colours from `--color-accent` with relative colour syntax at fixed lightness (`46%`, `40%`, `84%`, `21%`).",
+      "Do print the primary action of a storefront screen as a ticket link with a stub numeral, notches and a perforation.",
+      "Do draw every seven-segment segment, lit or ghost, and give the board's values as text for screen readers.",
+      "Do align every price board, service list and product list to the `name · duration · price` rail with tabular numerals.",
+      "Do keep storefront corners at 0 and floor corners at explicit `rounded-[6px]` (controls, frames) or `rounded-[4px]` (inside them).",
+      "Do show status as a lamp or dot followed by its word.",
+      "Do open floor screens on the chair strip or the open work, then underline tabs with counts, then the table.",
+      "Do put row actions in one row menu, destructive items last and separated.",
+      "Do honour `prefers-reduced-motion`: the tear and the dock become instant."
+    ],
+    "donts": [
+      "Don't use pill-shaped or heavily rounded buttons, tabs, chips or cards on either surface; the only curves are ticket notches, perforation dots and the floor's status dots.",
+      "Don't use the shell's `rounded-md`/`rounded-lg` utilities on the floor; they resolve to 8px and 10px from the shell's `--radius`.",
+      "Don't set tracked uppercase labels above headings on the storefront; a label names a field value.",
+      "Don't scatter the merchant colour as accents, borders or icon tints; it is a whole field or nothing.",
+      "Don't add shadows, blur or gradient surfaces to either world.",
+      "Don't show queue counts, waits or positions that are not from live data; show ghost dashes instead.",
+      "Don't reuse a shop or barber photograph as a product image.",
+      "Don't use the barber-pole stripe as decoration.",
+      "Don't edit the shared dashboard shell or its theme tokens to suit the floor."
+    ]
+  }
+}
