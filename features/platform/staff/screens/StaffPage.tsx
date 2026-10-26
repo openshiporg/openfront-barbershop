@@ -109,9 +109,9 @@ export default async function StaffPage() {
               <thead>
                 <tr>
                   <th scope="col" className={thClass}>Barber</th>
-                  {week.map((day) => <th key={day.day} scope="col" className={cn(thClass, 'hidden w-[6.5rem] text-center lg:table-cell', day.today && 'text-foreground')}>{day.short} <span className="tabular-nums">{day.dayOfMonth}</span>{day.today ? <span className="sr-only"> (today)</span> : null}</th>)}
+                  {week.map((day) => <th key={day.day} scope="col" className={cn(thClass, 'hidden w-[4.75rem] px-1.5 text-center lg:table-cell', day.today && 'text-foreground')}>{day.short} <span className="tabular-nums">{day.dayOfMonth}</span>{day.today ? <span className="sr-only"> (today)</span> : null}</th>)}
                   <th scope="col" className={cn(thClass, 'hidden md:table-cell')}>Coming up</th>
-                  <th scope="col" className={cn(thClass, 'hidden text-right xl:table-cell')}>Commission</th>
+                  <th scope="col" className={cn(thClass, 'hidden text-right 2xl:table-cell')}>Commission</th>
                   <th scope="col" className={cn(thClass, 'w-px')}><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
@@ -129,27 +129,32 @@ export default async function StaffPage() {
                         <Link className="font-medium underline-offset-4 hover:underline" href={`/dashboard/platform/staff/${barber.id}`}>{barber.displayName}</Link>
                         <span className="mt-0.5 block text-xs text-muted-foreground">{chairLabel || 'No chair'}{barber.chair && barber.chair.status !== 'active' ? ` (${barber.chair.status})` : ''} · <StatusCell tone={tone}>{barber.status !== 'active' ? barber.status : barber.bookingEnabled ? 'Books online' : 'Staff booking only'}</StatusCell></span>
                         <span className="mt-0.5 block text-xs tabular-nums text-muted-foreground lg:hidden">{workingDays.length ? `Works ${workingDays.join(' ')}` : 'No weekly hours'}</span>
+                        <span className="mt-0.5 block text-xs tabular-nums text-muted-foreground 2xl:hidden">{((barber.serviceCommissionRateBps || 0) / 100).toFixed(0)}% commission · {commissionLabel(barber.projectedCommission, data.commissionAccess)} projected</span>
                       </td>
                       {week.map((day) => {
                         const schedule = byDay.get(day.day);
                         const working = Boolean(schedule?.isWorking);
                         const exception = barber.scheduleExceptions.find((item) => overlaps(item, day.range)) || data.shopWideExceptions.find((item) => overlaps(item, day.range));
                         return (
-                          <td key={day.day} className={cn(tdClass, 'hidden whitespace-nowrap text-center align-middle tabular-nums lg:table-cell', day.today && 'bg-muted/40', !working && 'text-muted-foreground')}>
-                            {working ? <span className={cn('block text-[13px]', exception?.exceptionType === 'time_off' || exception?.exceptionType === 'shop_closure' ? 'text-muted-foreground line-through' : '')}>{clock(schedule?.startMinute)}–{clock(schedule?.endMinute)}</span> : <span className="block text-[13px]">{schedule ? 'Off' : '—'}</span>}
+                          <td key={day.day} className={cn(tdClass, 'hidden whitespace-nowrap px-1.5 text-center align-middle tabular-nums lg:table-cell', day.today && 'bg-muted/40', !working && 'text-muted-foreground')}>
+                            {working ? <span className={cn('block text-[13px] leading-tight', exception?.exceptionType === 'time_off' || exception?.exceptionType === 'shop_closure' ? 'text-muted-foreground line-through' : '')}><span className="block">{clock(schedule?.startMinute)}</span><span className="sr-only"> to </span><span className="block">{clock(schedule?.endMinute)}</span></span> : <span className="block text-[13px]">{schedule ? 'Off' : '—'}</span>}
                             {exception ? <span className="mt-0.5 inline-flex h-5 items-center rounded-[4px] border border-amber-300 bg-amber-50 px-1.5 text-[11px] font-medium text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{EXCEPTION[exception.exceptionType] || exception.exceptionType.replaceAll('_', ' ')}</span> : null}
                           </td>
                         );
                       })}
-                      <td className={cn(tdClass, 'hidden align-middle text-xs md:table-cell')}>
-                        {next && data.timeZone ? <span className="block"><StatusDot tone="wait" />{EXCEPTION[next.exceptionType] === 'Off' ? 'Time off' : EXCEPTION[next.exceptionType] || next.exceptionType} from {formatShopDateTime(next.startsAt, data.timeZone)}</span> : <span className="block text-muted-foreground">No time off</span>}
-                        <span className="block text-muted-foreground">{!barber.openShiftCount ? 'No open shifts' : barber.openShiftCount > barber.shifts.length ? <Link className="underline-offset-4 hover:underline" href={`${basePath}/staff-shifts${filterBy('barber', barber.id)}`}>{barber.openShiftCount} open shifts</Link> : `${barber.openShiftCount} open ${barber.openShiftCount === 1 ? 'shift' : 'shifts'}`}{barber.upcomingExceptionCount > 1 ? <> · <Link className="underline-offset-4 hover:underline" href={`${basePath}/schedule-exceptions${filterBy('barber', barber.id)}`}>{barber.upcomingExceptionCount} exceptions</Link></> : null}</span>
+                      <td className={cn(tdClass, 'hidden max-w-[16rem] align-middle text-xs md:table-cell')}>
+                        {/* One line: the next thing on this barber's calendar, else "Clear". */}
+                        {next && data.timeZone ? (
+                          <span className="block truncate" title={barber.upcomingExceptionCount > 1 ? `${barber.upcomingExceptionCount} upcoming exceptions` : undefined}><StatusDot tone="wait" />{EXCEPTION[next.exceptionType] === 'Off' ? 'Time off' : EXCEPTION[next.exceptionType] || next.exceptionType} from {formatShopDateTime(next.startsAt, data.timeZone)}{barber.upcomingExceptionCount > 1 ? <> · <Link className="underline-offset-4 hover:underline" href={`${basePath}/schedule-exceptions${filterBy('barber', barber.id)}`}>+{barber.upcomingExceptionCount - 1}</Link></> : null}</span>
+                        ) : barber.openShiftCount ? (
+                          <span className="block truncate text-muted-foreground">{barber.openShiftCount > barber.shifts.length ? <Link className="underline-offset-4 hover:underline" href={`${basePath}/staff-shifts${filterBy('barber', barber.id)}`}>{barber.openShiftCount} open shifts</Link> : `${barber.openShiftCount} open ${barber.openShiftCount === 1 ? 'shift' : 'shifts'}`}</span>
+                        ) : <span className="block text-muted-foreground">Clear</span>}
                       </td>
-                      <td className={cn(tdClass, 'hidden whitespace-nowrap text-right align-middle tabular-nums xl:table-cell')}>
+                      <td className={cn(tdClass, 'hidden whitespace-nowrap text-right align-middle tabular-nums 2xl:table-cell')}>
                         <span className="block">{((barber.serviceCommissionRateBps || 0) / 100).toFixed(0)}%</span>
                         <span className="block text-xs text-muted-foreground">{commissionLabel(barber.projectedCommission, data.commissionAccess)} projected</span>
                       </td>
-                      <td className={cn(tdClass, 'align-middle text-right')}>
+                      <td className={cn(tdClass, 'whitespace-nowrap align-middle text-right')}>
                         <BarberScheduleDrawer timeZone={data.timeZone} members={data.members} barber={{ id: barber.id, displayName: barber.displayName, chairId: barber.chair?.id, chairLabel, shifts: barber.shifts, exceptions: barber.scheduleExceptions, linkedUserId: barber.linkedUserId ?? null }} />
                       </td>
                     </tr>

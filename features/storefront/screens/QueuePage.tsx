@@ -32,12 +32,12 @@ export default async function QueuePage({ searchParams }: { searchParams?: Promi
             <section className="sf-ticket" role="status" aria-label="Queue ticket">
               <div className="sf-ticket-head">
                 <div className="grid gap-3">
-                  <p className="sf-eyebrow capitalize"><span className={`sf-dot ${queueTone[lookup.entry.status] || ''}`} aria-hidden="true" />{statusLabel(lookup.entry.status)}</p>
                   <p className="sf-ticket-wait">{place > 0 ? <><small>No. </small>{place}</> : lookup.entry.quotedWaitMinutes != null ? <>{lookup.entry.quotedWaitMinutes}<small> min</small></> : <small>In line</small>}</p>
                 </div>
                 <span className="sf-small font-semibold text-end">{settings?.name}</span>
               </div>
               <dl>
+                <div><dt>Status</dt><dd className="capitalize"><span className={`sf-dot ${queueTone[lookup.entry.status] || ''}`} aria-hidden="true" />{statusLabel(lookup.entry.status)}</dd></div>
                 {place > 0 ? <div><dt>Place in line</dt><dd className="sf-mono">{place} of {summary!.waiting}</dd></div> : null}
                 <div><dt>Quoted wait</dt><dd>{lookup.entry.quotedWaitMinutes != null ? `About ${lookup.entry.quotedWaitMinutes} minutes` : 'Not quoted yet'}</dd></div>
                 <div><dt>Barber</dt><dd>{lookup.entry.requestedBarber?.displayName || 'Next available'}</dd></div>

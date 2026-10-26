@@ -27,11 +27,11 @@ export function QueuePageClient({ services }: { services: StorefrontService[] })
       <section className="sf-ticket mt-8" role="status" aria-label="Queue ticket">
         <div className="sf-ticket-head">
           <div className="grid gap-3">
-            <p className="sf-eyebrow"><span className="sf-dot is-wait" aria-hidden="true" />On the list</p>
             <p className="sf-ticket-wait">{result.queueEntry.quotedWaitMinutes != null ? <>{result.queueEntry.quotedWaitMinutes}<small> min</small></> : <small>In line</small>}</p>
           </div>
         </div>
         <dl>
+          <div><dt>Status</dt><dd><span className="sf-dot is-wait" aria-hidden="true" />On the list</dd></div>
           <div><dt>Barber</dt><dd>{result.queueEntry.requestedBarber?.displayName || 'Next available'}</dd></div>
           <div><dt>Time</dt><dd>Seated when a chair is free</dd></div>
         </dl>

@@ -333,10 +333,7 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
         <p className="sf-lead mb-8 mt-3"><span className="sf-dot is-wait" aria-hidden="true" />Requested. The shop confirms it next.</p>
         <section className="sf-ticket" role="status" aria-label="Booking request">
           <div className="sf-ticket-head">
-            <div className="grid gap-2">
-              <p className="sf-eyebrow">Awaiting shop confirmation</p>
-              <p className="sf-subtitle text-[2.25rem]">{createdAppointment.service?.name}</p>
-            </div>
+            <p className="sf-subtitle text-[2.25rem]">{createdAppointment.service?.name}</p>
           </div>
           <dl>
             <div><dt>When</dt><dd className="sf-mono">{createdAppointment.startsAt ? (createdAppointment.bookingTimezone ? formatShopDateTime(createdAppointment.startsAt, createdAppointment.bookingTimezone) : createdAppointment.startsAt) : 'To be confirmed'}</dd></div>

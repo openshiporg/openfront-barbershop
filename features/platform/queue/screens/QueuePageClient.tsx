@@ -96,7 +96,12 @@ export function QueuePageClient({ data, breadcrumbs }: { data: QueueProjectionDa
         since: since ? `since ${clock(since, data.timeZone)} · ${sinceLabel(since, live.now)}` : null,
       };
     }
-    return { id: barber.id, barber: barber.displayName || 'Barber', chair: barber.chairNumber, tone: 'off', occupant: 'No walk-in seated' };
+    // A free chair says who it is waiting for: the first guest in line who asked for this barber.
+    const nextUp = line.find((entry) => entry.requestedBarber?.id === barber.id);
+    return {
+      id: barber.id, barber: barber.displayName || 'Barber', chair: barber.chairNumber, tone: 'off', occupant: 'Free',
+      detail: nextUp ? `Next up ${nextUp.customerName || 'Guest'}` : 'No walk-in seated',
+    };
   });
 
   const header = (
@@ -198,7 +203,7 @@ export function QueuePageClient({ data, breadcrumbs }: { data: QueueProjectionDa
           empty={<>No active barbers. <Link className="underline underline-offset-4" href="/dashboard/platform/staff">Barbers & schedules</Link></>}
         />
 
-        <div aria-live="polite">{message && <Notice tone={message.tone}>{message.text}</Notice>}</div>
+        <div aria-live="polite" className="empty:-mt-6">{message && <Notice tone={message.tone}>{message.text}</Notice>}</div>
 
         <section aria-labelledby="queue-line" className="min-w-0 space-y-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

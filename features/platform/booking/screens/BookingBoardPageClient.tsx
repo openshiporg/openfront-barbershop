@@ -320,7 +320,7 @@ export function BookingBoardPageClient({ data, breadcrumbs }: { data: BookingPro
           />
         )}
 
-        <div aria-live="polite">{message && <Notice tone={message.tone}>{message.text}</Notice>}</div>
+        <div aria-live="polite" className="empty:-mt-6">{message && <Notice tone={message.tone}>{message.text}</Notice>}</div>
 
         {!data.status && lanes.length > 0 && (
           <section aria-label="Schedule by barber" className="hidden md:block">
@@ -340,18 +340,28 @@ export function BookingBoardPageClient({ data, breadcrumbs }: { data: BookingPro
                     </div>
                     <div className="relative flex-1">
                       {hours.slice(1, -1).map((minute) => <span key={minute} aria-hidden="true" className="absolute inset-y-0 w-px bg-border/70" style={{ left: pct(minute) }} />)}
-                      {lane.items.map((appointment) => {
+                      {lane.items.map((appointment, index) => {
                         const start = shopMinute(appointment.startsAt as string, timeZone);
                         const status = appointment.status as AppointmentStatus;
+                        const duration = Math.max(1, durationOf(appointment));
+                        const name = customerName(appointment.customer);
+                        // The label may run past a short block into the empty lane, up to the next block (or the day's end).
+                        const following = lane.items.slice(index + 1).map((item) => shopMinute(item.startsAt as string, timeZone)).find((minute) => minute >= start + duration);
+                        const room = Math.max(duration, (following ?? dayEnd) - start);
+                        const initials = name.split(/\s+/).map((part) => part[0]).join('').slice(0, 3).toUpperCase();
+                        const summary = `${formatTime(appointment.startsAt, timeZone)}, ${name}, ${serviceLabel(appointment)}, ${appointmentStatusLabels[status] || statusLabel(status)}`;
                         return (
                           <a
                             key={appointment.id}
                             href={`#appt-${appointment.id}`}
-                            title={`${formatTime(appointment.startsAt, timeZone)} · ${customerName(appointment.customer)} · ${serviceLabel(appointment)} · ${appointmentStatusLabels[status] || statusLabel(status)}`}
-                            className={cn('absolute inset-y-1.5 flex min-w-0 items-center overflow-hidden rounded-[4px] border px-1.5 text-[11px] leading-tight transition-[filter] hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', blockClass[status] || 'border-border bg-muted')}
-                            style={{ left: pct(start), width: `max(1.5rem, calc(${(durationOf(appointment) / span) * 100}% - 2px))` }}
+                            aria-label={summary}
+                            title={summary}
+                            className={cn('absolute inset-y-1.5 min-w-0 rounded-[4px] border text-[11px] leading-tight transition-[filter] hover:brightness-95 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', blockClass[status] || 'border-border bg-muted')}
+                            style={{ left: pct(start), width: `max(1.5rem, calc(${(duration / span) * 100}% - 2px))` }}
                           >
-                            <span className="truncate"><span className="font-semibold tabular-nums">{formatTime(appointment.startsAt, timeZone).replace(/\s?[AP]M$/, '')}</span> {customerName(appointment.customer)}</span>
+                            <span aria-hidden="true" className={cn('pointer-events-none absolute inset-y-0 left-1.5 flex items-center overflow-hidden whitespace-nowrap', status === 'in_chair' && room > duration && 'text-emerald-950 dark:text-white')} style={{ maxWidth: `calc(${(room / duration) * 100}% - 0.5rem)` }}>
+                              <span className="truncate"><span className="font-semibold tabular-nums">{formatTime(appointment.startsAt, timeZone).replace(/\s?[AP]M$/, '')}</span> {room >= 75 ? name : initials}</span>
+                            </span>
                           </a>
                         );
                       })}

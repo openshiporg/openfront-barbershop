@@ -25,9 +25,10 @@ export type ChairCell = {
 export function ChairStrip({ cells, label = 'Chairs', empty }: { cells: ChairCell[]; label?: string; empty?: ReactNode }) {
   if (!cells.length) return empty ? <p className="rounded-[6px] border px-3 py-3 text-sm text-muted-foreground">{empty}</p> : null;
   return (
-    <ul aria-label={label} className="grid grid-cols-2 gap-px overflow-hidden rounded-[6px] border bg-border sm:grid-cols-3 lg:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]">
+    // Wrapping flex with growing cells: every row spans the full width, so no empty painted track reads as an extra chair.
+    <ul aria-label={label} className="flex flex-wrap gap-px overflow-hidden rounded-[6px] border bg-border">
       {cells.map((cell) => (
-        <li key={cell.id} className={cn('min-w-0 bg-background px-3 py-2.5', !cell.occupied && 'bg-muted/25')}>
+        <li key={cell.id} className={cn('min-w-0 grow basis-[calc(50%-1px)] bg-background px-3 py-2.5 sm:basis-[calc(33.333%-1px)] lg:basis-48', !cell.occupied && 'bg-muted/25')}>
           <p className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
             <span className="truncate"><StatusDot tone={cell.tone} className="mr-1.5" />{cell.barber}</span>
             {cell.chair ? <span className="shrink-0 tabular-nums">Chair {cell.chair}</span> : null}

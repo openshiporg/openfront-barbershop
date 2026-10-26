@@ -15,6 +15,8 @@ export function NowServingBoard({ summary, barbersOnNow = null, headingId = 'now
   const open = Boolean(summary?.open);
   const waiting = summary && open ? summary.waiting : null;
   const wait = summary && open ? (summary.waiting ? summary.waitMinutes : 0) : null;
+  // Closed with posted hours: the board spells the opening hour in lit segments instead of all ghosts.
+  const opening = summary && !open && summary.opensAt ? /(\d{1,2}):\d{2}\s*([AP]M)/i.exec(summary.opensAt) : null;
   const spoken = !summary
     ? 'The walk-in line couldn’t be read right now.'
     : !open
@@ -31,6 +33,14 @@ export function NowServingBoard({ summary, barbersOnNow = null, headingId = 'now
         </p>
       </div>
       <p className="sf-sr" role="status">{spoken}</p>
+      {opening ? (
+        <div className="sf-board-readouts">
+          <div className="sf-readout">
+            <SevenSeg value={opening[1]} digits={2} />
+            <span className="sf-readout-label" aria-hidden="true"><strong>{summary!.opensAt}</strong></span>
+          </div>
+        </div>
+      ) : (
       <div className="sf-board-readouts">
         <div className="sf-readout">
           <SevenSeg value={waiting == null ? '--' : String(waiting)} digits={2} dim={waiting == null} />
@@ -41,9 +51,10 @@ export function NowServingBoard({ summary, barbersOnNow = null, headingId = 'now
           <span className="sf-readout-label" aria-hidden="true">{wait === 0 ? <strong>No wait</strong> : 'min estimated wait'}</span>
         </div>
       </div>
+      )}
       <div className="sf-board-note">
         {!summary ? <span>The line couldn’t be read right now.{phone ? <> Call {phone}.</> : null}</span>
-          : !open ? <span><strong>{summary.opensAt || 'Closed now'}</strong> · book a time instead</span>
+          : !open ? <span>{opening ? 'Book a time instead' : <><strong>{summary.opensAt || 'Closed now'}</strong> · book a time instead</>}</span>
           : (
             <>
               <span><strong>{summary.inChair}</strong> in the chair</span>
