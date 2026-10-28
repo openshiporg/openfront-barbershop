@@ -39,6 +39,15 @@ type BookingPageProps = {
 
 type BookingOutcome = Awaited<ReturnType<typeof createStorefrontBooking>>;
 
+/** "America/New_York" reads as "Eastern Time"; an unknown zone stays as entered. */
+function timeZoneName(timeZone: string) {
+  try {
+    return new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'longGeneric' }).formatToParts(new Date()).find((part) => part.type === 'timeZoneName')?.value || timeZone;
+  } catch {
+    return timeZone;
+  }
+}
+
 function defaultBookingDate(timeZone: string) {
   try { new Intl.DateTimeFormat('en', { timeZone }).format(); } catch { return ''; }
   const tomorrow = new Date(`${shopDateKey(new Date(), timeZone)}T12:00:00Z`);
@@ -359,7 +368,7 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
     <main id="main-content">
       <section className="sf-container sf-page-head">
         <h1 className="sf-display">Book a time</h1>
-        <p className="sf-lead">Times are in the shop’s time zone ({settings.timezone}).</p>
+        <p className="sf-lead">Times are in the shop’s time zone ({timeZoneName(settings.timezone)}).</p>
       </section>
 
       <div className="sf-container pt-[var(--space-xl)]">

@@ -81,13 +81,19 @@
 html:has([data-storefront]),
 html:has([data-storefront]) body { overflow-x: clip; background: oklch(96.6% 0.005 230); }
 
-/* ---------- Element resets (zero specificity so component classes win) ---------- */
-:where([data-storefront]) { min-width: 0; }
-:where([data-storefront]) :where(*, *::before, *::after) { box-sizing: border-box; }
-:where([data-storefront]) :where(img) { display: block; }
-:where([data-storefront]) :where(a) { color: inherit; }
-:where([data-storefront]) :where(h1, h2, h3, p, dl, dd, ol, ul, figure) { margin: 0; }
-:where([data-storefront]) :where(ol, ul) { padding: 0; list-style: none; }
+/* ---------- Element resets ----------
+ * In the base layer, not just zero specificity: unlayered rules beat every
+ * Tailwind utility (those live in @layer utilities), so an unlayered
+ * `margin: 0` silently cancelled spacing utilities such as mb-6 / mt-8 on
+ * headings and paragraphs. */
+@layer base {
+  :where([data-storefront]) { min-width: 0; }
+  :where([data-storefront]) :where(*, *::before, *::after) { box-sizing: border-box; }
+  :where([data-storefront]) :where(img) { display: block; }
+  :where([data-storefront]) :where(a) { color: inherit; }
+  :where([data-storefront]) :where(h1, h2, h3, p, dl, dd, ol, ul, figure) { margin: 0; }
+  :where([data-storefront]) :where(ol, ul) { padding: 0; list-style: none; }
+}
 :where([data-storefront]) ::selection { background: var(--ticket); color: var(--ticket-ink); }
 [data-storefront] :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 [data-storefront] .sf-on-dark :focus-visible, [data-storefront] .sf-sign :focus-visible { outline-color: var(--led); }
@@ -100,7 +106,7 @@ html:has([data-storefront]) body { overflow-x: clip; background: oklch(96.6% 0.0
 /* A field label: plain small bold text, never tracked caps above a heading. */
 [data-storefront] .sf-eyebrow { font-size: var(--text-label); font-weight: 700; color: var(--ink-muted); }
 [data-storefront] .sf-mono { font-variant-numeric: tabular-nums; }
-[data-storefront] .sf-lead { max-width: var(--measure); color: var(--ink-2); font-size: var(--text-lead); line-height: 1.5; }
+[data-storefront] .sf-lead { max-width: var(--measure); color: var(--ink-2); font-size: var(--text-lead); line-height: 1.5; text-wrap: pretty; }
 [data-storefront] .sf-muted { color: var(--ink-muted); }
 [data-storefront] .sf-small { font-size: var(--text-small); }
 [data-storefront] .sf-link { color: inherit; font-weight: 650; text-decoration: underline; text-decoration-thickness: 2px; text-decoration-color: var(--ticket); text-underline-offset: 0.22em; }
@@ -146,6 +152,8 @@ html:has([data-storefront]) body { overflow-x: clip; background: oklch(96.6% 0.0
 [data-storefront] .sf-on-dark .sf-btn { border-color: var(--sign-ink); color: var(--sign-ink); }
 [data-storefront] .sf-on-dark .sf-btn.is-primary { background: var(--sign-ink); color: var(--sign); }
 [data-storefront] .sf-on-dark .sf-btn.is-accent { border-color: var(--ticket); color: var(--ticket-ink); }
+/* A ticket that can't be taken yet: unprinted stock on the black panel, not stock dimmed to mud. */
+[data-storefront] .sf-summary .sf-btn.is-accent:disabled, [data-storefront] .sf-dock .sf-btn.is-accent:disabled { opacity: 1; background: var(--sign-2); border-color: var(--sign-3); color: var(--sign-muted); }
 [data-storefront] .sf-on-dark .sf-btn.is-danger { border-color: var(--alert-on-sign); color: var(--alert-on-sign); }
 
 [data-storefront] .sf-on-dark { background: var(--sign); color: var(--sign-ink); }
@@ -226,7 +234,7 @@ html:has([data-storefront]) body { overflow-x: clip; background: oklch(96.6% 0.0
 [data-storefront] .sf-tix-body { display: grid; align-content: center; gap: 0.3rem; min-width: 0; padding: 1rem 1.25rem 1rem 1.25rem; }
 [data-storefront] .sf-tix-title { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; font-family: var(--font-display); font-size: clamp(1.9rem, 7vw, 2.6rem); font-weight: 850; line-height: 0.9; text-transform: uppercase; }
 [data-storefront] .sf-tix-title svg { width: 1.6rem; height: 1.6rem; flex: none; transition: transform var(--dur-med) var(--ease-out); }
-[data-storefront] .sf-tix-sub { font-size: 1.02rem; font-weight: 600; line-height: 1.35; }
+[data-storefront] .sf-tix-sub { font-size: 1.02rem; font-weight: 600; line-height: 1.35; text-wrap: pretty; }
 [data-storefront] .sf-tix:active { transform: scale(0.985); }
 /* The tear: the stub rips away along the perforation, then the page moves on. */
 [data-storefront] .sf-tix[data-torn='true'] .sf-tix-body { animation: sf-tear 260ms var(--ease-out) forwards; }
@@ -415,7 +423,8 @@ html:has([data-storefront]) body { overflow-x: clip; background: oklch(96.6% 0.0
 [data-storefront] .sf-product-art .sf-image { position: absolute; inset: 0; background: transparent; }
 [data-storefront] .sf-product-art img { object-fit: contain; }
 [data-storefront] .sf-shop-list { display: grid; gap: 1.5rem; }
-[data-storefront] .sf-shop-list > .sf-rail:first-child { border-top: 3px solid var(--ink); }
+/* The page head already closes on a 3px rule; a rail opens on its own only after the picture grid. */
+[data-storefront] .sf-shop-list > * + .sf-rail { border-top: 3px solid var(--ink); }
 [data-storefront] .sf-board-row.is-lead { grid-template-columns: minmax(0, 1fr) auto; border-top: 3px solid var(--ink); border-bottom-width: 3px; border-bottom-color: var(--ink); padding-block: 1rem 1.25rem; }
 [data-storefront] .sf-board-row.is-lead .sf-board-name, [data-storefront] .sf-board-row.is-lead .sf-board-price { font-size: clamp(2.2rem, 7vw, 3.6rem); }
 [data-storefront] .sf-board-row.is-lead .sf-board-desc { margin-top: 0.6rem; font-size: var(--text-lead); }
@@ -431,9 +440,10 @@ html:has([data-storefront]) body { overflow-x: clip; background: oklch(96.6% 0.0
 [data-storefront] .sf-footer-mark [data-store-logo] { width: 0.85em; height: 0.85em; }
 [data-storefront] .sf-footer-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1.5rem; align-content: start; }
 [data-storefront] .sf-footer-nav a { display: flex; min-height: 2.75rem; align-items: center; border-top: 1px solid var(--sign-2); color: var(--sign-ink); font-size: var(--text-small); font-weight: 600; text-decoration: none; }
-[data-storefront] .sf-footer-base { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 1.5rem; padding-block: 1rem 1.5rem; border-top: 1px solid var(--sign-2); color: var(--sign-muted); font-size: var(--text-label); }
+/* Phone: one left-aligned column; from 40rem one row, every item on the same centre line. */
+[data-storefront] .sf-footer-base { display: flex; flex-direction: column; align-items: flex-start; gap: 0; padding-block: 1rem 1.5rem; border-top: 1px solid var(--sign-2); color: var(--sign-muted); font-size: var(--text-label); }
+[data-storefront] .sf-footer-base > * { display: inline-flex; min-height: 2.75rem; align-items: center; }
 [data-storefront] .sf-footer-base address { font-style: normal; }
-[data-storefront] .sf-footer-base a { display: inline-flex; min-height: 2.75rem; align-items: center; }
 
 /* ---------- Centered states ---------- */
 [data-storefront] .sf-state, [data-storefront].sf-state { display: grid; min-height: 100svh; place-items: center; padding: 1.5rem; }
@@ -470,6 +480,7 @@ html:has([data-storefront]) body { overflow-x: clip; background: oklch(96.6% 0.0
   [data-storefront] .sf-chair-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   [data-storefront] .sf-rail { --rail: minmax(0, 1fr) 6rem 7rem; --rail-gap: 1.25rem; }
   [data-storefront] .sf-footer-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  [data-storefront] .sf-footer-base { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; column-gap: 1.5rem; }
   [data-storefront] .sf-ticket { padding-inline: 2rem; }
   [data-storefront] .sf-ticket-head::before { left: calc(-2rem - var(--notch)); }
   [data-storefront] .sf-ticket-head::after { right: calc(-2rem - var(--notch)); }

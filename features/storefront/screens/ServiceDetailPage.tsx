@@ -44,7 +44,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
             {service.specialists?.length ? (
               <section aria-labelledby="service-barbers" className="grid gap-2">
                 <h2 id="service-barbers" className="sf-subtitle">Barbers</h2>
-                <ul>
+                <ul className="sf-list-top">
                   {service.specialists.map((barber) => (
                     <li key={barber.id}>
                       <Link className="sf-booking-row" href={`/book?service=${encodeURIComponent(service.id)}&barber=${encodeURIComponent(barber.id)}`}>
