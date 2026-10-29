@@ -1,6 +1,10 @@
+<!-- logo -->
+
 # Openfront Barbershop
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fopenshiporg%2Fopenfront-barbershop&env=DATABASE_URL%2CSESSION_SECRET)
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/openfront-barbershop)
 
 Openfront Barbershop is a self-hostable appointment, walk-in, and shop-management application. Customers can browse services and barbers, book visits, and join the queue. Staff manage chairs, schedules, customer records, checkout, packages, inventory, and commissions from the dashboard.
 
@@ -10,12 +14,10 @@ Openfront Barbershop is a self-hostable appointment, walk-in, and shop-managemen
 
 ![Shop interior photograph included with the Barbershop storefront](public/images/barbershop/photo/shop-interior.webp)
 
-Explore the application locally using the setup instructions below.
-
 | | |
 |---|---|
-| **Public application** | `/` on your development URL |
-| **Dashboard** | `/dashboard` on your development URL |
+| **Storefront** | [barbershop.openship.org](https://barbershop.openship.org) |
+| **Dashboard** | [barbershop.openship.org/dashboard](https://barbershop.openship.org/dashboard) |
 
 [Learn more →](https://openship.org/products/openfront-barbershop)
 
