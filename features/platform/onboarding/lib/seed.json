@@ -91,7 +91,7 @@
       "price": 4200,
       "bookingBufferMinutes": 10,
       "color": "#111827",
-      "imagePath": "/images/barbershop/photo/scissor-cut.webp"
+      "imagePath": "/images/barbershop/antares/service-classic-cut.webp"
     },
     {
       "name": "Skin Fade",
@@ -101,7 +101,7 @@
       "price": 5200,
       "bookingBufferMinutes": 10,
       "color": "#2563eb",
-      "imagePath": "/images/barbershop/photo/clipper-fade.webp"
+      "imagePath": "/images/barbershop/antares/service-skin-fade.webp"
     },
     {
       "name": "Kids Cut",
@@ -111,7 +111,7 @@
       "price": 2800,
       "bookingBufferMinutes": 5,
       "color": "#16a34a",
-      "imagePath": "/images/barbershop/photo/barber-at-work.webp"
+      "imagePath": "/images/barbershop/antares/service-classic-cut.webp"
     },
     {
       "name": "Beard Trim",
@@ -121,7 +121,7 @@
       "price": 2400,
       "bookingBufferMinutes": 5,
       "color": "#7c3aed",
-      "imagePath": "/images/barbershop/photo/beard-detail.webp"
+      "imagePath": "/images/barbershop/antares/service-beard-trim.webp"
     },
     {
       "name": "Hot Towel Shave",
@@ -133,7 +133,7 @@
       "color": "#dc2626",
       "depositRequired": true,
       "depositAmount": 1000,
-      "imagePath": "/images/barbershop/photo/chair-service.webp"
+      "imagePath": "/images/barbershop/antares/service-hot-towel-shave.webp"
     },
     {
       "name": "Cut + Beard",
@@ -145,7 +145,7 @@
       "color": "#f59e0b",
       "depositRequired": true,
       "depositAmount": 1500,
-      "imagePath": "/images/barbershop/photo/shop-floor.webp"
+      "imagePath": "/images/barbershop/antares/service-cut-beard.webp"
     }
   ],
   "barbers": [
@@ -162,7 +162,7 @@
         "Cut + Beard",
         "Classic Cut"
       ],
-      "imagePath": "/images/barbershop/photo/clipper-fade.webp"
+      "imagePath": "/images/barbershop/antares/barber-maya.webp"
     },
     {
       "displayName": "Andre Miles",
@@ -177,7 +177,7 @@
         "Beard Trim",
         "Hot Towel Shave"
       ],
-      "imagePath": "/images/barbershop/photo/scissor-cut.webp"
+      "imagePath": "/images/barbershop/antares/barber-andre.webp"
     },
     {
       "displayName": "Leo Chen",
@@ -192,7 +192,7 @@
         "Classic Cut",
         "Beard Trim"
       ],
-      "imagePath": "/images/barbershop/photo/barber-at-work.webp"
+      "imagePath": "/images/barbershop/antares/barber-leo.webp"
     }
   ],
   "schedules": [
@@ -289,7 +289,7 @@
       "price": 2200,
       "cost": 900,
       "description": "Low-shine styling clay used for textured finishes after cuts.",
-      "imagePath": "/images/barbershop/photo/scissor-cut.webp",
+      "imagePath": "/images/barbershop/antares/product-matte-clay.webp",
       "inventoryTracked": true,
       "metadata": {
         "source": "onboarding",
@@ -303,7 +303,7 @@
       "price": 1800,
       "cost": 700,
       "description": "Light cedar beard oil for hot towel and beard service aftercare.",
-      "imagePath": "/images/barbershop/photo/beard-detail.webp",
+      "imagePath": "/images/barbershop/antares/product-beard-oil.webp",
       "inventoryTracked": true,
       "metadata": {
         "source": "onboarding",
@@ -317,7 +317,7 @@
       "price": 1600,
       "cost": 600,
       "description": "Texture spray used for natural volume and beachy finish.",
-      "imagePath": "/images/barbershop/photo/shop-interior.webp",
+      "imagePath": "/images/barbershop/antares/product-sea-salt-spray.webp",
       "inventoryTracked": true,
       "metadata": {
         "source": "onboarding",
