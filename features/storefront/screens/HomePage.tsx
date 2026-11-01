@@ -1,104 +1,171 @@
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
-import { phoneHref } from '@/features/shared/storefront-settings';
-import { BarberCard } from '../components/BarberCard';
-import { MenuList } from '../components/MenuList';
-import { NowServingBoard } from '../components/NowServingBoard';
+import { ArrowRight, Check, Clock, MapPin, ShoppingBag, Star, User } from 'lucide-react';
+import { QuickBook } from '../components/QuickBook';
 import { StorefrontImage } from '../components/StorefrontImage';
-import { TicketLink } from '../components/TicketLink';
-import { getAllBarbers, getServiceCategories } from '../lib/data/services';
+import { productArt } from '../components/productArt';
+import { getAllBarbers, getAllServices, getRetailProducts, type StorefrontProduct } from '../lib/data/services';
 import { getPublicStorefrontSettings } from '../lib/data/settings';
-import { getStorefrontOnNowBarberIds, getStorefrontQueueSummary } from '../lib/data/queue';
+import { getMembershipOffers, type PlanOffer, type PackageOffer } from '../lib/data/offers';
+import { getOnlineDepositsEnabled } from '../lib/data/deposits';
+import { getStorefrontQueueSummary } from '../lib/data/queue';
 import { shopHours } from '../lib/hours';
-import { shopTodayStub } from '../lib/format';
+import { formatDuration, formatMoney } from '../lib/format';
 import { StorefrontShell } from './StorefrontShell';
 
-export default async function HomePage() {
-  const [categories, barbers, settings, onNowIds, line] = await Promise.all([getServiceCategories(), getAllBarbers(), getPublicStorefrontSettings(), getStorefrontOnNowBarberIds(), getStorefrontQueueSummary()]);
-  if (!settings) return <StorefrontShell><></></StorefrontShell>;
-  const { days, state } = shopHours(settings.hours, settings.timezone);
-  const telephoneHref = phoneHref(settings.phone);
-  const call = telephoneHref && settings.phone ? <a href={`tel:${telephoneHref}`} className="sf-link">{settings.phone}</a> : null;
-  const serviceCount = categories.reduce((total, category) => total + category.services.length, 0);
-  const today = shopTodayStub(settings.timezone);
-  const walkInsOpen = Boolean(line?.open);
-  const onFloor = onNowIds ? onNowIds.length : null;
+const INTERVAL: Record<string, string> = { monthly: 'month', quarterly: 'quarter', annual: 'year' };
+const STOCK = ['is-red', 'is-black', 'is-outline'] as const;
+const HERO_PHOTO = '/images/barbershop/antares/hero-fade.webp';
 
-  const joinSub = !line
-    ? 'Line status unavailable · take a number online'
-    : !line.open
-      ? line.opensAt || 'Walk-ins closed now'
-      : line.waiting
-        ? `${line.waiting} ahead of you · about ${line.waitMinutes} min`
-        : 'No one waiting right now';
+/** Shop name set as the poster: every word in black, the last one in red. */
+function splitName(name: string) {
+  const words = name.trim().split(/\s+/);
+  if (words.length < 2) return { lead: [] as string[], last: words[0] || '' };
+  const lead = words.slice(0, -1);
+  // "Stack & Fade" reads STACK / & FADE: a joining ampersand travels with the red word.
+  if (lead.length > 1 && /^(&|and|\+)$/i.test(lead[lead.length - 1])) return { lead: lead.slice(0, -1), last: `${lead[lead.length - 1]} ${words[words.length - 1]}` };
+  return { lead, last: words[words.length - 1] };
+}
+
+type Offer = { id: string; name: string; price: number; per: string | null; lines: string[] };
+function planOffer(plan: PlanOffer): Offer {
+  const lines = [
+    plan.includedVisits ? `${plan.includedVisits} ${plan.includedVisits === 1 ? 'visit' : 'visits'} a ${INTERVAL[plan.billingInterval] || plan.billingInterval}` : null,
+    plan.discountPercent ? `${plan.discountPercent}% off other services` : null,
+    'Used when you book',
+  ].filter(Boolean) as string[];
+  return { id: plan.id, name: plan.name, price: plan.price, per: INTERVAL[plan.billingInterval] || plan.billingInterval, lines };
+}
+function packageOffer(item: PackageOffer): Offer {
+  return { id: item.id, name: item.name, price: item.price, per: null, lines: item.items.slice(0, 3).map((line) => `${line.quantity} × ${line.serviceName}`) };
+}
+
+export default async function HomePage() {
+  const [services, barbers, settings, offers, products, onlineDeposits, line] = await Promise.all([
+    getAllServices(),
+    getAllBarbers(),
+    getPublicStorefrontSettings(),
+    getMembershipOffers(),
+    getRetailProducts().catch(() => [] as StorefrontProduct[]),
+    getOnlineDepositsEnabled(),
+    getStorefrontQueueSummary(),
+  ]);
+  if (!settings) return <StorefrontShell><></></StorefrontShell>;
+  const { state, days } = shopHours(settings.hours, settings.timezone);
+  const today = days.find((day) => day.today);
+  const name = splitName(settings.name);
+  const chips = services.slice(0, 3);
+  const memberships: Offer[] = offers ? [...offers.plans.map(planOffer), ...offers.packages.map(packageOffer)].slice(0, 3) : [];
+  const featured = products.map((product) => ({ product, art: productArt(product) })).filter((item): item is { product: StorefrontProduct; art: string } => Boolean(item.art)).slice(0, 3);
+  const walkIns = line?.open ? (line.waiting ? `${line.waiting} waiting · about ${line.waitMinutes} min` : 'No wait right now') : line?.opensAt || null;
 
   return (
     <StorefrontShell>
-      <main id="main-content">
-        <section className="sf-container sf-dispenser" aria-label="Walk in or book">
-          <NowServingBoard summary={line} barbersOnNow={walkInsOpen ? onFloor : null} phone={call} />
-          <div className="sf-dispenser-tickets">
-            <TicketLink
-              href="/queue"
-              title="Join the line"
-              numeral={walkInsOpen && line ? String(line.waiting + 1) : '--'}
-              unit={walkInsOpen ? 'your place' : 'closed'}
-              sub={joinSub}
-              sign={!walkInsOpen}
-            />
-            <TicketLink
-              href="/book"
-              title="Book a time"
-              numeral={today?.day || '--'}
-              unit={today?.month}
-              sub="Choose your barber and a time"
-              sign={walkInsOpen}
-            />
+      <main id="main-content" className="sf-home">
+        <section className="sf-hero" aria-labelledby="home-title">
+          <div className="sf-hero-head">
+            <h1 id="home-title" className="sf-hero-title">
+              {name.lead.map((word, index) => <span key={index} className="sf-hero-word">{word}</span>)}
+              <span className="sf-hero-word is-red">{name.last}</span>
+            </h1>
+            {settings.tagline || settings.address ? <p className="sf-hero-banner">{settings.tagline || settings.address}</p> : null}
+            <Link href="/book" className="sf-hero-book" aria-label="Book a time">
+              <span>Book</span>
+              <svg viewBox="0 0 220 60" aria-hidden="true"><path d="M4 40 C 60 20, 120 18, 196 28" /><path d="M176 10 L 206 29 L 178 50" /></svg>
+            </Link>
+          </div>
+
+          {state || today || settings.address ? (
+            <p className="sf-hero-note">
+              {state ? <span className="sf-hero-note-big">{state.label}</span> : null}
+              <span className="sf-hero-note-small">{settings.address || (today ? `Today ${today.text}` : '')}</span>
+            </p>
+          ) : null}
+
+          <div className="sf-hero-photo">
+            <StorefrontImage src={HERO_PHOTO} fallbackSrc={HERO_PHOTO} alt={`A fresh fade at ${settings.name}`} priority sizes="(max-width: 1024px) 60vw, 55vw" />
+          </div>
+
+          {chips.length ? (
+            <div className="sf-hero-chips">
+              <p className="sf-hero-chips-label"><span className="is-red">Book</span> <span>appointment</span></p>
+              <ul>
+                {chips.map((service) => (
+                  <li key={service.id}>
+                    <Link href={`/services/${encodeURIComponent(service.id)}`} className="sf-chip">
+                      <span className="sf-chip-name">{service.name}</span>
+                      <span className="sf-chip-meta">{formatMoney(service.price)} · {formatDuration(service.durationMinutes)}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          <div className="sf-hero-quick">
+            <p className="sf-quick-head"><span>Book a haircut</span><Clock aria-hidden="true" /></p>
+            <QuickBook services={services} barbers={barbers} timeZone={settings.timezone} onlineDeposits={onlineDeposits} />
           </div>
         </section>
 
-        <div className="sf-photo-band">
-          <StorefrontImage src="/images/barbershop/photo/shop-floor.webp" fallbackSrc="/images/barbershop/photo/shop-floor.webp" alt={`${settings.name} shop floor`} priority sizes="100vw" />
+        {memberships.length ? (
+          <section className="sf-band" aria-labelledby="home-memberships">
+            <div className="sf-band-head">
+              <h2 id="home-memberships" className="sf-poster"><span className="sf-poster-ico" aria-hidden="true"><User /></span>Memberships</h2>
+              <Link href="/memberships" className="sf-viewall">View all</Link>
+            </div>
+            <ul className="sf-plans">
+              {memberships.map((offer, index) => (
+                <li key={offer.id} className={`sf-plan ${STOCK[index % STOCK.length]}`}>
+                  <h3>{offer.name}</h3>
+                  <p className="sf-plan-price"><b>{formatMoney(offer.price)}</b>{offer.per ? <span> / {offer.per}</span> : null}</p>
+                  <ul>{offer.lines.map((text) => <li key={text}><Check aria-hidden="true" />{text}</li>)}</ul>
+                  <Link href="/memberships" className="sf-plan-choose">Choose</Link>
+                </li>
+              ))}
+            </ul>
+            <div className="sf-band-actions">
+              <Link href="/memberships" className="sf-btn is-red">View all memberships <ArrowRight aria-hidden="true" /></Link>
+              <Link href="/queue" className="sf-btn is-red">Join the walk-in line</Link>
+            </div>
+          </section>
+        ) : null}
+
+        <div className="sf-strip" aria-hidden="true">
+          <div className="sf-strip-photo"><StorefrontImage src="/images/barbershop/antares/service-skin-fade.webp" fallbackSrc={HERO_PHOTO} alt="" sizes="30vw" /></div>
+          <p className="sf-strip-name">{settings.name}</p>
+          <p className="sf-strip-red">Book <span>now</span></p>
         </div>
 
-        <section className="sf-container sf-section" aria-labelledby="home-services">
-          <div className="sf-board-head">
-            <h2 id="home-services" className="sf-title">Prices</h2>
-            <Link href="/services" className="sf-arrow-link">{serviceCount > 8 ? `All ${serviceCount} services` : 'Service details'} <ArrowRight aria-hidden="true" /></Link>
-          </div>
-          {serviceCount ? <MenuList categories={categories} barberCount={barbers.length} limit={8} /> : <p className="sf-muted">No services listed online.</p>}
-        </section>
-
-        <section className="sf-container sf-section pt-0" aria-labelledby="home-barbers">
-          <div className="sf-section-head">
-            <h2 id="home-barbers" className="sf-title">The chairs</h2>
-            {barbers.length > 3 ? <Link href="/barbers" className="sf-arrow-link">All barbers <ArrowRight aria-hidden="true" /></Link> : null}
-          </div>
-          {barbers.length ? <div className="sf-chair-grid">{barbers.slice(0, 3).map((barber) => <BarberCard key={barber.id} barber={barber} onFloor={onNowIds ? onNowIds.includes(barber.id) : undefined} />)}</div> : <p className="sf-muted">No barbers listed online.</p>}
-        </section>
-
-        <section className="sf-container sf-section pt-0" aria-labelledby="home-visit">
-          <div className="sf-visit">
-            <div className="grid content-start gap-6">
-              <h2 id="home-visit" className="sf-title">Visit</h2>
-              <dl className="sf-facts">
-                {settings.address ? <div><dt className="sf-eyebrow">Address</dt><dd>{settings.address}</dd></div> : null}
-                {call ? <div><dt className="sf-eyebrow">Phone</dt><dd>{call}</dd></div> : null}
-              </dl>
-              <div className="sf-actions">
-                <Link href="/appointment" className="sf-btn">My appointment</Link>
-              </div>
+        {featured.length ? (
+          <section className="sf-band" aria-labelledby="home-featured">
+            <div className="sf-band-head">
+              <h2 id="home-featured" className="sf-poster"><span className="sf-poster-ico" aria-hidden="true"><ShoppingBag /></span>Featured<span className="sf-poster-extra"> products</span></h2>
+              <Link href="/shop" className="sf-viewall">View all</Link>
             </div>
-            {days.length ? (
-              <div className="grid content-start gap-3">
-                <h3 className="sf-subtitle">{state ? <><span className={`sf-dot ${state.open ? 'is-live' : 'is-alert'}`} aria-hidden="true" />Hours · {state.label}</> : 'Hours'}</h3>
-                <ul className="sf-hours">
-                  {days.map((day) => <li key={day.key} className={day.today ? 'is-today' : undefined}><span>{day.label}{day.today ? ' · today' : ''}</span><span>{day.text}</span></li>)}
-                </ul>
-              </div>
-            ) : null}
-          </div>
+            <ul className="sf-featured">
+              {featured.map(({ product, art }) => (
+                <li key={product.id}>
+                  <Link href={`/shop/${encodeURIComponent(product.id)}`} className="sf-feature">
+                    <span className="sf-feature-art"><StorefrontImage src={art} fallbackSrc={art} alt={product.name} sizes="(max-width: 640px) 33vw, 20vw" /></span>
+                    <span className="sf-feature-name">{product.name}</span>
+                    <span className="sf-feature-price">{formatMoney(product.price)}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <div className="sf-band-actions">
+              <Link href="/shop" className="sf-btn is-outline">View all products <ArrowRight aria-hidden="true" /></Link>
+            </div>
+          </section>
+        ) : null}
+
+        <section className="sf-closer" aria-label="Book or walk in">
+          <Link href="/memberships" className="sf-closer-btn">Become a member</Link>
+          <Link href="/book" className="sf-closer-book">Book now</Link>
+          <Link href="/queue" className="sf-closer-btn">{walkIns ? <>Walk in <span className="sf-closer-sub">{walkIns}</span></> : 'Walk in'}</Link>
+          {settings.address ? <p className="sf-closer-where"><MapPin aria-hidden="true" />{settings.address}{today ? <> · <Star aria-hidden="true" />Today {today.text}</> : null}</p> : null}
         </section>
+        <p className="sf-edge-name" aria-hidden="true">{settings.name}</p>
       </main>
     </StorefrontShell>
   );

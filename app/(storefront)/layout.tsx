@@ -1,23 +1,16 @@
 import type { Metadata } from 'next';
-import { Big_Shoulders, Public_Sans } from 'next/font/google';
+import { Anton, Barlow, Barlow_Condensed, Permanent_Marker } from 'next/font/google';
 import { getPublicStorefrontSettings } from '@/features/storefront/lib/data/settings';
 import { trustedOrigin } from '@/features/shared/trusted-origin';
 import { sanitizeStoreLogoSvg } from '@/features/shared/sanitize-store-logo';
 import { normalizeStoreLogoColor } from '@/features/platform/store-settings/lib/store-logo';
-import '@/features/storefront/styles/take-a-number.css';
+import '@/features/storefront/styles/antares.css';
 
-// Condensed display grotesk for numerals and signage (optical sizes for the big board numerals).
-const bigShoulders = Big_Shoulders({
-  variable: '--font-big-shoulders',
-  subsets: ['latin'],
-  axes: ['opsz'],
-});
-
-// Plain workhorse grotesk for everything a customer reads.
-const publicSans = Public_Sans({
-  variable: '--font-public-sans',
-  subsets: ['latin'],
-});
+// Antares: oversized poster grotesk, a brush-marker hand, condensed labels, plain body.
+const anton = Anton({ variable: '--font-anton', weight: '400', subsets: ['latin'] });
+const marker = Permanent_Marker({ variable: '--font-permanent-marker', weight: '400', subsets: ['latin'] });
+const barlowCondensed = Barlow_Condensed({ variable: '--font-barlow-condensed', weight: ['500', '600', '700'], subsets: ['latin'] });
+const barlow = Barlow({ variable: '--font-barlow', weight: ['400', '500', '600', '700'], subsets: ['latin'] });
 
 /** The shop's own logo (with its chosen colour) as the storefront icon. */
 function storeLogoIcon(logoIcon?: string | null, logoColor?: string | null) {
@@ -65,5 +58,5 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function StorefrontLayout({ children }: { children: React.ReactNode }) {
-  return <div className={`${bigShoulders.variable} ${publicSans.variable}`}>{children}</div>;
+  return <div className={`${anton.variable} ${marker.variable} ${barlowCondensed.variable} ${barlow.variable}`}>{children}</div>;
 }

@@ -14,6 +14,7 @@ import { phoneHref } from '@/features/shared/storefront-settings';
 import { formatDuration, formatMoney } from '../lib/format';
 import { PayDepositButton } from '../components/PayDepositButton';
 import type { PublicBookingEligibility } from '../../shared/public-booking-eligibility';
+import { shopDays } from '../lib/use-slots';
 
 function actorStorage(accountId: string) {
   const key = (name: string) => (accountId ? `${name}:account:${accountId}` : name);
@@ -119,8 +120,15 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
       ? 'The barber in your link isn’t available for this service, so First available is selected.'
       : null;
   });
-  const [selectedDate, setSelectedDate] = useState(() => settings?.timezone ? defaultBookingDate(settings.timezone) : '');
-  const [selectedStartsAt, setSelectedStartsAt] = useState('');
+  const [selectedDate, setSelectedDate] = useState(() => {
+    if (!settings?.timezone) return '';
+    // A date carried from the home picker or a service page, when it's inside the booking window.
+    const requested = searchParams?.get('date') || '';
+    const { min, max } = bookingDateBounds(settings.timezone);
+    return /^\d{4}-\d{2}-\d{2}$/.test(requested) && (!min || requested >= min) && (!max || requested <= max) ? requested : defaultBookingDate(settings.timezone);
+  });
+  // A start chosen before arriving here is only kept if it is still offered (checked against loaded slots).
+  const [selectedStartsAt, setSelectedStartsAt] = useState(() => searchParams?.get('at') || '');
   const [slots, setSlots] = useState<Record<string, StorefrontTimeSlot[]>>({});
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
@@ -447,8 +455,15 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
 
             <fieldset className="sf-step">
               <legend><span className="sf-step-no">03</span><span className="sf-step-title">Time</span></legend>
+              <div className="sf-days" role="group" aria-label="This week">
+                {shopDays(settings.timezone).map((day) => (
+                  <button type="button" key={day.key} aria-pressed={selectedDate === day.key} onClick={() => { setSelectedDate(day.key); setSelectedStartsAt(''); }} className="sf-day" aria-label={`${day.weekday} ${day.month} ${day.day}`}>
+                    <span>{day.weekday}</span><b>{day.day}</b>
+                  </button>
+                ))}
+              </div>
               <label htmlFor="booking-date" className="sf-field max-w-xs">
-                <span>Date</span>
+                <span>Or pick a date</span>
                 <input
                   id="booking-date"
                   name="date"
