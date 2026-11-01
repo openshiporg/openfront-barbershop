@@ -737,6 +737,9 @@ html:has([data-storefront]) body { overflow-x: clip; background: oklch(93.6% 0.0
 }
 
 @media (min-width: 64rem) {
+  /* Keep inner pages clear of the fixed side tab. */
+  [data-storefront] .sf-container { width: min(calc(100% - 10rem), var(--measure-wide)); }
+  [data-storefront] .sf-container-narrow { width: min(calc(100% - 10rem), var(--measure)); }
   [data-storefront] { --head-h: 4rem; }
   [data-storefront] .sf-nav-links { display: flex; align-items: center; gap: 1.5rem; }
   [data-storefront] .sf-nav-toggle { display: none; }
