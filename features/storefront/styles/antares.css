@@ -555,7 +555,7 @@ html:has([data-storefront]) body { overflow-x: clip; background: oklch(93.6% 0.0
 [data-storefront] .sf-quick-service-name { font-family: var(--font-label); font-size: clamp(0.8rem, 3.4vw, 0.98rem); font-weight: 700; line-height: 1.05; text-transform: uppercase; overflow-wrap: anywhere; }
 [data-storefront] .sf-quick-service-meta { font-size: clamp(0.66rem, 2.8vw, 0.78rem); white-space: nowrap; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
 [data-storefront] .sf-quick-service[aria-pressed='true'] .sf-quick-service-meta { color: var(--red); }
-[data-storefront] .sf-quick-check { position: absolute; top: 50%; right: 0.4rem; translate: 0 -50%; display: grid; width: 1.15rem; height: 1.15rem; place-items: center; border: 1.5px solid var(--red); border-radius: 999px; }
+[data-storefront] .sf-quick-check { position: absolute; top: 0; bottom: 0; right: 0.4rem; margin-block: auto; display: grid; width: 1.15rem; height: 1.15rem; place-items: center; border: 1.5px solid var(--red); border-radius: 999px; }
 [data-storefront] .sf-quick-service[aria-pressed='true'] .sf-quick-check { background: var(--red); color: var(--ticket-ink); }
 [data-storefront] .sf-quick-check svg { width: 0.75rem; height: 0.75rem; stroke-width: 3.5; }
 [data-storefront] .sf-quick-chev { display: none; }
@@ -802,7 +802,7 @@ html:has([data-storefront]) body { overflow-x: clip; background: oklch(93.6% 0.0
   [data-storefront] .sf-quick-step { gap: 0.4rem; }
   [data-storefront] .sf-quick-services { grid-template-columns: minmax(0, 1fr); gap: 0.35rem; }
   [data-storefront] .sf-quick-service { grid-template-columns: 1.2rem minmax(0, 1fr) auto 1rem; align-items: center; gap: 0.6rem; min-height: 2.5rem; padding: 0.25rem 0.6rem; box-shadow: none; }
-  [data-storefront] .sf-quick-check { position: static; transform: none; translate: none; }
+  [data-storefront] .sf-quick-check { position: static; margin-block: 0; }
   [data-storefront] .sf-quick-chev { display: block; width: 1rem; height: 1rem; color: var(--ink-muted); }
   [data-storefront] .sf-quick-service-meta { font-size: 0.85rem; }
   [data-storefront] .sf-quick-barber { box-shadow: none; }
