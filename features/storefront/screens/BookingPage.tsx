@@ -523,8 +523,8 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
             </fieldset>
           </div>
 
-          <aside className="sf-summary sf-on-dark" aria-label="Your ticket">
-            <h2>Your ticket</h2>
+          <aside className="sf-summary is-receipt" aria-label="Your booking">
+            <h2>Your booking</h2>
             <dl>
               <div><dt>Service</dt><dd>{selectedService?.name || '—'}{selectedService ? <span className="sf-muted block">{formatDuration(selectedService.durationMinutes)}</span> : null}</dd></div>
               <div><dt>Barber</dt><dd>{selectedBarber?.displayName || 'First available'}</dd></div>
