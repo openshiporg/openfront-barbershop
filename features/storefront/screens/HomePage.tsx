@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowRight, Check, Clock, MapPin, ShoppingBag, Star, User } from 'lucide-react';
 import { QuickBook } from '../components/QuickBook';
+import { ServiceGlyph } from '../components/ServiceGlyph';
 import { StorefrontImage } from '../components/StorefrontImage';
 import { productArt } from '../components/productArt';
 import { getAllBarbers, getAllServices, getRetailProducts, type StorefrontProduct } from '../lib/data/services';
@@ -83,6 +84,10 @@ export default async function HomePage() {
 
           <div className="sf-hero-photo">
             <StorefrontImage src={HERO_PHOTO} fallbackSrc={HERO_PHOTO} alt={`A fresh fade at ${settings.name}`} priority sizes="(max-width: 1024px) 60vw, 55vw" />
+            <span className="sf-hero-seal" aria-hidden="true">
+              <span>{name.lead.join(' ')}</span>
+              <span className="is-red">{name.last}</span>
+            </span>
           </div>
 
           {chips.length ? (
@@ -92,6 +97,7 @@ export default async function HomePage() {
                 {chips.map((service) => (
                   <li key={service.id}>
                     <Link href={`/services/${encodeURIComponent(service.id)}`} className="sf-chip">
+                      <ServiceGlyph name={service.name} category={service.category?.name} />
                       <span className="sf-chip-name">{service.name}</span>
                       <span className="sf-chip-meta">{formatMoney(service.price)} · {formatDuration(service.durationMinutes)}</span>
                     </Link>

@@ -887,6 +887,30 @@ html:has([data-storefront]) body { overflow-x: clip; background: oklch(93.6% 0.0
   [data-storefront] .sf-slot-line { min-height: 2.75rem; }
 }
 
+/* ---------- Home poster texture (phone): torn photo, the shop seal, a taped note ---------- */
+[data-storefront] .sf-chip-glyph { display: none; }
+[data-storefront] .sf-hero-seal { display: none; }
+@media (max-width: 63.99rem) {
+  [data-storefront] .sf-hero { grid-template-areas: 'head photo' 'quick quick'; row-gap: 0.9rem; }
+  /* Photo on a white paper rim, torn on every side. */
+  [data-storefront] .sf-hero-photo { min-height: 10.5rem; margin: -0.2rem -0.3rem 0 0; border-radius: 0; clip-path: var(--tear-all); background: oklch(97% 0.006 85); transform: rotate(1deg); }
+  [data-storefront] .sf-hero-photo .sf-image { inset: 0.3rem; clip-path: var(--tear-all); }
+  /* The shop seal: a scalloped round sticker in the photo corner. */
+  [data-storefront] .sf-hero-seal { position: absolute; z-index: 2; top: 0.15rem; right: 0.15rem; display: grid; width: 4.9rem; aspect-ratio: 1; place-content: center; padding: 0.5rem; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 2l6.2 4.4 7.5-1.3 4.1 6.4 7.4 1.8 1.2 7.5 6.3 4.3-1.4 7.5 4.5 6.1-3.9 6.5 3.9 6.5-4.5 6.1 1.4 7.5-6.3 4.3-1.2 7.5-7.4 1.8-4.1 6.4-7.5-1.3L50 98l-6.2-4.4-7.5 1.3-4.1-6.4-7.4-1.8-1.2-7.5-6.3-4.3 1.4-7.5-4.5-6.1 3.9-6.5-3.9-6.5 4.5-6.1-1.4-7.5 6.3-4.3 1.2-7.5 7.4-1.8 4.1-6.4 7.5 1.3z' fill='%23f3efe6' stroke='%231c1a17' stroke-width='2.2'/%3E%3Ccircle cx='50' cy='50' r='37' fill='none' stroke='%231c1a17' stroke-width='1.2' stroke-dasharray='2 2.5'/%3E%3C/svg%3E") center / contain no-repeat; filter: drop-shadow(0 3px 5px oklch(25% 0.02 50 / 0.3)); font-family: var(--font-display); font-size: 1.05rem; line-height: 0.85; text-align: center; text-transform: uppercase; color: var(--ink); transform: rotate(12deg); }
+  [data-storefront] .sf-hero-seal .is-red { color: var(--red); }
+  /* Status becomes a taped kraft sticker overlapping the photo's lower-left edge. */
+  [data-storefront] .sf-hero-note { grid-area: photo; z-index: 3; align-self: end; justify-self: end; display: grid; gap: 0.1rem; max-width: 9rem; margin: 0 -0.2rem -0.9rem 0; padding: 0.55rem 0.75rem 0.6rem; border: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M1 4 L14 1 L29 3 L46 0 L62 2.5 L79 0.5 L99 2 L97.5 22 L100 41 L98 63 L99.5 81 L98 99 L80 97.5 L63 100 L44 97 L27 99.5 L11 97 L0 99 L2 77 L0 55 L1.5 33 L0 15 Z' fill='%23d8c9b0'/%3E%3C/svg%3E") center / 100% 100% no-repeat; filter: drop-shadow(0 4px 6px oklch(25% 0.02 50 / 0.28)); transform: rotate(-5deg); }
+  [data-storefront] .sf-hero-note::before { content: ''; position: absolute; top: -0.45rem; left: 50%; width: 3rem; height: 1rem; margin-left: -1.5rem; background: oklch(93% 0.012 85 / 0.75); box-shadow: 0 1px 2px oklch(25% 0.02 50 / 0.15); clip-path: polygon(3% 0, 97% 8%, 100% 92%, 0 100%); transform: rotate(4deg); }
+  [data-storefront] .sf-hero-note-big { font-family: var(--font-display); font-weight: 400; font-size: 1.35rem; line-height: 0.9; letter-spacing: 0; }
+  [data-storefront] .sf-hero-note-small { font-family: var(--font-marker); font-size: 0.75rem; line-height: 1.15; color: var(--ink); }
+  /* The address banner hangs from a strip of tape. */
+  [data-storefront] .sf-hero-banner { position: relative; overflow: visible; }
+  [data-storefront] .sf-hero-head { padding-bottom: 0.4rem; }
+  /* "Book a haircut" header row above the booking steps, as in the mock. */
+  [data-storefront] .sf-quick-head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 0.45rem; margin-bottom: 0.2rem; border-bottom: 1.5px solid var(--rule); font-family: var(--font-label); font-size: 0.85rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--red); }
+  [data-storefront] .sf-quick-head svg { width: 1.15rem; height: 1.15rem; color: var(--ink); }
+}
+
 /* ---------- Home poster texture (desktop): torn paper, tape, the script "Book" ---------- */
 @media (min-width: 64rem) {
   /* Booking card at the mock's size: compact rows, small tiles, 4-across pills. */
@@ -948,6 +972,22 @@ html:has([data-storefront]) body { overflow-x: clip; background: oklch(93.6% 0.0
   [data-storefront] .sf-chip { border-radius: 0.2rem; }
   [data-storefront] .sf-hero-chips li:nth-child(odd) .sf-chip { transform: rotate(-0.8deg); }
   [data-storefront] .sf-hero-chips li:nth-child(even) .sf-chip { transform: rotate(0.7deg); }
+}
+
+@media (min-width: 64rem) {
+  /* Service chips: torn kraft scraps with a drawn tool mark, as in the mock. */
+  [data-storefront] .sf-hero-chips ul { justify-self: start; width: max-content; max-width: 100%; grid-template-columns: repeat(3, auto); justify-content: start; gap: 0; padding: 0.3rem 0.4rem; }
+  [data-storefront] .sf-chip { grid-template-columns: 1.7rem auto; column-gap: 0.55rem; align-items: center; min-height: 2.75rem; padding: 0.3rem 0.85rem 0.3rem 0.7rem; border-radius: 0; background: oklch(91% 0.016 80); box-shadow: none; clip-path: polygon(0 4%, 30% 0, 70% 3%, 100% 0, 98.5% 50%, 100% 100%, 64% 97%, 33% 100%, 0 96%, 1.5% 50%); }
+  [data-storefront] .sf-hero-chips li + li .sf-chip { border-left: 1px dashed oklch(70% 0.02 70); }
+  [data-storefront] .sf-chip-glyph { display: block; grid-row: 1 / span 2; width: 1.7rem; height: 1.7rem; color: var(--ink); }
+  [data-storefront] .sf-chip-name { grid-column: 2; font-family: var(--font-body); font-size: 0.92rem; font-weight: 600; letter-spacing: 0; text-transform: none; white-space: nowrap; }
+  [data-storefront] .sf-chip-meta { grid-column: 2; font-size: 0.78rem; color: var(--ink-2); white-space: nowrap; }
+
+  /* Product tiles: photo on the left, name and price below-right on an inset panel. */
+  [data-storefront] .sf-feature { grid-template-columns: 46% minmax(0, 1fr); grid-template-rows: 1fr auto; column-gap: 0.7rem; min-height: 0; aspect-ratio: 2.05; padding: 0.45rem; border: 1px solid oklch(86% 0.01 80); background: oklch(96% 0.006 85); }
+  [data-storefront] .sf-feature-art { grid-column: 1; grid-row: 1 / span 2; border-radius: 0.15rem; }
+  [data-storefront] .sf-feature-name { grid-column: 2; grid-row: 1; align-self: end; margin: 0; font-size: 1rem; }
+  [data-storefront] .sf-feature-price { grid-column: 2; grid-row: 2; padding-bottom: 0.1rem; font-size: 0.9rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
