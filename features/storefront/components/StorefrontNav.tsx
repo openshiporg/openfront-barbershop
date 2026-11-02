@@ -19,9 +19,9 @@ const items = [
 
 const tabs = [
   { href: '/', label: 'Home', icon: Home },
-  { href: '/book', label: 'Book', icon: CalendarDays },
+  { href: '/appointment', label: 'Appointments', icon: CalendarDays },
   { href: '/services', label: 'Services', icon: Scissors },
-  { href: '/account', label: 'Account', icon: User },
+  { href: '/account', label: 'Profile', icon: User },
 ];
 
 function isActive(pathname: string, href: string) {

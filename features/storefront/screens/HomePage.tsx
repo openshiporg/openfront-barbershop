@@ -68,7 +68,9 @@ export default async function HomePage() {
               {name.lead.map((word, index) => <span key={index} className="sf-hero-word">{word}</span>)}
               <span className="sf-hero-word is-red">{name.last}</span>
             </h1>
-            {settings.tagline || settings.address ? <p className="sf-hero-banner">{settings.tagline || settings.address}</p> : null}
+            {settings.tagline && settings.address ? (
+              <p className="sf-hero-banner"><span className="sf-banner-wide">{settings.tagline}</span><span className="sf-banner-phone">{settings.address}</span></p>
+            ) : settings.tagline || settings.address ? <p className="sf-hero-banner">{settings.tagline || settings.address}</p> : null}
             <Link href="/book" className="sf-hero-book" aria-label="Book a time">
               <span>Book</span>
               <svg viewBox="0 0 220 60" aria-hidden="true"><path d="M4 40 C 60 20, 120 18, 196 28" /><path d="M176 10 L 206 29 L 178 50" /></svg>
@@ -89,6 +91,7 @@ export default async function HomePage() {
               <span className="is-red">{name.last}</span>
             </span>
           </div>
+          {settings.tagline && settings.address ? <span className="sf-hero-burst" aria-hidden="true">{settings.tagline}</span> : null}
 
           {chips.length ? (
             <div className="sf-hero-chips">

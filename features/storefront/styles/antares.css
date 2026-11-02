@@ -890,6 +890,7 @@ html:has([data-storefront]) body { overflow-x: clip; background: oklch(93.6% 0.0
 /* ---------- Home poster texture (phone): torn photo, the shop seal, a taped note ---------- */
 [data-storefront] .sf-chip-glyph { display: none; }
 [data-storefront] .sf-hero-seal { display: none; }
+[data-storefront] .sf-hero-burst, [data-storefront] .sf-banner-phone { display: none; }
 @media (max-width: 63.99rem) {
   [data-storefront] .sf-hero { grid-template-areas: 'head photo' 'quick quick'; row-gap: 0.9rem; }
   /* Photo on a white paper rim, torn on every side. */
@@ -912,6 +913,92 @@ html:has([data-storefront]) body { overflow-x: clip; background: oklch(93.6% 0.0
   /* "Book a haircut" header row above the booking steps, as in the mock. */
   [data-storefront] .sf-quick-head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 0.45rem; margin-bottom: 0.2rem; border-bottom: 1.5px solid var(--rule); font-family: var(--font-label); font-size: 0.85rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--red); }
   [data-storefront] .sf-quick-head svg { width: 1.15rem; height: 1.15rem; color: var(--ink); }
+
+  /* ---- Phone home at the mock's proportions (measured at 402): one screen shows hero → featured above the tab bar. ---- */
+  /* Slim top row: the wordmark lives in the hero, so home keeps only Book and the menu. */
+  [data-storefront] .sf-nav { padding: 0.25rem 0.5rem 0; }
+  [data-storefront] .sf-nav-bar { min-height: 2.75rem; padding: 0 0.1rem 0 0.7rem; border-radius: 0.7rem; }
+  [data-storefront] .sf-brand-name { font-size: 1.05rem; }
+  [data-storefront] .sf-nav-book { min-height: 2.25rem; padding-inline: 0.9rem; font-size: 0.95rem; }
+  [data-storefront]:has(.sf-home) .sf-nav-bar { background: transparent; box-shadow: none; backdrop-filter: none; }
+  [data-storefront]:has(.sf-home) .sf-brand { visibility: hidden; }
+  [data-storefront]:has(.sf-home) .sf-nav-book, [data-storefront]:has(.sf-home) .sf-nav-toggle { box-shadow: 0 4px 12px -6px oklch(25% 0.02 50 / 0.45); }
+  [data-storefront]:has(.sf-home) .sf-nav-toggle { background: oklch(96% 0.004 85 / 0.92); }
+  [data-storefront]:has(.sf-home) .sf-nav { height: 0; padding-top: 0.4rem; }
+  [data-storefront] .sf-home { gap: 0.85rem; padding-top: 0.5rem; }
+
+  /* Hero: wordmark left, torn photo right, tape under the wordmark. */
+  [data-storefront] .sf-hero { row-gap: 0.55rem; }
+  [data-storefront] .sf-hero-head { gap: 0.35rem; padding-top: 2.4rem; padding-bottom: 0.2rem; }
+  [data-storefront] .sf-hero-photo { min-height: 8.6rem; margin-top: 2.6rem; }
+  [data-storefront] .sf-hero-banner { padding: 0.22rem 0.55rem 0.24rem; line-height: 1.15; }
+  [data-storefront] .sf-hero-note { margin-top: 4.4rem; }
+
+  /* Booking: compact section heads, two-line service chips, short barber cards, one row of time chips. */
+  [data-storefront] .sf-quick-head { padding-bottom: 0.3rem; margin-bottom: 0; font-size: 0.78rem; }
+  [data-storefront] .sf-quick-head svg { width: 1rem; height: 1rem; }
+  [data-storefront] .sf-quick { gap: 0.6rem; }
+  [data-storefront] .sf-quick-step { gap: 0.3rem; }
+  [data-storefront] .sf-quick-step legend { margin-bottom: 0.3rem; font-size: 0.82rem; line-height: 1.25rem; }
+  [data-storefront] .sf-quick-ico { width: 1.2rem; height: 1.2rem; }
+  [data-storefront] .sf-quick-ico svg { width: 0.95rem; height: 0.95rem; }
+  [data-storefront] .sf-quick-more { min-height: 1.5rem; margin-block: 0; font-size: 0.78rem; }
+  [data-storefront] .sf-quick-services { gap: 0.35rem; }
+  [data-storefront] .sf-quick-service { min-height: 0; gap: 0.05rem; padding: 0.12rem 1.45rem 0.12rem 0.45rem; border-width: 1px; border-radius: 0.4rem; }
+  [data-storefront] .sf-quick-service-name { font-size: 0.8rem; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  [data-storefront] .sf-quick-service-meta { line-height: 1; }
+  [data-storefront] .sf-quick-check { width: 1rem; height: 1rem; right: 0.3rem; }
+  [data-storefront] .sf-quick-barbers { gap: 0.4rem; }
+  [data-storefront] .sf-quick-barber { gap: 0; padding: 0.25rem 0.25rem 0.3rem; border-width: 1px; }
+  [data-storefront] .sf-quick-barber[aria-pressed='true'] { padding: 0.15rem 0.15rem 0.2rem; }
+  [data-storefront] .sf-quick-barber-photo { aspect-ratio: 1.1; }
+  [data-storefront] .sf-quick-barber-name { margin-top: 0.2rem; font-size: 0.82rem; line-height: 1.1; }
+  [data-storefront] .sf-quick-barber-meta { line-height: 1.1; }
+  /* The day picker shares the TIME heading row. */
+  [data-storefront] .sf-quick-step:has(.sf-quick-day) { position: relative; }
+  [data-storefront] .sf-quick-day { position: absolute; top: -0.3rem; right: -0.4rem; translate: 0 -1.85rem; grid-template-columns: 2rem auto 2rem; margin: 0; }
+  [data-storefront] .sf-quick-day button { width: 2rem; height: 2rem; }
+  [data-storefront] .sf-quick-day svg { width: 1rem; height: 1rem; }
+  [data-storefront] .sf-quick-day p { font-size: 0.78rem; }
+  [data-storefront] .sf-quick-slots { gap: 0.25rem; min-height: 1.6rem; margin-inline: calc(var(--pad) * -1); padding-inline: var(--pad); scroll-padding-inline: var(--pad); }
+  [data-storefront] .sf-quick-slot { min-height: 1.6rem; padding: 0 0.5rem; border-width: 1px; border-radius: 999px; font-size: 0.78rem; }
+  [data-storefront] .sf-quick-slot[aria-pressed='true'] { border-color: var(--red); background: var(--red); color: var(--ticket-ink); }
+  [data-storefront] .sf-quick-cta { min-height: 2.25rem; gap: 0.45rem; font-size: 1rem; }
+  [data-storefront] .sf-quick-cta svg { width: 1rem; height: 1rem; }
+
+  /* Bands: small poster heads, one-line membership tickets, a thin clipper strip, image-right product tiles. */
+  [data-storefront] .sf-band { gap: 0.35rem; }
+  [data-storefront] .sf-poster { gap: 0.35rem; font-size: 0.88rem; }
+  [data-storefront] .sf-poster-ico svg { width: 1rem; height: 1rem; }
+  [data-storefront] .sf-viewall { min-height: 1.5rem; font-size: 0.78rem; }
+  [data-storefront] .sf-plans { gap: 0.45rem; }
+  [data-storefront] .sf-plan { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0.3rem 0.55rem 0.3rem; }
+  [data-storefront] .sf-plan h3 { font-size: 0.95rem; overflow-wrap: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  [data-storefront] .sf-plan.is-red h3 { margin: -0.1rem 0 0.1rem -0.2rem; padding: 0.05rem 0.35rem 0.1rem; }
+  [data-storefront] .sf-plan-price { font-size: 0.75rem; line-height: 1.1; }
+  [data-storefront] .sf-plan-price b { font-size: 1rem; }
+  [data-storefront] .sf-plan ul { display: none; }
+    [data-storefront] .sf-plan-choose { display: none; }
+  [data-storefront] .sf-strip { min-height: 2.3rem; }
+  [data-storefront] .sf-strip-name { font-size: 1.3rem; }
+  [data-storefront] .sf-strip-red { font-size: 1.15rem; }
+  [data-storefront] .sf-strip-red span { font-size: 0.75rem; }
+  [data-storefront] .sf-featured { gap: 0.4rem; }
+  [data-storefront] .sf-feature { grid-template-columns: minmax(0, 1fr) 34%; grid-template-rows: 1fr auto; column-gap: 0.3rem; min-height: 0; height: 3rem; padding: 0.25rem 0.3rem 0.25rem 0.4rem; }
+  [data-storefront] .sf-feature-art { grid-column: 2; grid-row: 1 / span 2; min-height: 0; }
+  [data-storefront] .sf-feature-name { grid-column: 1; grid-row: 1; align-self: end; margin: 0; font-size: 0.75rem; line-height: 1; overflow-wrap: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+  [data-storefront] .sf-feature-price { grid-column: 1; grid-row: 2; font-size: 0.75rem; line-height: 1.1; }
+
+  /* Tab bar at the mock's height. */
+  [data-storefront] .sf-tabbar { padding-block: 0.25rem calc(0.25rem + env(safe-area-inset-bottom)); }
+  [data-storefront] .sf-tabbar a { min-height: 2.9rem; gap: 0.15rem; font-size: 0.75rem; letter-spacing: 0.02em; }
+  [data-storefront] .sf-tabbar svg { width: 1.35rem; height: 1.35rem; }
+
+  /* With a tagline in settings: the address stays on the tape and the tagline becomes the starburst. */
+  [data-storefront] .sf-banner-wide { display: none; }
+  [data-storefront] .sf-hero:has(.sf-hero-burst) .sf-hero-note { margin-top: 2.6rem; }
+  [data-storefront] .sf-banner-phone { display: inline; }
+  [data-storefront] .sf-hero-burst { grid-area: photo; align-self: end; justify-self: end; position: relative; z-index: 4; margin: 0 -0.5rem -0.6rem 0; display: grid; width: 5.4rem; aspect-ratio: 1; place-content: center; padding: 1.1rem; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 0l7 15 13-9 1 16 16-3-6 15 15 5-12 11 12 11-15 5 6 15-16-3-1 16-13-9-7 15-7-15-13 9-1-16-16 3 6-15-15-5 12-11-12-11 15-5-6-15 16 3 1-16 13 9z' fill='%23f3efe6' stroke='%231c1a17' stroke-width='1.6'/%3E%3C/svg%3E") center / contain no-repeat; filter: drop-shadow(0 3px 4px oklch(25% 0.02 50 / 0.3)); font-family: var(--font-label); font-size: 0.75rem; font-weight: 700; line-height: 1; letter-spacing: 0.02em; text-align: center; text-transform: uppercase; color: var(--ink); transform: rotate(-10deg); overflow: hidden; }
 }
 
 /* ---------- Home poster texture (desktop): torn paper, tape, the script "Book" ---------- */
