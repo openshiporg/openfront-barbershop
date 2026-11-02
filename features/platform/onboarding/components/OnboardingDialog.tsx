@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Notice, Pill, selectClass, StatusDot, Track } from '@/features/platform/lib/ui';
 import { useOnboardingApi } from '../hooks/useOnboardingApi';
+import { BARBERSHOP_TEMPLATES, SECTION_DEFINITIONS } from '../config/templates';
 
 function timeZones(current: string) {
   let zones: string[] = [];
@@ -54,10 +55,21 @@ export default function OnboardingDialog({ isOpen, onClose }: { isOpen: boolean;
               onKeyDown={(event) => { if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) { event.preventDefault(); const next = mode === 'full' ? 'minimal' : 'full'; setMode(next); const group = event.currentTarget.parentElement; requestAnimationFrame(() => (group?.querySelector('[aria-checked="true"]') as HTMLButtonElement | null)?.focus()); } }}
               className="h-11"
             >
-              {value === 'full' ? 'Full setup' : 'Minimal setup'}
+              {BARBERSHOP_TEMPLATES[value].name}
             </Pill>
           ))}
         </Track>
+      ) : null}
+      {!complete ? (
+        <div className="grid gap-1 text-sm">
+          <p className="text-muted-foreground">{BARBERSHOP_TEMPLATES[mode].description}</p>
+          <dl className="grid gap-x-3 gap-y-1 sm:grid-cols-[auto_minmax(0,1fr)]">
+            {SECTION_DEFINITIONS.map((section) => {
+              const items = section.getItemsFn(mode);
+              return items.length ? <div key={section.id} className="contents"><dt className="font-medium">{section.label}</dt><dd className="text-muted-foreground">{items.join(', ')}</dd></div> : null;
+            })}
+          </dl>
+        </div>
       ) : (
         <nav className="grid gap-4">
           {!localFixtures ? (
