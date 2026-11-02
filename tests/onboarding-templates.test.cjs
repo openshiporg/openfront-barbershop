@@ -55,12 +55,12 @@ const { storeOwnMark } = load('features/storefront/lib/store-mark.ts', {
   '@/features/platform/store-settings/lib/store-logo': { DEFAULT_STORE_LOGO_ICON: DEFAULT },
 });
 
-test('storefront shows only a mark the shop chose', () => {
-  assert.equal(storeOwnMark(''), '');
-  assert.equal(storeOwnMark(null), '');
-  assert.equal(storeOwnMark(DEFAULT), '');
-  assert.equal(storeOwnMark(`  ${DEFAULT} `), '');
-  assert.equal(storeOwnMark('not svg'), '');
+test('storefront always shows an icon beside the shop name', () => {
+  assert.equal(storeOwnMark(''), DEFAULT);
+  assert.equal(storeOwnMark(null), DEFAULT);
+  assert.equal(storeOwnMark(DEFAULT), DEFAULT);
+  assert.equal(storeOwnMark(`  ${DEFAULT} `), DEFAULT);
+  assert.equal(storeOwnMark('not svg'), DEFAULT);
   const own = '<svg viewBox="0 0 24 24"><circle r="4"/></svg>';
   assert.equal(storeOwnMark(own), own);
 });
