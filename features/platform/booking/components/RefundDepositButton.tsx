@@ -15,17 +15,18 @@ import {
 import { Pill } from '@/features/platform/lib/ui';
 
 /** "Refund deposit" with a confirm step. The key is minted once per opened dialog, so a retried click replays instead of refunding twice. */
-export function RefundDepositButton({ amountLabel, customer, disabled, onConfirm }: {
+export function RefundDepositButton({ amountLabel, customer, disabled, onOpen, onConfirm }: {
   amountLabel: string;
   customer: string;
   disabled?: boolean;
+  onOpen?: () => void;
   onConfirm: (idempotencyKey: string) => void;
 }) {
   const [key, setKey] = useState('');
   return (
-    <AlertDialog onOpenChange={(open) => { if (open) setKey(crypto.randomUUID()); }}>
+    <AlertDialog onOpenChange={(open) => { if (open) { setKey(crypto.randomUUID()); onOpen?.(); } }}>
       <AlertDialogTrigger asChild>
-        <Pill size="sm" variant="flat" disabled={disabled}>Refund deposit</Pill>
+        <Pill size="sm" disabled={disabled}>Refund deposit</Pill>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>

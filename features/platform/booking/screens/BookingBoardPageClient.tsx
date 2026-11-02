@@ -171,7 +171,7 @@ export function BookingBoardPageClient({ data, breadcrumbs }: { data: BookingPro
         <Track>
           <Pill className="relative" onClick={live.refresh} disabled={live.refreshing} aria-label="Refresh board"><RefreshCw className={cn(live.refreshing && 'animate-spin')} /><span className="max-sm:sr-only">{live.refreshing ? 'Refreshing' : 'Refresh'}</span></Pill>
           <PillLink href="/dashboard/platform/queue">Walk-ins</PillLink>
-          <Pill variant="primary" onClick={() => setShowBooking((value) => !value)} aria-expanded={showBooking} aria-controls="new-appointment">{showBooking ? <><X />Close</> : <><Plus />New appointment</>}</Pill>
+          <Pill variant="primary" onClick={() => { setMessage(null); setShowBooking((value) => !value); }} aria-expanded={showBooking} aria-controls="new-appointment">{showBooking ? <><X />Close</> : <><Plus />New appointment</>}</Pill>
         </Track>
       )}
     />
@@ -261,25 +261,22 @@ export function BookingBoardPageClient({ data, breadcrumbs }: { data: BookingPro
           </td>
           <td className={cn(stack.td, stack.wide)}>
             <p>{serviceLabel(appointment)}</p>
-            <p className="text-xs text-muted-foreground">{appointment.paymentStatus && appointment.paymentStatus !== 'not_required' ? statusLabel(appointment.paymentStatus) : appointment.source ? statusLabel(appointment.source) : ''}</p>
-            {refundState && <p className="text-xs font-medium text-foreground" data-refund-state={refundState.tone}>{refundState.tone === 'refunded' ? 'Deposit refunded' : 'Deposit partly refunded'} · {formatMoney(refundState.refunded)}</p>}
+            {refundState
+              ? <p className="text-xs font-medium text-foreground" data-refund-state={refundState.tone}>{refundState.tone === 'refunded' ? 'Deposit refunded' : 'Deposit partly refunded'} · {formatMoney(refundState.refunded)}</p>
+              : <p className="text-xs text-muted-foreground">{appointment.paymentStatus && appointment.paymentStatus !== 'not_required' ? statusLabel(appointment.paymentStatus) : appointment.source ? statusLabel(appointment.source) : ''}</p>}
           </td>
           <td className={cn(stack.td, stack.wide)}>{barberText}</td>
           <td className={cn(stack.td, 'whitespace-nowrap max-md:text-right')}><StatusCell tone={appointmentTone[status] || 'off'}>{appointmentStatusLabels[status] || statusLabel(status)}</StatusCell></td>
           <td className={cn(stack.td, stack.wide, 'whitespace-nowrap text-right tabular-nums')}>{formatMoney(appointment.price ?? appointment.service?.price)}</td>
           <td className={cn(stack.td, stack.full, 'md:text-right')}>
-            {refundable && (
-              <div className={cn('flex flex-wrap gap-1.5 md:justify-end', !closedVisit && 'mb-1.5')}>
-                <RefundDepositButton amountLabel={formatMoney(refundable.remaining)} customer={customerName(appointment.customer)} disabled={pending} onConfirm={(key) => refundDeposit(refundable.id, key)} />
-              </div>
-            )}
-            {!closedVisit && (
+            {(refundable || !closedVisit) && (
               <div className="flex flex-wrap gap-1.5 md:justify-end">
-                {action && <Pill size="sm" variant="primary" disabled={pending} onClick={() => moveAppointment(appointment.id, action.value)}>{action.label}</Pill>}
+                {refundable && <RefundDepositButton amountLabel={formatMoney(refundable.remaining)} customer={customerName(appointment.customer)} disabled={pending} onOpen={() => setMessage(null)} onConfirm={(key) => refundDeposit(refundable.id, key)} />}
+                {!closedVisit && action && <Pill size="sm" variant="primary" disabled={pending} onClick={() => moveAppointment(appointment.id, action.value)}>{action.label}</Pill>}
                 {status === 'in_chair' && <PillLink size="sm" variant="primary" href={`/dashboard/platform/pos?appointment=${encodeURIComponent(appointment.id)}`}>Checkout</PillLink>}
-                {status !== 'in_chair' && started && <Pill size="sm" variant="flat" disabled={pending} onClick={() => markNoShow(appointment.id)}>No-show</Pill>}
-                {hasStatus(changeableStatuses, status) && (
-                  <Pill size="sm" aria-expanded={changingId === appointment.id} onClick={() => setChangingId(changingId === appointment.id ? null : appointment.id)}>Change</Pill>
+                {!closedVisit && status !== 'in_chair' && started && <Pill size="sm" variant="flat" disabled={pending} onClick={() => markNoShow(appointment.id)}>No-show</Pill>}
+                {!closedVisit && hasStatus(changeableStatuses, status) && (
+                  <Pill size="sm" aria-expanded={changingId === appointment.id} onClick={() => { setMessage(null); setChangingId(changingId === appointment.id ? null : appointment.id); }}>Change</Pill>
                 )}
               </div>
             )}
@@ -342,7 +339,12 @@ export function BookingBoardPageClient({ data, breadcrumbs }: { data: BookingPro
           />
         )}
 
-        <div aria-live="polite" className="empty:-mt-6">{message && <Notice tone={message.tone}>{message.text}</Notice>}</div>
+        <div aria-live="polite" className="empty:-mt-6">{message && (
+          <Notice tone={message.tone} className="flex items-start justify-between gap-3">
+            <span>{message.text}</span>
+            <button type="button" onClick={() => setMessage(null)} aria-label="Dismiss message" className="-my-1 -mr-1 inline-flex size-7 shrink-0 items-center justify-center rounded-[6px] text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="size-4" aria-hidden="true" /></button>
+          </Notice>
+        )}</div>
 
         {!data.status && lanes.length > 0 && (
           <section aria-label="Schedule by barber" className="hidden md:block">

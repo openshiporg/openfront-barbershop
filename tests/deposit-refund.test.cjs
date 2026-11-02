@@ -59,3 +59,14 @@ test('board wiring: confirm dialog, mutation, and payment-permission gate', () =
   const board = read('features/platform/booking/screens/BookingBoardPageClient.tsx');
   assert.match(board, /data\.canRefundDeposits \? refundableDeposit\(/);
 });
+
+test('board nits: outline button, refund state shown once, dismissable banner', () => {
+  const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+  const button = read('features/platform/booking/components/RefundDepositButton.tsx');
+  assert.match(button, /<Pill size="sm" disabled=\{disabled\}>Refund deposit<\/Pill>/, 'same outline pill as Change');
+  assert.doesNotMatch(button, /variant="flat"/);
+  const board = read('features/platform/booking/screens/BookingBoardPageClient.tsx');
+  assert.match(board, /\{refundState\s*\? <p[^]*Deposit refunded[^]*: <p[^]*statusLabel\(appointment\.paymentStatus\)/, 'payment label replaced, not repeated');
+  assert.match(board, /aria-label="Dismiss message"/);
+  assert.match(board, /onOpen=\{\(\) => setMessage\(null\)\}/);
+});
