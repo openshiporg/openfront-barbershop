@@ -21,6 +21,7 @@ import {
   updateActiveShopStorefrontSettingsAction,
   type ActiveShopStorefrontSettings,
 } from '../actions/settings';
+import { formatPhone } from '@/features/platform/lib/phone';
 
 type ShopChoices = { success: boolean; error: string | null; activeShop: ShopChoice | null; shops: ShopChoice[]; total: number };
 
@@ -305,7 +306,7 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
 
         <aside className="min-w-0 space-y-4 xl:sticky xl:top-6 xl:self-start" aria-label="Preview and save">
           <div className="overflow-hidden rounded-[6px] ring-1 ring-border">
-            <div className="flex items-center justify-between gap-2 bg-zinc-900 px-3 py-1.5 text-[11px] text-zinc-300"><span className="truncate"><StatusDot tone={form.isPublic ? 'live' : 'off'} />{form.address || 'Address'}</span><span className="font-mono">{form.phone}</span></div>
+            <div className="flex items-center justify-between gap-2 bg-zinc-900 px-3 py-1.5 text-[11px] text-zinc-300"><span className="truncate"><StatusDot tone={form.isPublic ? 'live' : 'off'} />{form.address || 'Address'}</span><span className="font-mono">{formatPhone(form.phone)}</span></div>
             <div className="flex items-center gap-2.5 bg-[#f6f3ee] px-4 py-4 text-[#111a33]">
               {safeLogo ? <StoreLogo svg={safeLogo} color={form.logoColor} className="size-7" /> : <span className="size-7 rounded-[4px] bg-red-200" aria-hidden="true" />}
               <span className="min-w-0 truncate text-xl font-extrabold uppercase tracking-tight">{form.name || 'Shop name'}</span>

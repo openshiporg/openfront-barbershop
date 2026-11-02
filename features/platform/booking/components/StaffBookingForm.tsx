@@ -11,6 +11,7 @@ import { createStaffAppointmentAction, searchBookingCustomersAction, type Custom
 import { parseShopDateTime } from '../lib/shopTimeInput';
 import { Notice, Pill, selectClass, Track } from '@/features/platform/lib/ui';
 import { Segmented } from './FloorKit';
+import { formatPhone } from '@/features/platform/lib/phone';
 
 type ServiceOption = { id: string; name?: string | null; durationMinutes?: number | null; depositRequired?: boolean | null; specialistIds?: string[] };
 type BarberOption = { id: string; displayName?: string | null; name?: string | null; bookingEnabled?: boolean | null };
@@ -33,7 +34,7 @@ export type StaffBookingFormProps = {
 
 function customerLabel(customer: CustomerMatch) {
   const name = [customer.firstName, customer.lastName].filter(Boolean).join(' ') || 'Customer';
-  return `${name}${customer.phone ? ` · ${customer.phone}` : ''}${customer.email ? ` · ${customer.email}` : ''}`;
+  return `${name}${customer.phone ? ` · ${formatPhone(customer.phone)}` : ''}${customer.email ? ` · ${customer.email}` : ''}`;
 }
 
 export function StaffBookingForm(props: StaffBookingFormProps) {

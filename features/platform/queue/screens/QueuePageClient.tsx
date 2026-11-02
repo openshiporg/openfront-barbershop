@@ -12,6 +12,7 @@ import { createAppointmentFromQueue, updateQueueEntryStatus, type QueueEntry, ty
 import { AddWalkInForm, AssignQueueEntryForm } from '../components/QueueForms';
 import { interruptedQueueSeatMessage, interruptedQueueStatusMessage, queueSeatFeedback, queueStatusFeedback, type QueueActionResult } from '../lib/queueActionFeedback';
 import { queueStatusLabels, type QueueStatus } from '../lib/queueTypes';
+import { formatPhone } from '@/features/platform/lib/phone';
 
 type Breadcrumb = { type: 'link' | 'page'; label: string; href?: string };
 
@@ -140,7 +141,7 @@ export function QueuePageClient({ data, breadcrumbs }: { data: QueueProjectionDa
               {entry.customerName || 'Guest'}
               {(entry.partySize || 1) > 1 ? <span className="ml-1.5 text-xs font-normal tabular-nums text-muted-foreground">party of {entry.partySize}</span> : null}
             </p>
-            <p className="text-xs text-muted-foreground">{entry.phone || 'No phone'}<span className="md:hidden"> · {service || 'No service yet'} · {barber || 'Any barber'}</span></p>
+            <p className="text-xs text-muted-foreground">{formatPhone(entry.phone) || 'No phone'}<span className="md:hidden"> · {service || 'No service yet'} · {barber || 'Any barber'}</span></p>
             {entry.notes ? <p className="mt-1 max-w-prose text-xs text-muted-foreground">{entry.notes}</p> : null}
           </td>
           <td className={cn(stack.td, stack.wide)}>

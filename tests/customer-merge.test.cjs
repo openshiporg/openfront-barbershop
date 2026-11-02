@@ -10,10 +10,10 @@ const ts = require('typescript');
 const root = path.resolve(__dirname, '..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 
-function load(relative) {
+function load(relative, modules = {}) {
   const { outputText } = ts.transpileModule(read(relative), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } });
   const module = { exports: {} };
-  vm.runInNewContext(outputText, { module, exports: module.exports, require, Date });
+  vm.runInNewContext(outputText, { module, exports: module.exports, require: (name) => modules[name] || require(name), Date, Intl });
   return module.exports;
 }
 
@@ -119,4 +119,27 @@ test('staff merge is behind a confirm step with one key per dialog', () => {
   assert.match(ui, /if \(open\) \{ setKey\(crypto\.randomUUID\(\)\)/);
   const page = read('features/platform/customers/screens/CustomersPageClient.tsx');
   assert.match(page, /mergeCustomersAction\(\{ keepCustomerId, duplicateCustomerId: customer\.id, idempotencyKey \}\)/);
+});
+
+const phone = load('features/platform/lib/phone.ts');
+
+test('phones read as (718) 555-0199 and never get mangled', () => {
+  assert.equal(phone.formatPhone('7185550199'), '(718) 555-0199');
+  assert.equal(phone.formatPhone('+1 718-555-0199'), '(718) 555-0199');
+  assert.equal(phone.formatPhone('17185550199'), '(718) 555-0199');
+  assert.equal(phone.formatPhone('+44 20 7946 0958'), '+44 20 7946 0958', 'international kept as typed');
+  assert.equal(phone.formatPhone('555-0199'), '555-0199', 'partial kept as typed');
+  assert.equal(phone.formatPhone(null), '');
+});
+
+test('admin shows phones through the one helper', () => {
+  const files = {
+    'features/platform/customers/screens/CustomersPageClient.tsx': [/formatPhone\(customer\.phone\) \|\| customer\.email/, /formatPhone\(customer\.phone\) \|\| 'No phone'/],
+    'features/platform/booking/screens/BookingBoardPageClient.tsx': [/formatPhone\(appointment\.customer\?\.phone\)/],
+    'features/platform/booking/components/StaffBookingForm.tsx': [/formatPhone\(customer\.phone\)/],
+    'features/platform/queue/screens/QueuePageClient.tsx': [/formatPhone\(entry\.phone\)/],
+    'features/platform/barbershop/screens/WaitlistControls.tsx': [/>\{formatPhone\(entry\.phone\)\}<\/a>/],
+    'features/platform/inventory/screens/SuppliersPage.tsx': [/formatPhone\(supplier\.phone\)/, /\{formatPhone\(value\)\}<\/a>/],
+  };
+  for (const [file, patterns] of Object.entries(files)) for (const pattern of patterns) assert.match(read(file), pattern, file);
 });

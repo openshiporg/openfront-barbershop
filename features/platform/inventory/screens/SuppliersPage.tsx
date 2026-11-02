@@ -3,6 +3,7 @@ import { basePath } from '@/features/dashboard/lib/config';
 import { DataTable, Empty, Notice, PageHeader, PillLink, StatusCell, Td, type Tone } from '@/features/platform/lib/ui';
 import { getStockAction, getSuppliersAction } from '../actions/inventory';
 import { NewSupplierButton, ReceiveFromSupplierButton, SupplierActions } from '../components/InventoryControls';
+import { formatPhone } from '@/features/platform/lib/phone';
 
 const breadcrumbs = [
   { type: 'link' as const, label: 'Dashboard', href: basePath },
@@ -32,11 +33,11 @@ export default async function SuppliersPage() {
               <tr key={supplier.id} className="hover:bg-muted/30">
                 <Td className="align-middle">
                   <span className="block font-medium">{supplier.name}</span>
-                  <span className="block truncate text-xs text-muted-foreground md:hidden">{supplier.contactName || supplier.phone || supplier.email || 'No contact'}</span>
+                  <span className="block truncate text-xs text-muted-foreground md:hidden">{supplier.contactName || formatPhone(supplier.phone) || supplier.email || 'No contact'}</span>
                 </Td>
                 <Td className="hidden align-middle md:table-cell">
                   <span className="block">{supplier.contactName || <span className="text-muted-foreground">No contact</span>}</span>
-                  <span className="block text-xs text-muted-foreground">{[supplier.phone, supplier.email].filter(Boolean).map((value, index) => <span key={value}>{index ? ' · ' : ''}{value?.includes('@') ? <a className="underline-offset-4 hover:underline" href={`mailto:${value}`}>{value}</a> : <a className="underline-offset-4 hover:underline" href={`tel:${value}`}>{value}</a>}</span>)}</span>
+                  <span className="block text-xs text-muted-foreground">{[supplier.phone, supplier.email].filter(Boolean).map((value, index) => <span key={value}>{index ? ' · ' : ''}{value?.includes('@') ? <a className="underline-offset-4 hover:underline" href={`mailto:${value}`}>{value}</a> : <a className="underline-offset-4 hover:underline" href={`tel:${value}`}>{formatPhone(value)}</a>}</span>)}</span>
                 </Td>
                 <Td className="hidden align-middle text-right tabular-nums sm:table-cell">{supplier.inventoryLotsCount}</Td>
                 <Td className="hidden align-middle sm:table-cell"><StatusCell tone={tone(supplier.status)}>{STATUS[supplier.status] || supplier.status}</StatusCell></Td>

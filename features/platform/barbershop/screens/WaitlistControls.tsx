@@ -10,6 +10,7 @@ import { useCommandKey } from '@/features/platform/lib/useCommandKey';
 import { manageWaitlistAction } from '../actions/operations';
 import { Notice, Pill, selectClass as kitSelectClass, StatusCell } from '@/features/platform/lib/ui';
 import { zoneLabel } from '@/features/platform/staff/screens/WorkforceControls';
+import { formatPhone } from '@/features/platform/lib/phone';
 
 type Named = { id: string; name: string };
 type Entry = { id: string; status: string; customerName: string; phone?: string | null; preferredAt?: string | null; requestedService?: Named | null; requestedBarber?: Named | null };
@@ -74,7 +75,7 @@ export function WaitlistControls({ entries, services, barbers, timeZone }: { ent
       return <li key={entry.id} className="border-b px-3 py-2.5 text-sm last:border-b-0">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
-            <p className="font-medium">{entry.customerName}{entry.phone ? <a className="ml-2 text-xs font-normal tabular-nums text-muted-foreground underline-offset-4 hover:underline" href={`tel:${entry.phone}`}>{entry.phone}</a> : null}</p>
+            <p className="font-medium">{entry.customerName}{entry.phone ? <a className="ml-2 text-xs font-normal tabular-nums text-muted-foreground underline-offset-4 hover:underline" href={`tel:${entry.phone}`}>{formatPhone(entry.phone)}</a> : null}</p>
             <p className="text-xs text-muted-foreground">{entry.requestedService?.name || 'Any service'} · {entry.requestedBarber?.name || 'Any barber'}{entry.preferredAt ? ` · ${zone ? formatShopDateTime(entry.preferredAt, zone) : new Date(entry.preferredAt).toISOString()}` : ''}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">

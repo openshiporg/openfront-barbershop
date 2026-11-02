@@ -23,6 +23,7 @@ import {
   type AppointmentBoardItem,
   type AppointmentStatus,
 } from '../lib/appointmentTypes';
+import { formatPhone } from '@/features/platform/lib/phone';
 
 const minuteClock = (minute: number) => `${Math.floor(minute / 60) % 12 || 12}:${String(minute % 60).padStart(2, '0')}${Math.floor(minute / 60) >= 12 ? 'p' : 'a'}`;
 const hourLabel = (minute: number) => `${Math.floor(minute / 60) % 12 || 12}${Math.floor(minute / 60) >= 12 ? 'p' : 'a'}`;
@@ -256,7 +257,7 @@ export function BookingBoardPageClient({ data, breadcrumbs }: { data: BookingPro
           </td>
           <td className={cn(stack.td, 'max-md:order-first max-md:col-span-2')}>
             <p className={cn('font-medium', !closedVisit && 'text-foreground')}>{customerName(appointment.customer)}</p>
-            <p className="text-xs text-muted-foreground"><span className="md:hidden">{serviceLabel(appointment)} · {barberText}</span><span className="max-md:hidden">{appointment.customer?.phone || (appointment.source ? statusLabel(appointment.source) : '')}</span></p>
+            <p className="text-xs text-muted-foreground"><span className="md:hidden">{serviceLabel(appointment)} · {barberText}</span><span className="max-md:hidden">{formatPhone(appointment.customer?.phone) || (appointment.source ? statusLabel(appointment.source) : '')}</span></p>
             {appointment.customerNotes && <p className="mt-1 max-w-prose text-xs text-muted-foreground">{appointment.customerNotes}</p>}
           </td>
           <td className={cn(stack.td, stack.wide)}>

@@ -24,6 +24,7 @@ import {
   type MembershipPlanSummary,
 } from '../actions/customers';
 import { MergeCustomerButton } from '../components/MergeCustomerButton';
+import { formatPhone } from '@/features/platform/lib/phone';
 
 type RelationAccess = 'granted' | 'restricted';
 
@@ -141,7 +142,7 @@ export function CustomersPageClient({ data, search, planSearch, initialCustomerI
                     >
                       <span className="min-w-0">
                         <span className={cn('block truncate', isSelected ? 'font-semibold' : 'font-medium')}>{fullName(customer)}</span>
-                        <span className="block truncate text-xs text-muted-foreground">{customer.phone || customer.email || 'No contact'}{data.requestedCustomerId === customer.id ? ' · requested record' : ''}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{formatPhone(customer.phone) || customer.email || 'No contact'}{data.requestedCustomerId === customer.id ? ' · requested record' : ''}</span>
                       </span>
                       <span className="hidden sm:block"><StatusCell tone={customerTone[customer.status as CustomerStatus] || 'off'}><span className="capitalize">{statusLabel(customer.status)}</span></StatusCell></span>
                       <span className="text-right text-xs tabular-nums text-muted-foreground">{formatDay(customer.lastVisitAt, timeZone, '—')}</span>
@@ -331,7 +332,7 @@ function CustomerDetail({ customer, data, search, planSearch, merged }: { custom
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="text-xl font-semibold tracking-tight">{fullName(customer)}</h2>
-            <p className="text-sm text-muted-foreground">{customer.phone || 'No phone'} · {customer.email || 'No email'} · prefers {statusLabel(customer.preferredContactMethod)}</p>
+            <p className="text-sm text-muted-foreground">{formatPhone(customer.phone) || 'No phone'} · {customer.email || 'No email'} · prefers {statusLabel(customer.preferredContactMethod)}</p>
             {data.staffAccess === 'restricted'
               ? <p className="text-sm text-muted-foreground">Preferred barber restricted.</p>
               : customer.preferredBarber && <p className="text-sm">Preferred barber: <span className="font-medium">{customer.preferredBarber.displayName || 'Barber unavailable'}</span></p>}
