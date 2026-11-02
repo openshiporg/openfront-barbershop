@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import {
   AlertDialog,
@@ -25,12 +25,14 @@ export type { MergeCandidate };
  * current customer is the duplicate. The key is minted once per opened dialog so
  * a retried confirm replays instead of merging twice.
  */
-export function MergeCustomerButton({ customerName, current, candidates, timeZone, disabled, onConfirm }: {
+export function MergeCustomerButton({ customerName, current, candidates, timeZone, disabled, openSignal = 0, onConfirm }: {
   customerName: string;
   current: MergeCandidate;
   candidates: MergeCandidate[];
   timeZone: string;
   disabled?: boolean;
+  /** Each increase opens the dialog (the "Possible duplicate" hint uses this). */
+  openSignal?: number;
   onConfirm: (keepCustomerId: string, idempotencyKey: string) => void;
 }) {
   const labelId = useId();
@@ -38,10 +40,19 @@ export function MergeCustomerButton({ customerName, current, candidates, timeZon
   const [key, setKey] = useState('');
   const [keepId, setKeepId] = useState('');
   const [open, setOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const openDialog = (next: boolean) => {
+    if (next) { setKey(crypto.randomUUID()); setKeepId(''); setOpen(false); }
+    setDialogOpen(next);
+  };
+  useEffect(() => {
+    if (openSignal > 0 && candidates.length && !disabled) openDialog(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openSignal]);
   const keep = candidates.find((candidate) => candidate.id === keepId) || null;
   const everyone = [current, ...candidates];
   return (
-    <AlertDialog onOpenChange={(next) => { if (next) { setKey(crypto.randomUUID()); setKeepId(''); setOpen(false); } }}>
+    <AlertDialog open={dialogOpen} onOpenChange={openDialog}>
       <AlertDialogTrigger asChild>
         <Pill size="sm" disabled={disabled || !candidates.length} title={candidates.length ? undefined : 'Search so both records are listed, then merge.'}>Merge into…</Pill>
       </AlertDialogTrigger>

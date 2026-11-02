@@ -25,6 +25,7 @@ import {
 } from '../actions/customers';
 import { MergeCustomerButton, type MergeCandidate } from '../components/MergeCustomerButton';
 import { formatPhone } from '@/features/platform/lib/phone';
+import { emailKey, phoneKey } from '@/features/keystone/utils/customerDuplicates';
 
 type RelationAccess = 'granted' | 'restricted';
 
@@ -34,6 +35,7 @@ type CustomersPageClientProps = {
   planSearch: string;
   initialCustomerId: string;
   merged?: boolean;
+  openMerge?: boolean;
 };
 
 type Feedback = { tone: 'status' | 'alert'; text: string } | null;
@@ -103,7 +105,7 @@ function ViewAll({ href, label }: { href: string; label: string }) {
   return <Link href={href} className="text-xs font-medium text-primary underline-offset-4 hover:underline">{label}</Link>;
 }
 
-export function CustomersPageClient({ data, search, planSearch, initialCustomerId, merged }: CustomersPageClientProps) {
+export function CustomersPageClient({ data, search, planSearch, initialCustomerId, merged, openMerge }: CustomersPageClientProps) {
   const [selectedId, setSelectedId] = useState(initialCustomerId);
   const { customers, timeZone, page, pageSize, total } = data;
   // Never fall back to another customer when the selection disappears.
@@ -162,7 +164,7 @@ export function CustomersPageClient({ data, search, planSearch, initialCustomerI
 
         <section id="customer-detail" aria-label={selected ? `Customer details: ${fullName(selected)}` : 'Customer details'} className="min-w-0">
           {selected
-            ? <CustomerDetail key={selected.id} customer={selected} data={data} search={search} planSearch={planSearch} merged={merged && selected.id === initialCustomerId} />
+            ? <CustomerDetail key={selected.id} customer={selected} data={data} search={search} planSearch={planSearch} merged={merged && selected.id === initialCustomerId} openMerge={openMerge && selected.id === initialCustomerId} />
             : <div className="rounded-[6px] border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">{customers.length ? 'Choose a customer.' : 'No customer selected.'}</div>}
         </section>
       </div>
@@ -172,7 +174,7 @@ export function CustomersPageClient({ data, search, planSearch, initialCustomerI
 
 // Keyed by customer id: every draft below belongs to exactly this customer and is
 // discarded when the operator explicitly selects someone else.
-function CustomerDetail({ customer, data, search, planSearch, merged }: { customer: CustomerHistoryItem; data: CustomersProjectionData; search: string; planSearch: string; merged?: boolean }) {
+function CustomerDetail({ customer, data, search, planSearch, merged, openMerge }: { customer: CustomerHistoryItem; data: CustomersProjectionData; search: string; planSearch: string; merged?: boolean; openMerge?: boolean }) {
   const { timeZone, historyPreviewLimit: limit } = data;
   const notesAccess: RelationAccess = data.notesAccess === 'granted' ? 'granted' : 'restricted';
   const appointmentsAccess: RelationAccess = data.appointmentsAccess === 'granted' ? 'granted' : 'restricted';
@@ -272,6 +274,13 @@ function CustomerDetail({ customer, data, search, planSearch, merged }: { custom
   const router = useRouter();
   const asCandidate = (row: CustomerHistoryItem): MergeCandidate => ({ id: row.id, name: fullName(row), phone: row.phone, email: row.email, visits: row.appointmentsCount, lastVisitAt: row.lastVisitAt, createdAt: row.createdAt });
   const mergeCandidates = data.customers.filter((other) => other.id !== customer.id).map(asCandidate);
+  const [mergeSignal, setMergeSignal] = useState(openMerge ? 1 : 0);
+  const duplicate = customer.possibleDuplicate;
+  // When a matching record is already listed, the hint opens the dialog in place;
+  // otherwise it searches by what matched so both records are listed, then opens it.
+  const duplicateListed = Boolean(duplicate) && data.customers.some((other) => other.id !== customer.id && (
+    (phoneKey(customer.phone) && phoneKey(other.phone) === phoneKey(customer.phone)) || (emailKey(customer.email) && emailKey(other.email) === emailKey(customer.email))));
+  const duplicateHref = duplicate ? `/dashboard/platform/customers?${new URLSearchParams({ q: duplicate.search, customer: customer.id, merge: '1' }).toString()}` : '';
   const mergeInto = (keepCustomerId: string, idempotencyKey: string) => {
     setProfileFeedback(null);
     startTransition(async () => {
@@ -338,10 +347,18 @@ function CustomerDetail({ customer, data, search, planSearch, merged }: { custom
               ? <p className="text-sm text-muted-foreground">Preferred barber restricted.</p>
               : customer.preferredBarber && <p className="text-sm">Preferred barber: <span className="font-medium">{customer.preferredBarber.displayName || 'Barber unavailable'}</span></p>}
             <p className="text-sm text-muted-foreground">Last visit {formatDay(customer.lastVisitAt, timeZone, 'not recorded')}</p>
+            {duplicate && (
+              <p data-possible-duplicate className="text-sm text-muted-foreground">
+                Possible duplicate: {duplicate.count === 1 ? '1 other record shares' : `${duplicate.count} other records share`} this {duplicate.matchedOn}.{' '}
+                {duplicateListed
+                  ? <button type="button" onClick={() => setMergeSignal((value) => value + 1)} className="font-medium text-foreground underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Merge into…</button>
+                  : <Link href={duplicateHref} className="font-medium text-foreground underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Merge into…</Link>}
+              </p>
+            )}
           </div>
           <Track>
             <PillLink size="sm" href={`/dashboard/customers/${customer.id}`}>Edit profile</PillLink>
-            <MergeCustomerButton customerName={fullName(customer)} current={asCandidate(customer)} candidates={mergeCandidates} timeZone={timeZone} disabled={pending} onConfirm={mergeInto} />
+            <MergeCustomerButton customerName={fullName(customer)} current={asCandidate(customer)} candidates={mergeCandidates} timeZone={timeZone} openSignal={mergeSignal} disabled={pending} onConfirm={mergeInto} />
           </Track>
         </div>
         <div className="flex flex-wrap items-center gap-2">

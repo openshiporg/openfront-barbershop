@@ -162,3 +162,29 @@ test('merge choices with the same name and phone can be told apart', () => {
   const d = { ...a, id: 'd', phone: '7185550100' };
   assert.match(picker.candidateDetail(d, [a, d], tz), /^\(718\) 555-0100 · /, 'formatted phone shown when phones differ');
 });
+
+const dup = load('features/keystone/utils/customerDuplicates.ts');
+
+test('possible duplicate: another record with the same phone or email', () => {
+  const me = { id: 'a', phone: '(718) 555-0199', email: 'Guest@Example.com' };
+  assert.equal(dup.duplicateHint(me, [me]), null, 'itself is not a duplicate');
+  assert.equal(dup.duplicateHint(me, [{ id: 'b', phone: '2025550147', email: 'other@example.com' }]), null);
+  assert.deepEqual({ ...dup.duplicateHint(me, [{ id: 'b', phone: '+1 718 555 0199', email: '' }]) }, { count: 1, matchedOn: 'phone', search: '(718) 555-0199' });
+  assert.deepEqual({ ...dup.duplicateHint(me, [{ id: 'b', phone: '', email: ' guest@example.com ' }]) }, { count: 1, matchedOn: 'email', search: 'Guest@Example.com' });
+  const both = dup.duplicateHint(me, [{ id: 'b', phone: '7185550199', email: '' }, { id: 'c', phone: '', email: 'guest@example.com' }]);
+  assert.equal(both.count, 2);
+  assert.equal(both.matchedOn, 'phone and email');
+  assert.equal(dup.duplicateHint({ id: 'a', phone: '555', email: '' }, [{ id: 'b', phone: '555', email: '' }]), null, 'short numbers never match');
+  assert.equal(dup.duplicateCandidateWhere({ id: 'a', phone: '', email: '' }), null, 'no contact, no query');
+});
+
+test('the hint is plain text that leads to Merge into…', () => {
+  const page = read('features/platform/customers/screens/CustomersPageClient.tsx');
+  const hint = page.slice(page.indexOf('data-possible-duplicate'), page.indexOf('</p>', page.indexOf('data-possible-duplicate')));
+  assert.match(hint, /Possible duplicate:/);
+  assert.doesNotMatch(hint, /<(Tag|Badge|StatusCell|StatusDot)\b/, 'plain text, no badge');
+  assert.match(hint, /setMergeSignal\(\(value\) => value \+ 1\)/, 'opens the merge dialog in place');
+  assert.match(hint, /href=\{duplicateHref\}/, 'or lists both records first');
+  assert.match(page, /merge: '1'/);
+  assert.match(read('features/keystone/queries/getPlatformProjections.ts'), /possibleDuplicate: duplicates\[index\]/);
+});

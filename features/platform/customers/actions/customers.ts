@@ -61,6 +61,8 @@ export type CustomerHistoryItem = {
   createdAt?: string | null;
   /** Every appointment on the record; null without appointment authority. */
   appointmentsCount?: number | null;
+  /** Other records in the shop sharing this phone or email (staff hint, never auto-merged). */
+  possibleDuplicate?: { count: number; matchedOn: 'phone' | 'email' | 'phone and email'; search: string } | null;
   preferredBarber?: { id: string; displayName?: string | null; chairNumber?: string | null } | null;
   appointments?: CustomerAppointmentSummary[] | null;
   notes?: CustomerNoteSummary[] | null;

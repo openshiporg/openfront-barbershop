@@ -12,6 +12,7 @@ import { countProjectedServices, uncategorizedServiceWhere } from '../utils/serv
 import { getBookingEligibilityProjection } from '../utils/bookingPolicy';
 import { bookingEligibilityFromSnapshot } from '../../shared/public-booking-eligibility';
 import { paymentProviderSettlement } from '../utils/paymentProviderAdapter';
+import { duplicateCandidateWhere, duplicateHint } from '../utils/customerDuplicates';
 
 type QueryListApi = {
   findMany(args: { where: Record<string, unknown>; orderBy?: Array<Record<string, 'asc' | 'desc'>>; take?: number; query: string }): Promise<Array<Record<string, unknown>>>;
@@ -370,7 +371,7 @@ export async function getCustomersProjection(_root: unknown, args: { search?: st
   const requestedCustomer = requested[0] && !pageCustomers.some((customer) => customer.id === requested[0].id) ? requested[0] : null;
   const customers = requestedCustomer ? [requestedCustomer, ...pageCustomers] : pageCustomers;
   const statuses = ['active', 'vip', 'needs_attention', 'blocked'];
-  const [statusCounts, waiversByCustomer, relations, preferred, appointmentCounts] = await Promise.all([
+  const [statusCounts, waiversByCustomer, relations, preferred, appointmentCounts, duplicates] = await Promise.all([
     Promise.all(statuses.map(status => context.query.Customer.count({ where: { ...shopFilter, status: { equals: status } } }))),
     Promise.all(customers.map(customer => context.query.WaiverForm.findMany({ where: { ...shopFilter, customer: { id: { equals: customer.id } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: CUSTOMER_HISTORY_PREVIEW, query: 'id title waiverType status signedAt createdAt' }))),
     loadProtectedCustomerRelations(context, shopId, customers.map((customer) => customer.id), { planSearch: args.planSearch }),
@@ -379,6 +380,13 @@ export async function getCustomersProjection(_root: unknown, args: { search?: st
     sameShopAccess(context, 'canManageAppointments', shopId).then((access): Promise<Array<number | null>> | Array<number | null> => access === 'granted'
       ? Promise.all(customers.map((customer) => context.query.Appointment.count({ where: { ...shopFilter, customer: { id: { equals: customer.id } } } })))
       : customers.map(() => null)),
+    // Same-shop records sharing this phone or email: a staff hint only, never an automatic match.
+    Promise.all(customers.map(async (customer) => {
+      const where = duplicateCandidateWhere(customer);
+      if (!where) return null;
+      const others = await context.query.Customer.findMany({ where: { ...shopFilter, ...where }, take: 50, query: 'id phone email' });
+      return duplicateHint(customer, others as Array<{ id: string; phone?: string | null; email?: string | null }>);
+    })),
   ]);
   // Customer management does not imply note capability. Fresh, same-shop note
   // authority is established BEFORE any note read; the restricted branch issues
@@ -409,6 +417,7 @@ export async function getCustomersProjection(_root: unknown, args: { search?: st
         preferredBarber: preferred.staffAccess === 'granted' && preferredBarberId ? preferred.barbersById.get(preferredBarberId) ?? null : null,
         appointments: relations.appointmentsByCustomer[index],
         appointmentsCount: appointmentCounts[index],
+        possibleDuplicate: duplicates[index],
         transactions: relations.transactionsByCustomer[index],
         packageBalances: relations.balancesByCustomer[index],
       };

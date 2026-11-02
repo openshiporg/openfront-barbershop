@@ -57,6 +57,7 @@ export default async function CustomersPage({ searchParams }: PageProps) {
         search={search}
         planSearch={planSearch}
         merged={param(resolvedSearchParams.merged) === '1'}
+        openMerge={param(resolvedSearchParams.merge) === '1'}
         initialCustomerId={initialCustomerId}
       />
     </PageContainer>
