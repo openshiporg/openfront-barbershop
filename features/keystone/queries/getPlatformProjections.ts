@@ -227,6 +227,8 @@ export async function getBookingProjection(_root: unknown, args: { date?: string
   const page = Math.max(1, Math.floor(Number(args.page) || 1));
   const dayWhere = { shopId, startsAt: { gte: start, lt: end } };
   const listWhere = { ...dayWhere, ...(status ? { status: status as 'requested' } : {}) };
+  // Deposit money is separately governed: only payment managers see sessions and can refund.
+  const canRefund = (await currentShopForPermission(context.session, 'canManagePayments', context.prisma)) === shopId;
   const [appointments, matching, grouped, bookedValue, barbers, services] = await Promise.all([
     context.prisma.appointment.findMany({
       where: listWhere, orderBy: [{ startsAt: 'asc' }, { id: 'asc' }], skip: (page - 1) * BOOKING_PAGE_SIZE, take: BOOKING_PAGE_SIZE,
@@ -250,6 +252,21 @@ export async function getBookingProjection(_root: unknown, args: { date?: string
     } }),
     context.prisma.service.findMany({ where: { shopId, status: 'active' }, orderBy: [{ name: 'asc' }, { id: 'asc' }], select: { id: true, name: true, durationMinutes: true, price: true, depositRequired: true, specialists: { select: { id: true } } } }),
   ]);
+  // Processor deposit sessions for the listed visits, read only with payment authority.
+  const depositRows = canRefund && appointments.length
+    ? await context.prisma.paymentSession.findMany({
+      where: { shopId, appointmentId: { in: appointments.map((item) => item.id) }, status: { in: ['captured', 'partially_refunded', 'refunded'] }, transaction: { is: null } },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, appointmentId: true, status: true, amount: true, refundedAmount: true, paymentProvider: { select: { code: true } } },
+    })
+    : [];
+  const depositsByAppointment = new Map<string, Array<{ id: string; status: string | null; amount: number; refundedAmount: number | null; processor: boolean }>>();
+  for (const { appointmentId, paymentProvider, ...session } of depositRows) {
+    if (!appointmentId) continue;
+    const list = depositsByAppointment.get(appointmentId) || [];
+    list.push({ ...session, status: session.status ? String(session.status) : null, processor: paymentProvider ? paymentProviderSettlement(paymentProvider) === 'processor' : false });
+    depositsByAppointment.set(appointmentId, list);
+  }
   // On the floor that day: weekly hours for the weekday, no time off.
   const dayBarbers = barbers.map(({ schedules, scheduleExceptions, ...barber }) => ({
     ...barber,
@@ -263,7 +280,12 @@ export async function getBookingProjection(_root: unknown, args: { date?: string
   const total = BOOKING_STATUSES.reduce((sum, value) => sum + statusCounts[value], 0);
   return {
     timeZone, date: shopDateKey(start, timeZone), status, page, pageSize: BOOKING_PAGE_SIZE, matching,
-    appointments: appointments.map(({ bookingPolicySnapshot, ...appointment }) => ({ ...appointment, bookingEligibility: bookingEligibilityFromSnapshot(bookingPolicySnapshot) })),
+    canRefundDeposits: canRefund,
+    appointments: appointments.map(({ bookingPolicySnapshot, ...appointment }) => ({
+      ...appointment,
+      bookingEligibility: bookingEligibilityFromSnapshot(bookingPolicySnapshot),
+      depositSessions: canRefund ? depositsByAppointment.get(appointment.id) || [] : null,
+    })),
     barbers: dayBarbers,
     services: services.map(({ specialists, ...service }) => ({ ...service, specialistIds: specialists.map((item) => item.id) })),
     statusCounts,

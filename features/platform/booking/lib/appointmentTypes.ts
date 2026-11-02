@@ -1,4 +1,5 @@
 import type { PublicBookingEligibility } from '@/features/shared/public-booking-eligibility';
+import type { BoardDepositSession } from './depositRefund';
 
 export type AppointmentStatus =
   | 'requested'
@@ -64,6 +65,8 @@ export type AppointmentBoardItem = {
   customer?: AppointmentBoardCustomer | null;
   barber?: AppointmentBoardBarber | null;
   service?: AppointmentBoardService | null;
+  /** Processor deposit sessions; null when the viewer cannot manage payments. */
+  depositSessions?: BoardDepositSession[] | null;
 };
 
 export const appointmentStatusLabels: Record<AppointmentStatus, string> = {

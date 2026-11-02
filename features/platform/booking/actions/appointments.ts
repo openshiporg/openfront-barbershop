@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient';
+import type { DepositRefundResult } from '../lib/depositRefund';
 import type { AppointmentBoardBarber, AppointmentBoardItem, AppointmentStatus, BookingServiceOption } from '../lib/appointmentTypes';
 
 export type BookingProjectionData = {
@@ -16,6 +17,7 @@ export type BookingProjectionData = {
   services: BookingServiceOption[];
   statusCounts: Record<string, number>;
   metrics: { scheduled: number; inShop: number; activeFlow: number; bookedValue: number };
+  canRefundDeposits?: boolean;
 };
 
 export type BookingLoadResult =
@@ -131,6 +133,22 @@ export async function manageStaffAppointmentAction(input: { appointmentId: strin
     revalidatePath('/dashboard/appointments');
   }
   return result ?? { success: false, error: response.error || 'Unable to change this appointment.' };
+}
+
+export async function refundDepositAction(paymentSessionId: string, idempotencyKey: string): Promise<DepositRefundResult> {
+  if (!paymentSessionId || !idempotencyKey) return { success: false, error: 'Request key is missing. Reload and try again.' };
+  const response = await keystoneClient<{ refundAppointmentPaymentSession: DepositRefundResult }>(`
+    mutation RefundDeposit($id: ID!, $key: String!) {
+      refundAppointmentPaymentSession(paymentSessionId: $id, idempotencyKey: $key) { success error paymentSession { id status amount refundedAmount } }
+    }
+  `, { id: paymentSessionId, key: idempotencyKey });
+  const result = response.data?.refundAppointmentPaymentSession;
+  if (response.success && result?.success) {
+    revalidatePath('/dashboard/platform/booking');
+    revalidatePath('/dashboard/appointments');
+    revalidatePath('/dashboard/platform/payments');
+  }
+  return result ?? { success: false, error: response.error || 'Unable to refund this deposit.' };
 }
 
 export type CustomerMatch = { id: string; firstName?: string | null; lastName?: string | null; phone?: string | null; email?: string | null };

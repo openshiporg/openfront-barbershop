@@ -9,10 +9,12 @@ import { useLiveRefresh } from '@/features/platform/lib/useLiveRefresh';
 import { shopDateKey, shopMinute } from '@/features/shared/shop-time';
 import { cn } from '@/lib/utils';
 import { liveStamp, Notice, PageHeader, Pager, Pill, PillLink, Section, StatusCell, StatusTabs, Track, type Tone } from '@/features/platform/lib/ui';
-import { markAppointmentNoShowAction, updateAppointmentStatus, type BookingProjectionData, type ForwardAppointmentStatus } from '../actions/appointments';
+import { markAppointmentNoShowAction, refundDepositAction, updateAppointmentStatus, type BookingProjectionData, type ForwardAppointmentStatus } from '../actions/appointments';
 import { AppointmentChangeForm } from '../components/AppointmentChangeForm';
 import { ChairStrip, sinceLabel, stack, type ChairCell } from '../components/FloorKit';
 import { StaffBookingForm } from '../components/StaffBookingForm';
+import { RefundDepositButton } from '../components/RefundDepositButton';
+import { depositRefundFeedback, depositRefundState, refundableDeposit } from '../lib/depositRefund';
 import { appointmentNoShowFeedback, appointmentStatusFeedback, interruptedAppointmentActionMessage, type AppointmentActionResult } from '../lib/appointmentActionFeedback';
 import {
   appointmentStatusLabels,
@@ -137,6 +139,18 @@ export function BookingBoardPageClient({ data, breadcrumbs }: { data: BookingPro
   };
   const moveAppointment = (id: string, status: ForwardAppointmentStatus) => run(() => updateAppointmentStatus(id, status), (result) => appointmentStatusFeedback(result, id, status));
   const markNoShow = (id: string) => run(() => markAppointmentNoShowAction(id), (result) => appointmentNoShowFeedback(result, id));
+  const refundDeposit = (sessionId: string, key: string) => {
+    setMessage(null);
+    startTransition(async () => {
+      try {
+        const result = await refundDepositAction(sessionId, key);
+        setMessage({ tone: result.success ? 'status' : 'alert', text: depositRefundFeedback(result, sessionId, formatMoney) });
+        if (result.success) router.refresh();
+      } catch {
+        setMessage({ tone: 'alert', text: interruptedAppointmentActionMessage });
+      }
+    });
+  };
 
   const totalPages = Math.max(1, Math.ceil(data.matching / data.pageSize));
   const zone = zoneAbbreviation(timeZone);
@@ -230,6 +244,8 @@ export function BookingBoardPageClient({ data, breadcrumbs }: { data: BookingPro
     const currentBarber = appointment.barber?.displayName;
     const bookedBarber = appointment.barberNameSnapshot;
     const closedVisit = hasStatus(closedStatuses, status);
+    const refundable = data.canRefundDeposits ? refundableDeposit(appointment.depositSessions) : null;
+    const refundState = depositRefundState(appointment.depositSessions);
     const barberText = `${currentBarber || bookedBarber || 'No barber'}${bookedBarber && currentBarber && bookedBarber !== currentBarber ? ` (booked with ${bookedBarber})` : ''}`;
     return (
       <Fragment key={appointment.id}>
@@ -246,11 +262,17 @@ export function BookingBoardPageClient({ data, breadcrumbs }: { data: BookingPro
           <td className={cn(stack.td, stack.wide)}>
             <p>{serviceLabel(appointment)}</p>
             <p className="text-xs text-muted-foreground">{appointment.paymentStatus && appointment.paymentStatus !== 'not_required' ? statusLabel(appointment.paymentStatus) : appointment.source ? statusLabel(appointment.source) : ''}</p>
+            {refundState && <p className="text-xs font-medium text-foreground" data-refund-state={refundState.tone}>{refundState.tone === 'refunded' ? 'Deposit refunded' : 'Deposit partly refunded'} · {formatMoney(refundState.refunded)}</p>}
           </td>
           <td className={cn(stack.td, stack.wide)}>{barberText}</td>
           <td className={cn(stack.td, 'whitespace-nowrap max-md:text-right')}><StatusCell tone={appointmentTone[status] || 'off'}>{appointmentStatusLabels[status] || statusLabel(status)}</StatusCell></td>
           <td className={cn(stack.td, stack.wide, 'whitespace-nowrap text-right tabular-nums')}>{formatMoney(appointment.price ?? appointment.service?.price)}</td>
           <td className={cn(stack.td, stack.full, 'md:text-right')}>
+            {refundable && (
+              <div className={cn('flex flex-wrap gap-1.5 md:justify-end', !closedVisit && 'mb-1.5')}>
+                <RefundDepositButton amountLabel={formatMoney(refundable.remaining)} customer={customerName(appointment.customer)} disabled={pending} onConfirm={(key) => refundDeposit(refundable.id, key)} />
+              </div>
+            )}
             {!closedVisit && (
               <div className="flex flex-wrap gap-1.5 md:justify-end">
                 {action && <Pill size="sm" variant="primary" disabled={pending} onClick={() => moveAppointment(appointment.id, action.value)}>{action.label}</Pill>}
