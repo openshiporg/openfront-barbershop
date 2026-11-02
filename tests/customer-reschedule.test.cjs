@@ -40,4 +40,6 @@ test('reschedule and cancel stay behind review then confirm, through the existin
   assert.match(ui, /useSlots\(\{ serviceId: source\?\.serviceId/, 'times come from barber availability');
   const page = fs.readFileSync(path.join(root, 'features/storefront/screens/AppointmentStatusPage.tsx'), 'utf8');
   assert.match(page, /slotSource=\{/);
+  assert.match(ui, /slots\.slice\(0, 12\)/, 'long days start with twelve times');
+  assert.match(ui, /=== 1 \? 'time' : 'times'/, 'more-times count is pluralised');
 });

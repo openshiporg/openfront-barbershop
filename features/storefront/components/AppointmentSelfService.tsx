@@ -100,6 +100,9 @@ export function AppointmentSelfService(props: { timeZone: string; appointmentId:
   const [date, setDate] = useState(days.some((day) => day.key === visitDay) ? visitDay : days[0]?.key || '');
   const { loading, slots: barberSlots, error: slotError } = useSlots({ serviceId: source?.serviceId, durationMinutes: source?.durationMinutes, barberIds: source ? [source.barberId] : [], date: source ? date : '' });
   const slots = rescheduleSlots(barberSlots, source?.currentStartsAt);
+  const [showAll, setShowAll] = useState(false);
+  // Keep the chosen time visible even when it sits past the first twelve.
+  const shown = showAll || slots.findIndex((slot) => slot.startsAt === startsAt) >= 12 ? slots : slots.slice(0, 12);
   const zone = timeZoneName(props.timeZone);
 
   function nextInstant() {
@@ -152,7 +155,7 @@ export function AppointmentSelfService(props: { timeZone: string; appointmentId:
           <span>New time · {zone}</span>
           <div className="sf-days" role="group" aria-label="Day">
             {days.map((item) => (
-              <button key={item.key} type="button" className="sf-day" aria-pressed={item.key === date} aria-label={`${item.weekday} ${item.month} ${item.day}`} onClick={() => { setDate(item.key); setStartsAt(''); setReview(null); }}>
+              <button key={item.key} type="button" className="sf-day" aria-pressed={item.key === date} aria-label={`${item.weekday} ${item.month} ${item.day}`} onClick={() => { setDate(item.key); setStartsAt(''); setShowAll(false); setReview(null); }}>
                 <span>{item.weekday}</span><b>{item.day}</b>
               </button>
             ))}
@@ -160,8 +163,9 @@ export function AppointmentSelfService(props: { timeZone: string; appointmentId:
           <div className="sf-slot-list" role="group" aria-label="Open times" aria-busy={loading}>
             {loading ? <p role="status">Checking times…</p>
               : !slots.length ? <p role="status">{slotError || 'No open times with your barber that day. Try another day.'}</p>
-              : slots.map((slot) => <button key={slot.startsAt} type="button" className="sf-slot-line" aria-pressed={slot.startsAt === startsAt} onClick={() => { setStartsAt(slot.startsAt); setReview(null); }}>{slot.label}</button>)}
+              : shown.map((slot) => <button key={slot.startsAt} type="button" className="sf-slot-line" aria-pressed={slot.startsAt === startsAt} onClick={() => { setStartsAt(slot.startsAt); setReview(null); }}>{slot.label}</button>)}
           </div>
+          {!loading && shown.length < slots.length ? <button type="button" className="sf-btn is-quiet justify-self-start" onClick={() => setShowAll(true)}>{slots.length - shown.length} more {slots.length - shown.length === 1 ? 'time' : 'times'}</button> : null}
         </div>
       ) : (
         <label className="sf-field"><span>New time · {zone}</span><input className="sf-input sf-mono" type="datetime-local" value={startsAt} onChange={(event) => { setStartsAt(event.target.value); setReview(null); }} /></label>
