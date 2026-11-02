@@ -20,6 +20,7 @@ import { requireEffectiveBookingPolicy } from '../utils/bookingPolicy';
 import { resolvePublishedShop } from '../utils/publicShop';
 import { getWaiverRequirement } from '../utils/waiverEvidence';
 import { assertPublicServiceEligibility } from '../utils/publicServiceEligibility';
+import { resolveBookingCustomer, type AccountCustomerClient } from '../utils/accountCustomer';
 import { publicBookingEligibilityView } from '../../shared/public-booking-eligibility';
 
 type ServiceRecord = {
@@ -262,17 +263,15 @@ export async function createLockedAppointment({
 
   // Contact details are not authentication. Never attach a guest to an existing
   // customer/profile/package balance solely because they know a phone number.
+  // A signed-in account keeps one Customer per shop (see resolveBookingCustomer).
   const [firstName, ...rest] = customerName.split(/\s+/);
-  const customer = await transaction.customer.create({
-    data: {
-      shopId: service.shopId,
-      firstName: firstName || customerName,
-      lastName: rest.join(' '),
-      phone: customerPhone,
-      email: customerEmail,
-      status: 'active',
-    },
-  });
+  const customer = await resolveBookingCustomer(transaction as unknown as AccountCustomerClient, {
+    shopId: service.shopId,
+    firstName: firstName || customerName,
+    lastName: rest.join(' '),
+    phone: customerPhone,
+    email: customerEmail,
+  }, accountId);
 
   const appointment = await transaction.appointment.create({
     data: {
