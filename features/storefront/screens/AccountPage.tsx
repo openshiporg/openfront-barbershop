@@ -10,9 +10,10 @@ import { getPublicStorefrontSettings } from '../lib/data/settings';
 import { getAccountBalances } from '../lib/data/offers';
 import { formatMoney, paymentLabel, shopTodayStub, statusLabel } from '../lib/format';
 import { getStorefrontQueueSummary } from '../lib/data/queue';
+import { timeZoneName } from '../lib/reschedule';
 
 function bookingTime(startsAt: string, timeZone: string | null) {
-  return new Date(startsAt).toLocaleString('en-US', { ...(timeZone ? { timeZone } : {}), dateStyle: 'medium', timeStyle: 'short' }) + (timeZone ? ` (${timeZone})` : '');
+  return new Date(startsAt).toLocaleString('en-US', { ...(timeZone ? { timeZone } : {}), dateStyle: 'medium', timeStyle: 'short' }) + (timeZone ? ` · ${timeZoneName(timeZone)}` : '');
 }
 
 const bookingTone: Record<string, string> = { requested: 'is-wait', confirmed: 'is-accent', checked_in: 'is-live', in_chair: 'is-live', completed: '', cancelled: 'is-alert', no_show: 'is-alert' };

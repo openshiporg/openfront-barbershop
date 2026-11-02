@@ -8,6 +8,7 @@ import { confirmDeposit, getOnlineDepositsEnabled } from '../lib/data/deposits';
 import { PayDepositButton } from '../components/PayDepositButton';
 import { formatShopDateTime } from '../../shared/shop-time';
 import { formatMoney, paymentLabel, statusLabel } from '../lib/format';
+import { timeZoneName } from '../lib/reschedule';
 import { StorefrontShell } from './StorefrontShell';
 
 function customerName(customer?: PublicAppointmentCustomer | null) {
@@ -129,7 +130,7 @@ export default async function AppointmentStatusPage({
                   </ol>
                 )}
                 <dl className="sf-ledger">
-                  <div><dt>When</dt><dd className="sf-mono">{appointment.startsAt ? (timeZone ? `${formatShopDateTime(appointment.startsAt, timeZone)} (${timeZone})` : appointment.startsAt) : 'To be confirmed'}</dd></div>
+                  <div><dt>When</dt><dd className="sf-mono">{appointment.startsAt ? (timeZone ? `${formatShopDateTime(appointment.startsAt, timeZone)} · ${timeZoneName(timeZone)}` : appointment.startsAt) : 'To be confirmed'}</dd></div>
                   <div><dt>Barber</dt><dd>{appointment.barber?.displayName || 'To be assigned'}{appointment.barber?.chairNumber ? ` · Chair ${appointment.barber.chairNumber}` : ''}</dd></div>
                   <div><dt>Time in chair</dt><dd className="sf-mono">{receiptLine?.durationMinutes || appointment.durationMinutes ? `${receiptLine?.durationMinutes || appointment.durationMinutes} min` : '—'}</dd></div>
                   <div><dt>Price</dt><dd className="sf-mono">{formatMoney(receiptLine?.price ?? appointment.price)}</dd></div>
@@ -169,7 +170,13 @@ export default async function AppointmentStatusPage({
                   />
                 )}
                 {timeZone && ['requested', 'confirmed'].includes(appointment.status || '') && (
-                  <AppointmentSelfService timeZone={timeZone} appointmentId={appointment.id} />
+                  <AppointmentSelfService
+                    timeZone={timeZone}
+                    appointmentId={appointment.id}
+                    slotSource={appointment.service?.id && appointment.barber?.id && (receiptLine?.durationMinutes || appointment.durationMinutes)
+                      ? { serviceId: appointment.service.id, barberId: appointment.barber.id, durationMinutes: (receiptLine?.durationMinutes || appointment.durationMinutes)!, currentStartsAt: appointment.startsAt }
+                      : null}
+                  />
                 )}
 
                 {appointment.customer?.packageBalances?.length ? (

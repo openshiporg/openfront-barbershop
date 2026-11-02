@@ -1,8 +1,10 @@
 'use client';
 
-import { shopWallTime } from '../../shared/shop-time';
+import { formatShopDateTime, shopDateKey, shopWallTime } from '../../shared/shop-time';
 import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { shopDays, useSlots } from '../lib/use-slots';
+import { rescheduleSlots, timeZoneName } from '../lib/reschedule';
 import { managePublicAppointment, signPublicWaiver, type AppointmentChangeOutcome } from '../lib/data/public-appointments';
 import { formatMoney } from '../lib/format';
 
@@ -81,20 +83,33 @@ export function AppointmentWaiver(props: {
   );
 }
 
-export function AppointmentSelfService(props: { timeZone: string; appointmentId: string }) {
+type SlotSource = { serviceId: string; durationMinutes: number; barberId: string; currentStartsAt?: string | null };
+
+export function AppointmentSelfService(props: { timeZone: string; appointmentId: string; slotSource?: SlotSource | null }) {
   const router = useRouter();
   const intent = useIntentKey();
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
+  // Either a wall-clock "YYYY-MM-DDTHH:mm" from the fallback box, or an exact slot instant.
   const [startsAt, setStartsAt] = useState('');
   const [reason, setReason] = useState('');
   const [review, setReview] = useState<(AppointmentChangeOutcome & { action: 'cancel' | 'reschedule' }) | null>(null);
+  const source = props.slotSource;
+  const days = useMemo(() => shopDays(props.timeZone, 7), [props.timeZone]);
+  const visitDay = source?.currentStartsAt ? shopDateKey(new Date(source.currentStartsAt), props.timeZone) : '';
+  const [date, setDate] = useState(days.some((day) => day.key === visitDay) ? visitDay : days[0]?.key || '');
+  const { loading, slots: barberSlots, error: slotError } = useSlots({ serviceId: source?.serviceId, durationMinutes: source?.durationMinutes, barberIds: source ? [source.barberId] : [], date: source ? date : '' });
+  const slots = rescheduleSlots(barberSlots, source?.currentStartsAt);
+  const zone = timeZoneName(props.timeZone);
+
+  function nextInstant() {
+    if (!startsAt) return undefined;
+    if (startsAt.endsWith('Z')) return startsAt;
+    return shopWallTime(startsAt.slice(0, 10), Number(startsAt.slice(11, 13)) * 60 + Number(startsAt.slice(14, 16)), props.timeZone).toISOString();
+  }
 
   function request(action: 'cancel' | 'reschedule') {
-    let nextStartsAt: string | undefined;
-    if (action === 'reschedule') {
-      nextStartsAt = shopWallTime(startsAt.slice(0, 10), Number(startsAt.slice(11, 13)) * 60 + Number(startsAt.slice(14, 16)), props.timeZone).toISOString();
-    }
+    const nextStartsAt = action === 'reschedule' ? nextInstant() : undefined;
     return { appointmentId: props.appointmentId, action, startsAt: nextStartsAt, reason: reason.trim(), idempotencyKey: intent.keyFor(JSON.stringify({ action, nextStartsAt, reason: reason.trim() })) };
   }
 
@@ -132,7 +147,25 @@ export function AppointmentSelfService(props: { timeZone: string; appointmentId:
   return (
     <section className="sf-block" aria-labelledby="change-heading">
       <h2 id="change-heading" className="sf-subtitle">Change this visit</h2>
-      <label className="sf-field"><span>New time ({props.timeZone})</span><input className="sf-input sf-mono" type="datetime-local" value={startsAt} onChange={(event) => { setStartsAt(event.target.value); setReview(null); }} /></label>
+      {source ? (
+        <div className="sf-field">
+          <span>New time · {zone}</span>
+          <div className="sf-days" role="group" aria-label="Day">
+            {days.map((item) => (
+              <button key={item.key} type="button" className="sf-day" aria-pressed={item.key === date} aria-label={`${item.weekday} ${item.month} ${item.day}`} onClick={() => { setDate(item.key); setStartsAt(''); setReview(null); }}>
+                <span>{item.weekday}</span><b>{item.day}</b>
+              </button>
+            ))}
+          </div>
+          <div className="sf-slot-list" role="group" aria-label="Open times" aria-busy={loading}>
+            {loading ? <p role="status">Checking times…</p>
+              : !slots.length ? <p role="status">{slotError || 'No open times with your barber that day. Try another day.'}</p>
+              : slots.map((slot) => <button key={slot.startsAt} type="button" className="sf-slot-line" aria-pressed={slot.startsAt === startsAt} onClick={() => { setStartsAt(slot.startsAt); setReview(null); }}>{slot.label}</button>)}
+          </div>
+        </div>
+      ) : (
+        <label className="sf-field"><span>New time · {zone}</span><input className="sf-input sf-mono" type="datetime-local" value={startsAt} onChange={(event) => { setStartsAt(event.target.value); setReview(null); }} /></label>
+      )}
       <label className="sf-field"><span>Reason (required)</span><input className="sf-input" value={reason} required minLength={2} maxLength={1000} onChange={(event) => { setReason(event.target.value); setReview(null); }} /></label>
       {!review ? (
         <div className="sf-actions">
@@ -143,6 +176,7 @@ export function AppointmentSelfService(props: { timeZone: string; appointmentId:
         <div className="sf-card-dark sf-on-dark" role="status">
           <p className="sf-subtitle">{review.action === 'cancel' ? 'Cancel this appointment?' : 'Move this appointment?'}</p>
           <dl className="sf-ledger">
+            {review.action === 'reschedule' && nextInstant() ? <div><dt>New time</dt><dd className="sf-mono">{formatShopDateTime(nextInstant()!, props.timeZone)}</dd></div> : null}
             <div><dt>Change fee</dt><dd className="sf-mono">{review.feeAmount ? formatMoney(review.feeAmount) : 'None'}</dd></div>
             {depositMessage(review.depositConsequence) ? <div><dt>Deposit</dt><dd>{depositMessage(review.depositConsequence)}</dd></div> : null}
             {review.policyName ? <div><dt>Policy</dt><dd>{review.policyName}{review.policyVersion ? ` · v${review.policyVersion}` : ''}</dd></div> : null}
