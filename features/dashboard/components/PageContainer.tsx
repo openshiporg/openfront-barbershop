@@ -15,6 +15,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { MessagesSquare, Sparkles } from 'lucide-react'
+import { AssistantHeaderButton } from './AssistantHeaderButton'
 
 interface BreadcrumbItem {
   type: 'link' | 'page'
@@ -59,7 +60,7 @@ export function PageContainer({ children, title, header, breadcrumbs }: PageCont
             </Breadcrumb>
           )}
         </div>
-        
+        <AssistantHeaderButton className="mr-4" />
       </header>
 
       {/* Page header section */}
