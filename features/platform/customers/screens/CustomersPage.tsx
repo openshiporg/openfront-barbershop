@@ -48,14 +48,16 @@ export default async function CustomersPage({ searchParams }: PageProps) {
   }
 
   const data = response.data;
+  const initialCustomerId = data.requestedCustomerId || (customerId && data.customers.some((customer) => customer.id === customerId) ? customerId : data.customers[0]?.id || '');
   return (
     <PageContainer title="Customers" header={customersHeader} breadcrumbs={breadcrumbs}>
       <CustomersPageClient
+        key={initialCustomerId}
         data={data}
         search={search}
         planSearch={planSearch}
         merged={param(resolvedSearchParams.merged) === '1'}
-        initialCustomerId={data.requestedCustomerId || (customerId && data.customers.some((customer) => customer.id === customerId) ? customerId : data.customers[0]?.id || '')}
+        initialCustomerId={initialCustomerId}
       />
     </PageContainer>
   );
