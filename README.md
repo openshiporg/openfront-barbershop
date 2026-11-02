@@ -229,7 +229,7 @@ Use the development commands above when preparing changes. Keep model changes an
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+No top-level license file or package license declaration is included in this repository.
 
 ## Support
 
