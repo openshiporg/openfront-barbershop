@@ -52,7 +52,7 @@ export function QuickBook({ services, barbers, timeZone, onlineDeposits, layout 
   return (
     <section className={`sf-quick ${layout === 'sections' ? 'is-sections' : ''}`} aria-label="Book a haircut">
       <fieldset className="sf-quick-step">
-        <legend><span className="sf-quick-ico" aria-hidden="true"><Scissors /></span>Service</legend>
+        <legend><span className="sf-quick-ico" aria-hidden="true"><Scissors /></span>Service{bookable.length > 3 ? <Link href="/services" className="sf-quick-more">All {bookable.length} services</Link> : null}</legend>
         <div className="sf-quick-services">
           {bookable.slice(0, 3).map((item) => (
             <button key={item.id} type="button" className="sf-quick-service" aria-pressed={item.id === serviceId} onClick={() => chooseService(item.id)}>
@@ -63,7 +63,6 @@ export function QuickBook({ services, barbers, timeZone, onlineDeposits, layout 
             </button>
           ))}
         </div>
-        {bookable.length > 3 ? <Link href="/services" className="sf-quick-more">All {bookable.length} services</Link> : null}
       </fieldset>
 
       <fieldset className="sf-quick-step">

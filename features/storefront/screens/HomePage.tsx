@@ -77,7 +77,7 @@ export default async function HomePage() {
           {state || today || settings.address ? (
             <p className="sf-hero-note">
               {state ? <span className="sf-hero-note-big">{state.label}</span> : null}
-              <span className="sf-hero-note-small">{settings.address || (today ? `Today ${today.text}` : '')}</span>
+              <span className="sf-hero-note-small">{settings.tagline ? settings.address || (today ? `Today ${today.text}` : '') : today ? `Today ${today.text}` : settings.address}</span>
             </p>
           ) : null}
 
