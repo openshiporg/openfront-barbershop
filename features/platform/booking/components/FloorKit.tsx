@@ -96,7 +96,7 @@ export function Segmented<T extends string>({ label, value, options, onChange, s
             )}
           >
             <span>{option.label}</span>
-            {option.hint ? <span className={cn('text-[11px] font-normal', checked && size === 'lg' ? 'text-background/70' : 'text-muted-foreground')}>{option.hint}</span> : null}
+            {option.hint ? <span className={cn('text-xs font-normal', checked && size === 'lg' ? 'text-background/70' : 'text-muted-foreground')}>{option.hint}</span> : null}
           </button>
         );
       })}

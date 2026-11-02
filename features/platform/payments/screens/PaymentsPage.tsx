@@ -100,7 +100,7 @@ export default async function PaymentsPage() {
             <div className="mt-2 space-y-3">
               <p className="text-xs text-muted-foreground">
                 <StatusDot tone={data.stripeKeyConfigured ? 'live' : 'off'} />
-                Stripe secret key on the server: {data.stripeKeyConfigured ? 'set' : <>not set (<code className="text-[11px]">STRIPE_SECRET_KEY</code>)</>}
+                Stripe secret key on the server: {data.stripeKeyConfigured ? 'set' : <>not set (<code className="text-xs">STRIPE_SECRET_KEY</code>)</>}
               </p>
               {!data.providers.length ? <Empty>No payment providers yet.</Empty> : (
                 <DataTable label="Payment providers" head={[{ label: 'Provider' }, { label: 'Used for', className: 'max-sm:hidden' }, { label: 'Status' }, { label: 'Payments', className: 'text-right' }, { label: <span className="sr-only">Actions</span>, className: 'text-right' }]} className="relative">
@@ -108,7 +108,7 @@ export default async function PaymentsPage() {
                     <tr key={provider.id}>
                       <Td>
                         <p className="font-medium">{provider.name}</p>
-                        <p className="text-[11px] text-muted-foreground"><code>{provider.code}</code></p>
+                        <p className="text-xs text-muted-foreground"><code>{provider.code}</code></p>
                       </Td>
                       <Td className="text-muted-foreground max-sm:hidden">{PROVIDER_ROLE[provider.code] || 'Other payments'}</Td>
                       <Td><StatusCell tone={provider.isInstalled ? 'live' : 'off'}>{provider.isInstalled ? 'On' : 'Off'}</StatusCell></Td>

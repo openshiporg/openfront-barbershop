@@ -138,7 +138,7 @@ export default async function StaffPage() {
                         return (
                           <td key={day.day} className={cn(tdClass, 'hidden whitespace-nowrap px-1.5 text-center align-middle tabular-nums lg:table-cell', day.today && 'bg-muted/40', !working && 'text-muted-foreground')}>
                             {working ? <span className={cn('block text-[13px] leading-tight', exception?.exceptionType === 'time_off' || exception?.exceptionType === 'shop_closure' ? 'text-muted-foreground line-through' : '')}><span className="block">{clock(schedule?.startMinute)}</span><span className="sr-only"> to </span><span className="block">{clock(schedule?.endMinute)}</span></span> : <span className="block text-[13px]">{schedule ? 'Off' : '—'}</span>}
-                            {exception ? <span className="mt-0.5 inline-flex h-5 items-center rounded-[4px] border border-amber-300 bg-amber-50 px-1.5 text-[11px] font-medium text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{EXCEPTION[exception.exceptionType] || exception.exceptionType.replaceAll('_', ' ')}</span> : null}
+                            {exception ? <span className="mt-0.5 inline-flex h-5 items-center rounded-[4px] border border-amber-300 bg-amber-50 px-1.5 text-xs font-medium text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{EXCEPTION[exception.exceptionType] || exception.exceptionType.replaceAll('_', ' ')}</span> : null}
                           </td>
                         );
                       })}

@@ -136,7 +136,7 @@ export function QueuePageClient({ data, breadcrumbs }: { data: QueueProjectionDa
           </td>
           <td className={stack.td}>
             <p className="font-medium">
-              {next ? <span className="mr-2 inline-flex h-5 items-center rounded-[4px] bg-foreground px-1.5 text-[11px] font-semibold text-background">Next</span> : null}
+              {next ? <span className="mr-2 inline-flex h-5 items-center rounded-[4px] bg-foreground px-1.5 text-xs font-semibold text-background">Next</span> : null}
               {entry.customerName || 'Guest'}
               {(entry.partySize || 1) > 1 ? <span className="ml-1.5 text-xs font-normal tabular-nums text-muted-foreground">party of {entry.partySize}</span> : null}
             </p>

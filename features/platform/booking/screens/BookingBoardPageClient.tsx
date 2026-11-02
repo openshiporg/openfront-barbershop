@@ -360,7 +360,7 @@ export function BookingBoardPageClient({ data, breadcrumbs }: { data: BookingPro
                   <div key={lane.key} className="flex h-12 border-b last:border-b-0">
                     <div className="flex w-36 shrink-0 flex-col justify-center border-r px-3">
                       <span className="truncate text-sm font-medium">{lane.label}</span>
-                      {lane.chair ? <span className="text-[11px] tabular-nums text-muted-foreground">Chair {lane.chair}</span> : null}
+                      {lane.chair ? <span className="text-xs tabular-nums text-muted-foreground">Chair {lane.chair}</span> : null}
                     </div>
                     <div className="relative flex-1">
                       {hours.slice(1, -1).map((minute) => <span key={minute} aria-hidden="true" className="absolute inset-y-0 w-px bg-border/70" style={{ left: pct(minute) }} />)}

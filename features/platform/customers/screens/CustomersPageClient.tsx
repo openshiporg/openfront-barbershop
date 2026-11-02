@@ -112,7 +112,7 @@ export function CustomersPageClient({ data, search, planSearch, initialCustomerI
         {planSearch && <input type="hidden" name="plans" value={planSearch} />}
         <label htmlFor="customer-search" className="sr-only">Find a customer</label>
         <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <input id="customer-search" name="q" type="search" defaultValue={search} placeholder="Find a customer by name, phone or email" className="h-10 w-full rounded-[6px] border bg-background pl-9 pr-16 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+        <input id="customer-search" name="q" type="search" defaultValue={search} placeholder="Name, phone or email" className="h-10 w-full rounded-[6px] border bg-background pl-9 pr-16 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
         {search && <Link href="/dashboard/platform/customers" className="absolute right-1.5 top-1/2 inline-flex h-7 -translate-y-1/2 items-center rounded-[6px] px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Clear</Link>}
       </form>
 

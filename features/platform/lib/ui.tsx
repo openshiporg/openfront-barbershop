@@ -119,7 +119,7 @@ export function Restricted({ children }: { children: ReactNode }) {
 export const selectClass = 'h-9 w-full min-w-0 rounded-[6px] border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50';
 
 export function Tag({ children, tone }: { children: ReactNode; tone?: Tone }) {
-  return <span className="inline-flex h-5 items-center rounded-[4px] border bg-muted/40 px-1.5 text-[11px] font-medium capitalize text-foreground">{tone ? <StatusDot tone={tone} className="mr-1.5 size-1.5 align-[0.15em]" /> : null}{children}</span>;
+  return <span className="inline-flex h-5 items-center rounded-[4px] border bg-muted/40 px-1.5 text-xs font-medium capitalize text-foreground">{tone ? <StatusDot tone={tone} className="mr-1.5 size-1.5 align-[0.15em]" /> : null}{children}</span>;
 }
 
 export function Pager({ page, pages, prev, next, label }: { page: number; pages: number; prev?: string | null; next?: string | null; label: string }) {
@@ -144,8 +144,8 @@ export function liveStamp(at: Date, timeZone?: string | null) {
 /** Status filters as flat underline tabs. Server-safe: takes plain data and a href builder. */
 export function StatusTabs({ tabs, current, hrefFor, label = 'Status' }: { tabs: Array<{ value: string; label: string; count?: number; tone?: Tone }>; current: string; hrefFor: (value: string) => string; label?: string }) {
   return (
-    <nav aria-label={label} className="relative -mx-4 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:px-0">
-      <div className="flex min-w-max items-end gap-5 border-b">
+    <nav aria-label={label} className="relative md:-mx-0">
+      <div className="flex flex-wrap items-end gap-x-5 border-b">
         {tabs.map((tab) => {
           const active = tab.value === current;
           return (
