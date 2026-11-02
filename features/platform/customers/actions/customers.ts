@@ -58,6 +58,9 @@ export type CustomerHistoryItem = {
   preferredContactMethod?: string | null;
   acceptsMarketing?: boolean | null;
   lastVisitAt?: string | null;
+  createdAt?: string | null;
+  /** Every appointment on the record; null without appointment authority. */
+  appointmentsCount?: number | null;
   preferredBarber?: { id: string; displayName?: string | null; chairNumber?: string | null } | null;
   appointments?: CustomerAppointmentSummary[] | null;
   notes?: CustomerNoteSummary[] | null;

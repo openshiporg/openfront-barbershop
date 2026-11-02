@@ -116,12 +116,16 @@ test('staff merge is behind a confirm step with one key per dialog', () => {
   const ui = read('features/platform/customers/components/MergeCustomerButton.tsx');
   assert.match(ui, /Merge into…/);
   assert.match(ui, /AlertDialogAction disabled=\{!keep\}/, 'nothing merges until a record to keep is chosen');
-  assert.match(ui, /if \(open\) \{ setKey\(crypto\.randomUUID\(\)\)/);
+  assert.doesNotMatch(ui, /<select/, 'no native select: the Keep picker is a popover of rows');
+  assert.match(ui, /<Popover open=\{open\}/);
+  assert.match(ui, /role="option"/);
+  assert.match(ui, /if \(next\) \{ setKey\(crypto\.randomUUID\(\)\)/);
   const page = read('features/platform/customers/screens/CustomersPageClient.tsx');
   assert.match(page, /mergeCustomersAction\(\{ keepCustomerId, duplicateCustomerId: customer\.id, idempotencyKey \}\)/);
 });
 
 const phone = load('features/platform/lib/phone.ts');
+const picker = load('features/platform/customers/lib/mergeCandidates.ts', { '../../lib/phone': phone });
 
 test('phones read as (718) 555-0199 and never get mangled', () => {
   assert.equal(phone.formatPhone('7185550199'), '(718) 555-0199');
@@ -142,4 +146,19 @@ test('admin shows phones through the one helper', () => {
     'features/platform/inventory/screens/SuppliersPage.tsx': [/formatPhone\(supplier\.phone\)/, /\{formatPhone\(value\)\}<\/a>/],
   };
   for (const [file, patterns] of Object.entries(files)) for (const pattern of patterns) assert.match(read(file), pattern, file);
+});
+
+test('merge choices with the same name and phone can be told apart', () => {
+  const a = { id: 'a', name: 'QA Test Customer', phone: '7185550199', email: 'one@example.com', visits: 1, lastVisitAt: null, createdAt: '2026-11-01T15:00:00.000Z' };
+  const b = { id: 'b', name: 'QA Test Customer', phone: '7185550199', email: 'one@example.com', visits: 3, lastVisitAt: '2026-11-06T15:00:00.000Z', createdAt: '2026-10-20T15:00:00.000Z' };
+  const tz = 'America/New_York';
+  const da = picker.candidateDetail(a, [a, b], tz);
+  const db = picker.candidateDetail(b, [a, b], tz);
+  assert.notEqual(da, db);
+  assert.equal(da, '1 visit · added Nov 1, 2026');
+  assert.equal(db, '3 visits · last visit Nov 6, 2026');
+  const c = { ...b, id: 'c', email: 'two@example.com' };
+  assert.match(picker.candidateDetail(c, [a, c], tz), /^two@example\.com · /, 'email shown when emails differ');
+  const d = { ...a, id: 'd', phone: '7185550100' };
+  assert.match(picker.candidateDetail(d, [a, d], tz), /^\(718\) 555-0100 · /, 'formatted phone shown when phones differ');
 });

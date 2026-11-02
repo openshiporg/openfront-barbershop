@@ -23,7 +23,7 @@ import {
   type CustomersProjectionData,
   type MembershipPlanSummary,
 } from '../actions/customers';
-import { MergeCustomerButton } from '../components/MergeCustomerButton';
+import { MergeCustomerButton, type MergeCandidate } from '../components/MergeCustomerButton';
 import { formatPhone } from '@/features/platform/lib/phone';
 
 type RelationAccess = 'granted' | 'restricted';
@@ -270,7 +270,8 @@ function CustomerDetail({ customer, data, search, planSearch, merged }: { custom
   };
 
   const router = useRouter();
-  const mergeCandidates = data.customers.filter((other) => other.id !== customer.id).map((other) => ({ id: other.id, name: fullName(other), contact: other.phone || other.email || '' }));
+  const asCandidate = (row: CustomerHistoryItem): MergeCandidate => ({ id: row.id, name: fullName(row), phone: row.phone, email: row.email, visits: row.appointmentsCount, lastVisitAt: row.lastVisitAt, createdAt: row.createdAt });
+  const mergeCandidates = data.customers.filter((other) => other.id !== customer.id).map(asCandidate);
   const mergeInto = (keepCustomerId: string, idempotencyKey: string) => {
     setProfileFeedback(null);
     startTransition(async () => {
@@ -340,7 +341,7 @@ function CustomerDetail({ customer, data, search, planSearch, merged }: { custom
           </div>
           <Track>
             <PillLink size="sm" href={`/dashboard/customers/${customer.id}`}>Edit profile</PillLink>
-            <MergeCustomerButton customerName={fullName(customer)} candidates={mergeCandidates} disabled={pending} onConfirm={mergeInto} />
+            <MergeCustomerButton customerName={fullName(customer)} current={asCandidate(customer)} candidates={mergeCandidates} timeZone={timeZone} disabled={pending} onConfirm={mergeInto} />
           </Track>
         </div>
         <div className="flex flex-wrap items-center gap-2">

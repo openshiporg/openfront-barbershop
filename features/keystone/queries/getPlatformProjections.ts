@@ -351,7 +351,7 @@ export async function getCustomersProjection(_root: unknown, args: { search?: st
   const isOwner = await hasCurrentOwnerMembership(context.session, shopId, context.prisma);
   const shopFilter = { shop: { id: { equals: shopId } } };
   const timeZone = await shopTimeZone(context.prisma, shopId);
-  const customerSelection = 'id firstName lastName phone email status preferredContactMethod acceptsMarketing lastVisitAt preferredBarber { id }';
+  const customerSelection = 'id firstName lastName phone email status preferredContactMethod acceptsMarketing lastVisitAt createdAt preferredBarber { id }';
   const directoryWhere = { ...shopFilter, ...(search ? { OR: [
     { firstName: { contains: search, mode: 'insensitive' } }, { lastName: { contains: search, mode: 'insensitive' } },
     { phone: { contains: search, mode: 'insensitive' } }, { email: { contains: search, mode: 'insensitive' } },
@@ -370,11 +370,15 @@ export async function getCustomersProjection(_root: unknown, args: { search?: st
   const requestedCustomer = requested[0] && !pageCustomers.some((customer) => customer.id === requested[0].id) ? requested[0] : null;
   const customers = requestedCustomer ? [requestedCustomer, ...pageCustomers] : pageCustomers;
   const statuses = ['active', 'vip', 'needs_attention', 'blocked'];
-  const [statusCounts, waiversByCustomer, relations, preferred] = await Promise.all([
+  const [statusCounts, waiversByCustomer, relations, preferred, appointmentCounts] = await Promise.all([
     Promise.all(statuses.map(status => context.query.Customer.count({ where: { ...shopFilter, status: { equals: status } } }))),
     Promise.all(customers.map(customer => context.query.WaiverForm.findMany({ where: { ...shopFilter, customer: { id: { equals: customer.id } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: CUSTOMER_HISTORY_PREVIEW, query: 'id title waiverType status signedAt createdAt' }))),
     loadProtectedCustomerRelations(context, shopId, customers.map((customer) => customer.id), { planSearch: args.planSearch }),
     loadPreferredBarbers(context, shopId, customers.map((customer) => customer.preferredBarber?.id)),
+    // Full visit counts (the history preview is capped), only with appointment authority.
+    sameShopAccess(context, 'canManageAppointments', shopId).then((access): Promise<Array<number | null>> | Array<number | null> => access === 'granted'
+      ? Promise.all(customers.map((customer) => context.query.Appointment.count({ where: { ...shopFilter, customer: { id: { equals: customer.id } } } })))
+      : customers.map(() => null)),
   ]);
   // Customer management does not imply note capability. Fresh, same-shop note
   // authority is established BEFORE any note read; the restricted branch issues
@@ -404,6 +408,7 @@ export async function getCustomersProjection(_root: unknown, args: { search?: st
         ...record, waivers, notes: notesByCustomer[index],
         preferredBarber: preferred.staffAccess === 'granted' && preferredBarberId ? preferred.barbersById.get(preferredBarberId) ?? null : null,
         appointments: relations.appointmentsByCustomer[index],
+        appointmentsCount: appointmentCounts[index],
         transactions: relations.transactionsByCustomer[index],
         packageBalances: relations.balancesByCustomer[index],
       };
