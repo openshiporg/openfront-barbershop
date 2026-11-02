@@ -915,16 +915,14 @@ html:has([data-storefront]) body { overflow-x: clip; background: oklch(93.6% 0.0
   [data-storefront] .sf-quick-head svg { width: 1.15rem; height: 1.15rem; color: var(--ink); }
 
   /* ---- Phone home at the mock's proportions (measured at 402): one screen shows hero → featured above the tab bar. ---- */
-  /* Slim top row: the wordmark lives in the hero, so home keeps only Book and the menu. */
+  /* Slim top row: the shop's icon and name stay beside Book and the menu on home too. */
   [data-storefront] .sf-nav { padding: 0.25rem 0.5rem 0; }
   [data-storefront] .sf-nav-bar { min-height: 2.75rem; padding: 0 0.1rem 0 0.7rem; border-radius: 0.7rem; }
   [data-storefront] .sf-brand-name { font-size: 1.05rem; }
   [data-storefront] .sf-nav-book { min-height: 2.25rem; padding-inline: 0.9rem; font-size: 0.95rem; }
-  [data-storefront]:has(.sf-home) .sf-nav-bar { background: transparent; box-shadow: none; backdrop-filter: none; }
-  [data-storefront]:has(.sf-home) .sf-brand { visibility: hidden; }
   [data-storefront]:has(.sf-home) .sf-nav-book, [data-storefront]:has(.sf-home) .sf-nav-toggle { box-shadow: 0 4px 12px -6px oklch(25% 0.02 50 / 0.45); }
   [data-storefront]:has(.sf-home) .sf-nav-toggle { background: oklch(96% 0.004 85 / 0.92); }
-  [data-storefront]:has(.sf-home) .sf-nav { height: 0; padding-top: 0.4rem; }
+  [data-storefront]:has(.sf-home) .sf-nav { padding-top: 0.4rem; }
   [data-storefront] .sf-home { gap: 0.85rem; padding-top: 0.5rem; }
 
   /* Hero: wordmark left, torn photo right, tape under the wordmark. */
