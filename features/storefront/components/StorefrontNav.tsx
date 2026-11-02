@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { phoneHref, type PublicStorefrontSettings } from '@/features/shared/storefront-settings';
 import type { ShopOpenState } from '../lib/hours';
-import { StoreLogo } from './StoreLogo';
+import { StoreMark } from './StoreMark';
 
 const items = [
   { href: '/shop', label: 'Shop' },
@@ -49,7 +49,7 @@ export function StorefrontNav({ settings, openState }: { settings: PublicStorefr
           </nav>
 
           <Link href="/" className="sf-brand" aria-label={`${settings.name} home`} onClick={() => setOpen(false)}>
-            <StoreLogo svg={settings.logoIcon} color={settings.logoColor} />
+            <StoreMark svg={settings.logoIcon} color={settings.logoColor} />
             <span className="sf-brand-name">{settings.name}</span>
           </Link>
 

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { StoreLogo } from './StoreLogo';
+import { StoreMark } from './StoreMark';
 import { phoneHref, type PublicStorefrontSettings } from '@/features/shared/storefront-settings';
 
 export function StorefrontFooter({ settings }: { settings: PublicStorefrontSettings }) {
@@ -9,7 +9,7 @@ export function StorefrontFooter({ settings }: { settings: PublicStorefrontSetti
     <footer className="sf-footer sf-on-dark">
       <div className="sf-container sf-footer-main">
         <div className="grid gap-4">
-          <p className="sf-footer-mark"><StoreLogo svg={settings.logoIcon} color={settings.logoColor} />{settings.name}</p>
+          <p className="sf-footer-mark"><StoreMark svg={settings.logoIcon} color={settings.logoColor} />{settings.name}</p>
           {settings.tagline ? <p className="sf-muted max-w-md">{settings.tagline}</p> : null}
         </div>
         <nav className="sf-footer-nav" aria-label="Storefront links">
