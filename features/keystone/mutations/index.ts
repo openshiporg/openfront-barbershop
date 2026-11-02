@@ -32,7 +32,7 @@ import markAppointmentNoShow from "./markAppointmentNoShow";
 import { createCommissionPayout, transitionCommission } from "./manageCommissions";
 import { recordProductSale, returnProductSaleLine } from "./manageProductSales";
 import reconcilePaymentSession from "./reconcilePaymentSession";
-import { addCustomerNote, issueCustomerWaiver, setCustomerConsent, setCustomerStatus } from "./manageCustomers";
+import { addCustomerNote, issueCustomerWaiver, mergeCustomers, setCustomerConsent, setCustomerStatus } from "./manageCustomers";
 import manageMembership from "./manageMemberships";
 import refundCashCheckout from './refundCashCheckout';
 import { linkBarberAccount, manageScheduleException, manageStaffShift } from "./manageWorkforce";
@@ -563,6 +563,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         reconcilePaymentSession(paymentSessionId: ID!, idempotencyKey: String!): DomainCommandResult!
         addCustomerNote(customerId: ID!, body: String!, noteType: String, visibility: String, appointmentId: ID, idempotencyKey: String!): DomainCommandResult!
         setCustomerStatus(customerId: ID!, status: String!, reason: String, idempotencyKey: String!): DomainCommandResult!
+        mergeCustomers(keepCustomerId: ID!, duplicateCustomerId: ID!, idempotencyKey: String!): DomainCommandResult!
         setCustomerConsent(customerId: ID!, acceptsMarketing: Boolean!, preferredContactMethod: String, idempotencyKey: String!): DomainCommandResult!
         issueCustomerWaiver(customerId: ID!, appointmentId: ID, title: String!, waiverType: String, deliveryStatus: String, idempotencyKey: String!): DomainCommandResult!
         manageMembership(action: String!, customerId: ID, membershipPlanId: ID, servicePackageId: ID, customerPackageId: ID, paymentMethod: String, reason: String, idempotencyKey: String!): DomainCommandResult!
@@ -693,6 +694,9 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         },
         addCustomerNote: async (root, args, context) => {
           const result = await addCustomerNote(root, args, context); return { success: result.success, error: result.error, data: result.note };
+        },
+        mergeCustomers: async (root, args, context) => {
+          const result = await mergeCustomers(root, args, context); return { success: result.success, error: result.error, data: result.customer };
         },
         setCustomerStatus: async (root, args, context) => {
           const result = await setCustomerStatus(root, args, context); return { success: result.success, error: result.error, data: result.customer };

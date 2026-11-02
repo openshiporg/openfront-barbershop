@@ -180,3 +180,11 @@ export async function updateCustomerStatusAction(input: { customerId: string; st
     }
   `, { id: input.customerId, status: input.status, key: input.idempotencyKey }, ['/dashboard/platform/customers', '/dashboard/customers']);
 }
+
+export async function mergeCustomersAction(input: { keepCustomerId: string; duplicateCustomerId: string; idempotencyKey: string }) {
+  return runCommand<{ id?: string; moved?: Record<string, number> }>('mergeCustomers', `
+    mutation MergeCustomers($keep: ID!, $duplicate: ID!, $key: String!) {
+      mergeCustomers(keepCustomerId: $keep, duplicateCustomerId: $duplicate, idempotencyKey: $key) { success error data }
+    }
+  `, { keep: input.keepCustomerId, duplicate: input.duplicateCustomerId, key: input.idempotencyKey }, ['/dashboard/platform/customers', '/dashboard/customers', '/dashboard/platform/booking']);
+}

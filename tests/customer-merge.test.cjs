@@ -18,6 +18,7 @@ function load(relative) {
 }
 
 const { resolveBookingCustomer } = load('features/keystone/utils/accountCustomer.ts');
+const merge = load('features/keystone/utils/customerMerge.ts');
 
 // Minimal store that answers the queries resolveBookingCustomer makes, and lets
 // the test record each booking the way createOnlineBooking does.
@@ -81,4 +82,41 @@ test('email alone never claims someone else’s record', async () => {
   const result = await book(db, 'user2');
   assert.notEqual(result.id, 'walkin');
   assert.equal(db.customers.length, 2);
+});
+
+test('the merge moves every relation that points at a Customer', () => {
+  const schema = read('schema.prisma');
+  const models = [...schema.matchAll(/^model (\w+) \{([\s\S]*?)^\}/gm)]
+    .filter(([, name, body]) => name !== 'User' && /\s+customer\s+Customer\?\s+@relation/.test(body))
+    .map(([, name]) => name[0].toLowerCase() + name.slice(1)).sort();
+  assert.deepEqual([...merge.CUSTOMER_RELATIONS].sort(), models);
+  const mutation = read('features/keystone/mutations/manageCustomers.ts');
+  for (const relation of merge.CUSTOMER_RELATIONS) {
+    assert.match(mutation, new RegExp(`moved\\.${relation} = \\(await transaction\\.${relation}\\.updateMany\\(\\{ where, data \\}\\)\\)\\.count`), relation);
+  }
+  assert.match(mutation, /requireCurrentShopPermission\(context\.session, 'canManageCustomers', transaction\)[\s\S]*customer\.delete\(\{ where: \{ id: duplicate!\.id \} \}\)/, 'authorized before anything moves');
+  assert.match(mutation, /customer-merge:\$\{hash\}:v1/, 'idempotent');
+});
+
+test('merge refuses unsafe pairs and only fills blanks', () => {
+  const row = (id, extra = {}) => ({ id, shopId: 'shop1', userId: null, lastVisitAt: null, email: '', phone: '', acceptsMarketing: false, birthday: null, preferredBarberId: null, ...extra });
+  assert.equal(merge.mergeRefusal(row('a'), row('a'), 'shop1'), 'Choose a different customer to merge into.');
+  assert.equal(merge.mergeRefusal(row('a'), row('b', { shopId: 'shop2' }), 'shop1'), 'Customer not found.');
+  assert.match(merge.mergeRefusal(row('a', { userId: 'u1' }), row('b', { userId: 'u2' }), 'shop1'), /two different online accounts/);
+  assert.equal(merge.mergeRefusal(row('a', { userId: 'u1' }), row('b'), 'shop1'), null);
+  const later = new Date('2026-11-01T00:00:00Z');
+  const fields = merge.mergedCustomerFields(row('a', { phone: '111', acceptsMarketing: true }), row('b', { phone: '222', email: 'b@x.com', userId: 'u1', lastVisitAt: later }));
+  assert.deepEqual(Object.keys(fields).sort(), ['acceptsMarketing', 'email', 'lastVisitAt', 'userId']);
+  assert.equal(fields.email, 'b@x.com');
+  assert.equal(fields.acceptsMarketing, false, 'consent is never widened');
+  assert.equal(fields.phone, undefined, 'existing phone kept');
+});
+
+test('staff merge is behind a confirm step with one key per dialog', () => {
+  const ui = read('features/platform/customers/components/MergeCustomerButton.tsx');
+  assert.match(ui, /Merge into…/);
+  assert.match(ui, /AlertDialogAction disabled=\{!keep\}/, 'nothing merges until a record to keep is chosen');
+  assert.match(ui, /if \(open\) \{ setKey\(crypto\.randomUUID\(\)\)/);
+  const page = read('features/platform/customers/screens/CustomersPageClient.tsx');
+  assert.match(page, /mergeCustomersAction\(\{ keepCustomerId, duplicateCustomerId: customer\.id, idempotencyKey \}\)/);
 });

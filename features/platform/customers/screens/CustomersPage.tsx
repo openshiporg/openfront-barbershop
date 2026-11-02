@@ -54,6 +54,7 @@ export default async function CustomersPage({ searchParams }: PageProps) {
         data={data}
         search={search}
         planSearch={planSearch}
+        merged={param(resolvedSearchParams.merged) === '1'}
         initialCustomerId={data.requestedCustomerId || (customerId && data.customers.some((customer) => customer.id === customerId) ? customerId : data.customers[0]?.id || '')}
       />
     </PageContainer>

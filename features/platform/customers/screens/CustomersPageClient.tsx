@@ -2,6 +2,7 @@
 
 import { useState, useTransition, type ReactNode } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Plus, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +14,7 @@ import {
   addCustomerNoteAction,
   issueCustomerWaiverAction,
   manageMembershipAction,
+  mergeCustomersAction,
   setCustomerConsentAction,
   updateCustomerStatusAction,
   type CustomerCommandResult,
@@ -21,6 +23,7 @@ import {
   type CustomersProjectionData,
   type MembershipPlanSummary,
 } from '../actions/customers';
+import { MergeCustomerButton } from '../components/MergeCustomerButton';
 
 type RelationAccess = 'granted' | 'restricted';
 
@@ -29,6 +32,7 @@ type CustomersPageClientProps = {
   search: string;
   planSearch: string;
   initialCustomerId: string;
+  merged?: boolean;
 };
 
 type Feedback = { tone: 'status' | 'alert'; text: string } | null;
@@ -98,7 +102,7 @@ function ViewAll({ href, label }: { href: string; label: string }) {
   return <Link href={href} className="text-xs font-medium text-primary underline-offset-4 hover:underline">{label}</Link>;
 }
 
-export function CustomersPageClient({ data, search, planSearch, initialCustomerId }: CustomersPageClientProps) {
+export function CustomersPageClient({ data, search, planSearch, initialCustomerId, merged }: CustomersPageClientProps) {
   const [selectedId, setSelectedId] = useState(initialCustomerId);
   const { customers, timeZone, page, pageSize, total } = data;
   // Never fall back to another customer when the selection disappears.
@@ -157,7 +161,7 @@ export function CustomersPageClient({ data, search, planSearch, initialCustomerI
 
         <section id="customer-detail" aria-label={selected ? `Customer details: ${fullName(selected)}` : 'Customer details'} className="min-w-0">
           {selected
-            ? <CustomerDetail key={selected.id} customer={selected} data={data} search={search} planSearch={planSearch} />
+            ? <CustomerDetail key={selected.id} customer={selected} data={data} search={search} planSearch={planSearch} merged={merged && selected.id === initialCustomerId} />
             : <div className="rounded-[6px] border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">{customers.length ? 'Choose a customer.' : 'No customer selected.'}</div>}
         </section>
       </div>
@@ -167,7 +171,7 @@ export function CustomersPageClient({ data, search, planSearch, initialCustomerI
 
 // Keyed by customer id: every draft below belongs to exactly this customer and is
 // discarded when the operator explicitly selects someone else.
-function CustomerDetail({ customer, data, search, planSearch }: { customer: CustomerHistoryItem; data: CustomersProjectionData; search: string; planSearch: string }) {
+function CustomerDetail({ customer, data, search, planSearch, merged }: { customer: CustomerHistoryItem; data: CustomersProjectionData; search: string; planSearch: string; merged?: boolean }) {
   const { timeZone, historyPreviewLimit: limit } = data;
   const notesAccess: RelationAccess = data.notesAccess === 'granted' ? 'granted' : 'restricted';
   const appointmentsAccess: RelationAccess = data.appointmentsAccess === 'granted' ? 'granted' : 'restricted';
@@ -182,7 +186,7 @@ function CustomerDetail({ customer, data, search, planSearch }: { customer: Cust
   const [waiverType, setWaiverType] = useState('general');
   const servicePackages = membershipsAccess === 'granted' ? data.servicePackages ?? [] : null;
   const [servicePackageId, setServicePackageId] = useState(servicePackages?.[0]?.id || '');
-  const [profileFeedback, setProfileFeedback] = useState<Feedback>(null);
+  const [profileFeedback, setProfileFeedback] = useState<Feedback>(merged ? { tone: 'status', text: 'Merged. Every appointment, note and payment is on this record now.' } : null);
   const [membershipFeedback, setMembershipFeedback] = useState<Feedback>(null);
   const [consentFeedback, setConsentFeedback] = useState<Feedback>(null);
   const [noteFeedback, setNoteFeedback] = useState<Feedback>(null);
@@ -264,6 +268,19 @@ function CustomerDetail({ customer, data, search, planSearch }: { customer: Cust
     run(setProfileFeedback, () => updateCustomerStatusAction({ ...input, idempotencyKey: statusKey.keyFor(input) }), (result) => result?.id === customer.id && result?.status === status, `Marked ${statusLabel(status)}.`, statusKey.settle);
   };
 
+  const router = useRouter();
+  const mergeCandidates = data.customers.filter((other) => other.id !== customer.id).map((other) => ({ id: other.id, name: fullName(other), contact: other.phone || other.email || '' }));
+  const mergeInto = (keepCustomerId: string, idempotencyKey: string) => {
+    setProfileFeedback(null);
+    startTransition(async () => {
+      const result = await mergeCustomersAction({ keepCustomerId, duplicateCustomerId: customer.id, idempotencyKey });
+      if (!result.success) { setProfileFeedback({ tone: 'alert', text: result.error || interrupted }); return; }
+      const params = new URLSearchParams({ customer: keepCustomerId, merged: '1' });
+      if (search) params.set('q', search);
+      router.push(`/dashboard/platform/customers?${params.toString()}`);
+    });
+  };
+
   const noteId = `note-body-${customer.id}`;
   const noteTypeId = `note-type-${customer.id}`;
   const waiverTitleId = `waiver-title-${customer.id}`;
@@ -320,7 +337,10 @@ function CustomerDetail({ customer, data, search, planSearch }: { customer: Cust
               : customer.preferredBarber && <p className="text-sm">Preferred barber: <span className="font-medium">{customer.preferredBarber.displayName || 'Barber unavailable'}</span></p>}
             <p className="text-sm text-muted-foreground">Last visit {formatDay(customer.lastVisitAt, timeZone, 'not recorded')}</p>
           </div>
-          <PillLink size="sm" href={`/dashboard/customers/${customer.id}`}>Edit profile</PillLink>
+          <Track>
+            <PillLink size="sm" href={`/dashboard/customers/${customer.id}`}>Edit profile</PillLink>
+            <MergeCustomerButton customerName={fullName(customer)} candidates={mergeCandidates} disabled={pending} onConfirm={mergeInto} />
+          </Track>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-muted-foreground">Status</span>

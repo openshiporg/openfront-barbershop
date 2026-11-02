@@ -5,6 +5,7 @@ import { hasCurrentOwnerMembership, requireCurrentShopPermission } from '../util
 import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
 import { hashPublicAccessToken } from '../utils/publicAccessToken';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
+import { mergedCustomerFields, mergeRefusal } from '../utils/customerMerge';
 
 type Context = { session?: Parameters<typeof permissions.canManageCustomers>[0]['session']; prisma: PrismaClient };
 
@@ -152,4 +153,69 @@ export async function issueCustomerWaiver(_root: unknown, args: { customerId: st
     });
     return { success: true, error: null, waiver: { id: waiver.id, title: waiver.title, waiverType: waiver.waiverType, status: waiver.status } };
   } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Unable to issue waiver.', waiver: null }; }
+}
+
+/**
+ * Staff "Merge into…": moves every appointment, note, payment, balance, waiver
+ * and queue/waitlist record from the duplicate to the kept customer, fills the
+ * kept record's blank contact fields, then deletes the now-empty duplicate.
+ * One idempotency key per confirmed dialog; a replay returns the same result.
+ */
+export async function mergeCustomers(_root: unknown, args: { keepCustomerId: string; duplicateCustomerId: string; idempotencyKey: string }, context: Context) {
+  if (!permissions.canManageCustomers({ session: context.session })) return { success: false, error: 'Not authorized to merge customers.', customer: null };
+  if (!args.keepCustomerId || !args.duplicateCustomerId || !args.idempotencyKey?.trim()) return { success: false, error: 'Both customers and an idempotency key are required.', customer: null };
+  try {
+    const hash = hashPublicAccessToken(args.idempotencyKey.trim());
+    const result = await runSerializableTransaction(context.prisma, async (client) => {
+      const transaction = client as Prisma.TransactionClient;
+      const shopId = await requireCurrentShopPermission(context.session, 'canManageCustomers', transaction);
+      for (const id of [args.keepCustomerId, args.duplicateCustomerId].sort()) {
+        await transaction.$executeRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', 'barbershop-customer', id);
+      }
+      const eventKey = `customer-merge:${hash}:v1`;
+      const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+      if (replay) {
+        const payload = replay.payload as { aggregateId?: string; data?: { merge?: { duplicateCustomerId?: string; moved?: Record<string, number> } } } | null;
+        if (replay.shopId !== shopId || payload?.aggregateId !== args.keepCustomerId || payload?.data?.merge?.duplicateCustomerId !== args.duplicateCustomerId) throw new Error('Merge idempotency key was reused with different customers.');
+        return { id: args.keepCustomerId, moved: payload.data.merge.moved || {} };
+      }
+      const fields = { id: true, shopId: true, userId: true, lastVisitAt: true, email: true, phone: true, acceptsMarketing: true, birthday: true, preferredBarberId: true } as const;
+      const [kept, duplicate] = await Promise.all([
+        transaction.customer.findFirst({ where: { id: args.keepCustomerId, shopId }, select: fields }),
+        transaction.customer.findFirst({ where: { id: args.duplicateCustomerId, shopId }, select: fields }),
+      ]);
+      const refusal = mergeRefusal(kept, duplicate, shopId);
+      if (refusal) throw new Error(refusal);
+      const moved: Record<string, number> = {};
+      const where = { customerId: duplicate!.id };
+      const data = { customerId: kept!.id };
+      // Explicit per-model calls keep Prisma's types; CUSTOMER_RELATIONS lists the same set.
+      moved.appointment = (await transaction.appointment.updateMany({ where, data })).count;
+      moved.customerNote = (await transaction.customerNote.updateMany({ where, data })).count;
+      moved.checkoutTransaction = (await transaction.checkoutTransaction.updateMany({ where, data })).count;
+      moved.customerPackage = (await transaction.customerPackage.updateMany({ where, data })).count;
+      moved.membershipEvent = (await transaction.membershipEvent.updateMany({ where, data })).count;
+      moved.noShowEvent = (await transaction.noShowEvent.updateMany({ where, data })).count;
+      moved.walkInQueueEntry = (await transaction.walkInQueueEntry.updateMany({ where, data })).count;
+      moved.waiverForm = (await transaction.waiverForm.updateMany({ where, data })).count;
+      moved.groomingNote = (await transaction.groomingNote.updateMany({ where, data })).count;
+      moved.waitlistEntry = (await transaction.waitlistEntry.updateMany({ where, data })).count;
+      moved.tip = (await transaction.tip.updateMany({ where, data })).count;
+      const merged = mergedCustomerFields(kept!, duplicate!);
+      // userId is unique: release it from the duplicate before the kept record takes it.
+      await transaction.customer.delete({ where: { id: duplicate!.id } });
+      const updated = Object.keys(merged).length
+        ? await transaction.customer.update({ where: { id: kept!.id }, data: merged as Prisma.CustomerUncheckedUpdateInput })
+        : await transaction.customer.findUniqueOrThrow({ where: { id: kept!.id } });
+      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId,
+        eventKey, eventType: 'customer.merged', aggregateType: 'customer', aggregateId: kept!.id,
+        shopId, occurredAt: updated.updatedAt,
+        data: { merge: { duplicateCustomerId: duplicate!.id, moved, filled: Object.keys(merged), actorId: context.session?.itemId ?? null } },
+      }));
+      return { id: kept!.id, moved };
+    });
+    return { success: true, error: null, customer: result };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unable to merge customers.', customer: null };
+  }
 }
