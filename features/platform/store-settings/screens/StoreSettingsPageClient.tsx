@@ -5,6 +5,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import * as SelectPrimitive from '@radix-ui/react-select';
+import { cn } from '@/lib/utils';
+import { Code } from 'lucide-react';
 import { sanitizeStoreLogoSvg } from '@/features/shared/sanitize-store-logo';
 import {
   STOREFRONT_BRAND_COLOR_OPTIONS,
@@ -12,11 +28,12 @@ import {
 } from '@/features/shared/storefront-settings';
 import { ActiveShopSelector } from '@/features/platform/barbershop/screens/ActiveShopSelector';
 import type { ShopChoice } from '@/features/platform/barbershop/actions/shop';
-import { LogoPicker } from '../components/LogoPicker';
+import { LOGO_ICONS, HUE_PRESETS } from '../lib/icon-registry';
+import { StoreSettingsSaveBar } from '../components/StoreSettingsSaveBar';
 import { DEFAULT_STORE_LOGO_ICON } from '../lib/store-logo';
 import { StoreLogo } from '@/features/storefront/components/StoreLogo';
 import { hoursTextToTimes, parseHoursRange, SHOP_HOURS_DAYS, timesToHoursText } from '@/features/shared/shop-hours';
-import { Notice, PageHeader, Pill, PillLink, selectClass, StatusDot } from '@/features/platform/lib/ui';
+import { Notice, PageHeader, Pill, PillLink, StatusDot } from '@/features/platform/lib/ui';
 import {
   updateActiveShopStorefrontSettingsAction,
   type ActiveShopStorefrontSettings,
@@ -141,6 +158,14 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
     setForm((current) => (current ? { ...current, ...patch } : current));
   };
 
+  // Same names as the E-commerce logo block, over this page's form state.
+  const logoIcon = form.logoIcon
+  const logoColor = form.logoColor
+  const setLogoIcon = (value: string) => update({ logoIcon: value })
+  const setLogoColor = (value: string) => update({ logoColor: value })
+  // Find matching preset icon, but don't default to first icon if not found
+  const selectedIcon = LOGO_ICONS.find((icon) => icon.lightSvg === logoIcon)
+
   const hoursInvalid = SHOP_HOURS_DAYS.some((day) => draftInvalid(drafts[day]));
   const setDraft = (day: string, patch: Partial<DayDraft>) => {
     const next = { ...drafts[day], ...patch };
@@ -186,7 +211,7 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
         title="Store settings"
         tone={saved.isPublic ? 'live' : 'off'}
         meta={saved.isPublic ? 'Storefront published' : 'Storefront unpublished'}
-        actions={<div className="flex flex-wrap items-center gap-1.5"><PillLink href="/">View storefront</PillLink><Pill type="submit" form="store-settings-form" variant="primary" disabled={isLoading}>{isLoading ? 'Saving…' : dirty ? 'Save changes' : 'Save'}</Pill></div>}
+        actions={<div className="flex flex-wrap items-center gap-1.5"><PillLink href="/">View storefront</PillLink><StoreSettingsSaveBar isSaving={isLoading} button={<Pill type="submit" form="store-settings-form" variant="primary" disabled={isLoading}>{isLoading ? 'Saving…' : dirty ? 'Save changes' : 'Save'}</Pill>} /></div>}
       />
       {shopSelector}
 
@@ -198,14 +223,130 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
               <Label htmlFor="store-name">Shop name</Label>
               <Input id="store-name" value={form.name} maxLength={120} required onChange={(e) => update({ name: e.target.value })} className="mt-2 h-9 rounded-[6px]" />
             </div>
-            <div className="flex flex-wrap gap-6">
-              <LogoPicker
-                logoIcon={form.logoIcon}
-                logoColor={form.logoColor}
-                disabled={isLoading}
-                onIconChange={(logoIcon) => update({ logoIcon })}
-                onColorChange={(logoColor) => update({ logoColor })}
-              />
+            {/* Logo Icon Selector */}
+            <div>
+              <Label>Logo Icon</Label>
+              <div className="mt-2 flex items-center gap-2">
+                <Select
+                  value={selectedIcon?.id || ''}
+                  onValueChange={(id) => {
+                    const icon = LOGO_ICONS.find((i) => i.id === id);
+                    if (icon) setLogoIcon(icon.lightSvg);
+                  }}
+                >
+                  <SelectPrimitive.Trigger
+                    className={cn(
+                      'flex h-12 w-12 shrink-0 rounded-lg border border-input bg-background focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 p-0 overflow-hidden items-center justify-center'
+                    )}
+                  >
+                    <div
+                      dangerouslySetInnerHTML={{ __html: logoIcon }}
+                      style={{ filter: `hue-rotate(${logoColor}deg)` }}
+                      className="[&>svg]:w-6 [&>svg]:h-6"
+                    />
+                  </SelectPrimitive.Trigger>
+                  <SelectContent className="border-border dark:border-blue-700">
+                    {LOGO_ICONS.map((icon) => (
+                      <SelectItem key={icon.id} value={icon.id}>
+                        <span className="flex items-center gap-3">
+                          <div
+                            dangerouslySetInnerHTML={{ __html: icon.lightSvg }}
+                            style={{ filter: `hue-rotate(${logoColor}deg)` }}
+                            className="[&>svg]:w-6 [&>svg]:h-6"
+                          />
+                          <span>
+                            <span className="block font-medium text-gray-900 dark:text-gray-100">
+                              {icon.name}
+                            </span>
+                          </span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* SVG Code Editor Popover */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-12 w-12 shrink-0"
+                      type="button"
+                    >
+                      <Code className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[min(500px,calc(100vw-2rem))]" align="start">
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="font-medium mb-2">Edit SVG Code</h4>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Edit the SVG code directly. Changes will be reflected in the icon preview.
+                        </p>
+                      </div>
+                      <Textarea
+                        value={logoIcon}
+                        onChange={(e) => setLogoIcon(e.target.value)}
+                        className="font-mono text-xs min-h-[300px]"
+                        placeholder="<svg>...</svg>"
+                      />
+                      <div className="flex items-center gap-2">
+                        <div className="text-sm text-muted-foreground">Preview:</div>
+                        <div
+                          dangerouslySetInnerHTML={{ __html: logoIcon }}
+                          style={{ filter: `hue-rotate(${logoColor}deg)` }}
+                          className="[&>svg]:w-8 [&>svg]:h-8 flex items-center justify-center p-2 border rounded"
+                        />
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            {/* Logo Color Selector */}
+            <div>
+              <Label>Logo Color</Label>
+              <div className="mt-2">
+                <Select
+                  value={logoColor}
+                  onValueChange={(value) => setLogoColor(value)}
+                >
+                  <SelectPrimitive.Trigger
+                    className={cn(
+                      'flex h-12 w-12 shrink-0 rounded-lg border border-input bg-background focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 p-0 overflow-hidden items-center justify-center'
+                    )}
+                  >
+                    <SelectValue>
+                      <div
+                        className="w-6 h-6 rounded-full"
+                        style={{
+                          background: `hsl(${(240 + parseInt(logoColor)) % 360}, 70%, 50%)`
+                        }}
+                      />
+                    </SelectValue>
+                  </SelectPrimitive.Trigger>
+                  <SelectContent className="border-border dark:border-blue-700">
+                    <div className="grid grid-cols-4 gap-2 p-2">
+                      {HUE_PRESETS.map((preset) => (
+                        <SelectItem
+                          key={preset.value}
+                          value={preset.value.toString()}
+                          className="cursor-pointer p-0 h-12 w-12 flex items-center justify-center [&>span:first-child]:hidden"
+                        >
+                          <div
+                            className="w-6 h-6 rounded-full"
+                            style={{
+                              background: `hsl(${(240 + preset.value) % 360}, 70%, 50%)`
+                            }}
+                          />
+                        </SelectItem>
+                      ))}
+                    </div>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div>
               <Label htmlFor="tagline">Tagline</Label>
@@ -257,9 +398,12 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
               </div>
               <div>
                 <Label htmlFor="timezone">Timezone</Label>
-                <select id="timezone" value={form.timezone} required onChange={(e) => update({ timezone: e.target.value })} className={`${selectClass} mt-2`}>
-                  {(zones.length ? zones : [form.timezone]).map((zone) => <option key={zone} value={zone}>{zone}</option>)}
-                </select>
+                <Select value={form.timezone} onValueChange={(value) => update({ timezone: value })}>
+                  <SelectTrigger id="timezone" className="mt-2 h-9 w-full min-w-0 rounded-[6px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(zones.length ? zones : [form.timezone]).map((zone) => <SelectItem key={zone} value={zone}>{zone}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="currency">Currency</Label>
@@ -306,7 +450,7 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
 
         <aside className="min-w-0 space-y-4 xl:sticky xl:top-6 xl:self-start" aria-label="Preview and save">
           <div className="overflow-hidden rounded-[6px] ring-1 ring-border">
-            <div className="flex items-center justify-between gap-2 bg-zinc-900 px-3 py-1.5 text-[11px] text-zinc-300"><span className="truncate"><StatusDot tone={form.isPublic ? 'live' : 'off'} />{form.address || 'Address'}</span><span className="font-mono">{formatPhone(form.phone)}</span></div>
+            <div className="flex items-center justify-between gap-2 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-300"><span className="truncate"><StatusDot tone={form.isPublic ? 'live' : 'off'} />{form.address || 'Address'}</span><span className="font-mono">{formatPhone(form.phone)}</span></div>
             <div className="flex items-center gap-2.5 bg-[#f6f3ee] px-4 py-4 text-[#111a33]">
               {safeLogo ? <StoreLogo svg={safeLogo} color={form.logoColor} className="size-7" /> : <span className="size-7 rounded-[4px] bg-red-200" aria-hidden="true" />}
               <span className="min-w-0 truncate text-xl font-extrabold uppercase tracking-tight">{form.name || 'Shop name'}</span>
@@ -320,7 +464,7 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
             <StatusDot tone={dirty ? 'wait' : 'live'} />{isLoading ? 'Saving…' : status || (dirty ? 'Unsaved changes' : 'All changes saved')}
           </div>
           {error && <Notice tone="alert">{error}</Notice>}
-          <Pill type="submit" variant="primary" className="w-full" disabled={isLoading}>
+          <Pill type="submit" variant="primary" className="hidden w-full md:inline-flex" disabled={isLoading}>
             {isLoading ? 'Saving…' : 'Save settings'}
           </Pill>
         </aside>
