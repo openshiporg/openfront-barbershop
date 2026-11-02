@@ -31,7 +31,7 @@ async function loadAppointment(context: Context, args: Args) {
   const prisma = context.sudo().prisma;
   const appointment = await prisma.appointment.findUnique({
     where: { id: String(args.appointmentId || '') },
-    select: { id: true, shopId: true, status: true, paymentStatus: true, depositAmount: true, serviceTitleSnapshot: true, publicAccessTokenHash: true, accountId: true },
+    select: { id: true, shopId: true, status: true, paymentStatus: true, depositAmount: true, serviceTitleSnapshot: true, publicAccessTokenHash: true, accountId: true, customer: { select: { email: true } } },
   });
   if (!appointment) throw new Error('Appointment not found.');
   assertAppointmentAccess({ token: args.accessToken?.trim() || '', storedHash: appointment.publicAccessTokenHash, accountId: appointment.accountId, sessionItemId: context.session?.itemId || null });
@@ -59,7 +59,7 @@ export async function startDepositCheckout(_root: unknown, args: Args, context: 
       provider: { code: provider.code },
       amount, currency: 'usd', description: `Deposit · ${appointment.serviceTitleSnapshot || 'Appointment'}`,
       successUrl: `${returnTo}&deposit=return`, cancelUrl: `${returnTo}&deposit=cancelled`,
-      idempotencyKey: key, metadata: { appointmentId: appointment.id },
+      idempotencyKey: key, metadata: { appointmentId: appointment.id }, customerEmail: appointment.customer?.email || '',
     }) as { id?: string; url?: string | null };
     if (!result.id || !result.url) throw new Error('Stripe did not open a checkout.');
     await prisma.paymentSession.create({ data: {

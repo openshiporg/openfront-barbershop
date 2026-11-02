@@ -51,7 +51,7 @@ function asString(value: unknown) {
   return typeof value === 'string' ? value : ''
 }
 
-export async function createPaymentFunction({ amount, currency, successUrl, cancelUrl, description, idempotencyKey, metadata }: PaymentAdapterArgs) {
+export async function createPaymentFunction({ amount, currency, successUrl, cancelUrl, description, idempotencyKey, metadata, customerEmail }: PaymentAdapterArgs) {
   const cents = Math.round(Number(amount))
   if (!Number.isSafeInteger(cents) || cents <= 0) throw new Error('Payment amount must be greater than zero.')
   const meta = (metadata && typeof metadata === 'object' ? metadata : {}) as Record<string, unknown>
@@ -62,6 +62,7 @@ export async function createPaymentFunction({ amount, currency, successUrl, canc
       mode: 'payment',
       success_url: asString(successUrl),
       cancel_url: asString(cancelUrl),
+      ...(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(asString(customerEmail)) ? { customer_email: asString(customerEmail) } : {}),
       'line_items[0][quantity]': 1,
       'line_items[0][price_data][currency]': asString(currency || 'usd').toLowerCase(),
       'line_items[0][price_data][unit_amount]': cents,
