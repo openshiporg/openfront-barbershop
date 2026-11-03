@@ -3,6 +3,7 @@ import { createMCPClient, type MCPClient } from '@ai-sdk/mcp';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { createSameOriginMcpFetch } from '@/features/dashboard/lib/sameOriginMcpFetch';
 import { getBaseUrl } from '@/features/dashboard/lib/getBaseUrl';
+import { loopbackOrigin } from '@/features/keystone/lib/internal-origin';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
 export async function POST(req: Request) {
@@ -91,7 +92,7 @@ export async function POST(req: Request) {
       });
     }
 
-    const mcpEndpoint = new URL('/api/mcp-transport/http', await getBaseUrl());
+    const mcpEndpoint = new URL('/api/mcp-transport/http', loopbackOrigin() ?? await getBaseUrl());
     const transport = new StreamableHTTPClientTransport(mcpEndpoint, {
       fetch: createSameOriginMcpFetch({
         endpoint: mcpEndpoint,

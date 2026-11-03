@@ -1,6 +1,6 @@
 import { ClientError, GraphQLClient } from 'graphql-request';
 import { getAuthHeaders } from '@/features/dashboard/lib/cookies';
-import { getGraphQLEndpoint } from '@/features/dashboard/lib/getBaseUrl';
+import { getServerGraphQLTarget } from '@/features/dashboard/lib/getBaseUrl';
 
 /**
  * Server-side GraphQL call for platform commands. Unlike the shared dashboard
@@ -27,7 +27,8 @@ function readable(error: unknown): string {
 
 export async function platformRequest<T>(query: string, variables: Record<string, unknown> = {}): Promise<PlatformResult<T>> {
   try {
-    const client = new GraphQLClient(await getGraphQLEndpoint(), { headers: (await getAuthHeaders()) || {}, redirect: 'error' });
+    const target = await getServerGraphQLTarget();
+    const client = new GraphQLClient(target.endpoint, { headers: (await getAuthHeaders()) || {}, redirect: 'error', ...(target.fetch ? { fetch: target.fetch } : {}) });
     return { ok: true, data: await client.request<T>(query, variables) };
   } catch (error) {
     return { ok: false, error: readable(error) };
