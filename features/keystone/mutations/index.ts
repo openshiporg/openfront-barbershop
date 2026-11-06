@@ -28,7 +28,7 @@ import selectActiveShop from "./selectActiveShop";
 import claimShopOwnership, { claimableShops } from "./claimShopOwnership";
 import { addShopMemberByEmail, platformTeam } from "./manageTeam";
 import { confirmDepositCheckout, getPublicPaymentOptions, startDepositCheckout } from "./publicDeposits";
-import { expireStalePaymentSessions } from "../utils/expireStalePaymentSessions";
+import { sweepStalePaymentSessions } from "../utils/expireStalePaymentSessions";
 import { requireCurrentShopPermission } from "../utils/currentAuthorization";
 import { confirmGiftCardOrder, giftCardOptions, lookupGiftCard, settleOpenGiftCards, startGiftCardCheckout } from "./giftCards";
 import { cancelDeskCardPayment, checkDeskCardPayment, openDeskCardPayment, startDeskCardPayment } from "./deskCardPayment";
@@ -563,7 +563,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         startDeskCardPayment(appointmentId: ID!, tipAmount: Int, discountAmount: Int, taxAmount: Int, notes: String): DomainCommandResult!
         checkDeskCardPayment(paymentSessionId: ID!): DomainCommandResult!
         cancelDeskCardPayment(paymentSessionId: ID!): DomainCommandResult!
-        expireStalePaymentSessions: DomainCommandResult!
+        expireStalePaymentSessions(force: Boolean): DomainCommandResult!
         startGiftCardCheckout(amount: Int!, purchaserName: String!, purchaserEmail: String!, recipientName: String, recipientEmail: String, message: String): DomainCommandResult!
         confirmGiftCardOrder(giftCardId: ID!, token: String!): DomainCommandResult!
         confirmDepositCheckout(appointmentId: ID!, accessToken: String): DomainCommandResult!
@@ -698,7 +698,9 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
           try {
             const shopId = await requireCurrentShopPermission(context.session, 'canManagePayments');
             await settleOpenGiftCards(context.prisma, shopId).catch(() => undefined);
-            return { success: true, error: null, data: { expired: await expireStalePaymentSessions(context.prisma, shopId) } };
+            const force = Boolean(_args && (_args as { force?: boolean }).force);
+            const result = await sweepStalePaymentSessions(context.prisma, shopId, new Date(), { force });
+            return { success: true, error: null, data: result };
           } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Unable to expire payments.', data: null }; }
         },
         confirmDepositCheckout,

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCommandKey } from '../../lib/useCommandKey';
 import { Pill, Track } from '../../lib/ui';
-import { payCommissionAction, reconcilePaymentAction, transitionCommissionAction } from '../actions/operations';
+import { checkAllPaymentsAction, payCommissionAction, reconcilePaymentAction, transitionCommissionAction } from '../actions/operations';
 
 type Commission = { id: string; status: string; commissionNumber?: string };
 type PaymentSession = { id: string; status: string; amount: number; currencyCode: string; paymentProvider?: { name?: string | null } | null };
@@ -75,7 +75,27 @@ export function ReconciliationControls({ sessions }: { sessions: PaymentSession[
       }
     });
   };
+  const checkAll = () => {
+    setOutcome(null);
+    setPendingId('all');
+    startTransition(async () => {
+      try {
+        const result = await checkAllPaymentsAction();
+        if (!result.success) { setOutcome({ kind: 'error', text: result.error || 'Unable to check payments.' }); return; }
+        const parts = [result.reconciled ? `${result.reconciled} paid and recorded` : '', result.expired ? `${result.expired} unpaid closed` : ''].filter(Boolean);
+        setOutcome({ kind: 'status', text: result.checked ? `Checked ${result.checked} with Stripe${parts.length ? `: ${parts.join(', ')}` : ''}.` : 'Nothing past its lifetime. Open pages close on their own after 24 hours.' });
+      } catch {
+        setOutcome({ kind: 'error', text: interrupted });
+      } finally {
+        setPendingId(null);
+      }
+    });
+  };
   return <div>
+    <div className="flex flex-wrap items-center justify-between gap-2 pb-2">
+      <p className="text-xs text-muted-foreground">Checked with Stripe automatically every few minutes: paid pages are recorded, unpaid ones close after 24 hours.</p>
+      <Track><Pill size="sm" disabled={pending} onClick={checkAll}>{pendingId === 'all' ? 'Checking…' : 'Check all with Stripe'}</Pill></Track>
+    </div>
     <ul>
       {sessions.map((session) => <li key={session.id} className="flex flex-wrap items-center justify-between gap-2 border-b py-2.5 last:border-b-0">
         <div className="min-w-0 text-sm"><p className="font-medium">{session.paymentProvider?.name || 'Payment provider'}</p><p className="text-xs text-muted-foreground">{session.status} · <span className="font-mono tabular-nums">{(session.amount / 100).toLocaleString('en-US', { style: 'currency', currency: session.currencyCode || 'USD' })}</span></p></div>

@@ -1,3 +1,4 @@
+import { triggerPaymentSweep } from '../utils/expireStalePaymentSessions';
 import { resolvePublishedShop } from '../utils/publicShop';
 
 type ImageQuery = { findMany(args: { where: Record<string, unknown>; query: string }): Promise<Array<{ id: string; [field: string]: unknown }>> };
@@ -46,6 +47,7 @@ export async function getPublicServiceCatalog(
 ) {
   const shopId = await canonicalPublicShopId(context);
   if (!shopId) return [];
+  triggerPaymentSweep(context.sudo().prisma as never, shopId);
   const categories = await context.sudo().prisma.serviceCategory.findMany({
     where: { shopId, status: 'active' },
     orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }],
