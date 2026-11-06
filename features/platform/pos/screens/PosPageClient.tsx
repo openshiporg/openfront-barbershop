@@ -13,6 +13,7 @@ import { Empty, Notice, Pager as KitPager, Pill, PillLink, selectClass, StatusCe
 import { LocalTabs, Segmented } from '@/features/platform/booking/components/FloorKit';
 import { DeskCardPanel } from '../components/DeskCardPanel';
 import { lookupGiftCardAction, type GiftCardLookup } from '../actions/checkout';
+import { refundDepositAction } from '@/features/platform/booking/actions/appointments';
 import { checkoutAppointmentAction, recordProductSaleAction, refundCashCheckoutAction, returnProductSaleAction, type PosQuery } from '../actions/checkout';
 import type { Paging, PosAppointment, PosCustomerSummary, PosProjectionData, PosReceipt, ProductLineSummary } from '../lib/posTypes';
 
@@ -557,6 +558,25 @@ function ReceiptDetail({ receipt, timeZone }: { receipt: PosReceipt; timeZone: s
   const refundKey = useCommandKey(`cash-refund:${receipt.id}`);
   const refundable = !refunded && receipt.paymentMethod === 'cash' && receipt.status === 'paid' && !receipt.paymentSessionId && !receipt.cashRefund && (receipt.total || 0) >= 0;
   const valid = reason.trim().length >= 3 && cashReturned;
+  const [cardArmed, setCardArmed] = useState(false);
+  const cardKey = useCommandKey(`card-refund:${receipt.id}`);
+  const cardRefundable = !refunded && receipt.paymentMethod === 'card' && receipt.status === 'paid' && Boolean(receipt.paymentSessionId) && (receipt.total || 0) > 0;
+  const submitCardRefund = () => {
+    if (!cardRefundable || !receipt.paymentSessionId) return;
+    const input = { paymentSessionId: receipt.paymentSessionId };
+    setFeedback(null);
+    startTransition(async () => {
+      try {
+        const result = await refundDepositAction(receipt.paymentSessionId!, cardKey.keyFor(input));
+        if (!result.success) { setFeedback({ tone: 'alert', text: result.error || 'The card refund did not go through.' }); return; }
+        cardKey.settle();
+        setRefunded(true); setCardArmed(false);
+        setFeedback({ tone: 'status', text: `Refunded ${formatMoney(result.paymentSession?.refundedAmount ?? receipt.total)} to the card.` });
+      } catch {
+        setFeedback({ tone: 'alert', text: interrupted });
+      }
+    });
+  };
 
   const submitRefund = () => {
     if (!refundable || !valid) return;
@@ -615,6 +635,18 @@ function ReceiptDetail({ receipt, timeZone }: { receipt: PosReceipt; timeZone: s
             <Label htmlFor={`refund-cash-${receipt.id}`} className="text-xs font-normal">I returned {formatMoney(receipt.total)} in cash to the customer.</Label>
           </div>
           <Track><Pill size="sm" variant="danger" disabled={pending || !valid} onClick={submitRefund}>Record cash refund</Pill></Track>
+        </div>
+      )}
+      {cardRefundable && (
+        <div className="space-y-2 rounded-[6px] border border-destructive/30 p-3">
+          <p className="text-xs font-medium">Card refund</p>
+          <p className="text-xs tabular-nums text-muted-foreground">Sends {formatMoney(receipt.total)} back to the card through Stripe · voids unpaid commissions</p>
+          <Track>
+            {cardArmed ? <>
+              <Pill size="sm" variant="danger" disabled={pending} onClick={submitCardRefund}>{pending ? 'Refunding…' : `Refund ${formatMoney(receipt.total)}`}</Pill>
+              <Pill size="sm" variant="flat" disabled={pending} onClick={() => setCardArmed(false)}>Keep sale</Pill>
+            </> : <Pill size="sm" variant="danger" onClick={() => setCardArmed(true)}>Refund card</Pill>}
+          </Track>
         </div>
       )}
       <FeedbackMessage feedback={feedback} />

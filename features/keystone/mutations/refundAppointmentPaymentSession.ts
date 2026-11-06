@@ -78,6 +78,10 @@ export default async function refundAppointmentPaymentSession(_root: unknown, ar
         throw new Error('Refund amount must be positive and no greater than the remaining captured amount.');
       }
       await lockAppointmentMoney(transaction, paymentSession.appointmentId);
+      if (paymentSession.transaction?.id) {
+        const paidCommission = await transaction.commission.count({ where: { transactionId: paymentSession.transaction.id, status: 'paid' } });
+        if (paidCommission) throw new Error('A commission on this sale was already paid. Owner reconciliation is required before refunding it.');
+      }
 
       const result = recordOf(await refundPayment({
         provider: provider as PaymentProviderConfig,
@@ -119,6 +123,11 @@ export default async function refundAppointmentPaymentSession(_root: unknown, ar
           where: { id: paymentSession.transaction.id },
           data: { status: fullyRefunded ? 'refunded' : 'partially_refunded' },
         });
+        // A fully refunded card sale reverses the visit's paid state and its unpaid commissions, like a cash refund.
+        if (fullyRefunded) {
+          await transaction.appointment.updateMany({ where: { transactionId: paymentSession.transaction.id, shopId }, data: { paymentStatus: 'refunded' } });
+          await transaction.commission.updateMany({ where: { transactionId: paymentSession.transaction.id, status: { in: ['projected', 'approved'] } }, data: { status: 'voided' } });
+        }
       }
       await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
         actorId: context.session?.itemId,

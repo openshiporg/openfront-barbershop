@@ -147,6 +147,7 @@ export async function refundDepositAction(paymentSessionId: string, idempotencyK
     revalidatePath('/dashboard/platform/booking');
     revalidatePath('/dashboard/appointments');
     revalidatePath('/dashboard/platform/payments');
+    revalidatePath('/dashboard/platform/pos');
   }
   return result ?? { success: false, error: response.error || 'Unable to refund this deposit.' };
 }
