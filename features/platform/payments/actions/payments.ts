@@ -8,7 +8,8 @@ export type ProviderRow = { id: string; name: string; code: string; isInstalled:
 export type SessionRow = { id: string; status: string; amount: number; currencyCode: string; createdAt: string; paymentProvider: { name: string | null } | null; appointment: { id: string; serviceTitleSnapshot: string | null } | null };
 export type ReceiptRow = { id: string; status: string; paymentMethod: string; total: number | null; tipAmount: number | null; completedAt: string | null; customer: { firstName: string; lastName: string | null } | null };
 export type ReconciliationRow = { id: string; localStatusBefore: string; remoteStatus: string; localStatusAfter: string; changed: boolean; amount: number; observedAt: string };
-export type PaymentsData = { shopName: string; timezone: string; providers: ProviderRow[]; sessions: SessionRow[]; receipts: ReceiptRow[]; reconciliations: ReconciliationRow[]; stripeKeyConfigured: boolean };
+export type GiftCardRow = { id: string; code: string; status: string; initialValue: number; balance: number; purchaserName: string | null; recipientName: string | null; activatedAt: string | null; createdAt: string; paymentSession: { id: string; status: string } | null };
+export type PaymentsData = { shopName: string; timezone: string; providers: ProviderRow[]; sessions: SessionRow[]; receipts: ReceiptRow[]; reconciliations: ReconciliationRow[]; giftCards: GiftCardRow[]; stripeKeyConfigured: boolean };
 
 export async function getPaymentsAction(): Promise<PaymentsData | null> {
   const shop = await activeShop();
@@ -16,17 +17,18 @@ export async function getPaymentsAction(): Promise<PaymentsData | null> {
   // Unpaid card pages past their lifetime close on their own before the list is read.
   await platformRequest('mutation { expireStalePaymentSessions { success } }').catch(() => null);
   const since = new Date(Date.now() - 30 * 86400_000).toISOString();
-  const result = await platformRequest<{ shop: { timezone: string | null } | null; paymentProviders: ProviderRow[]; paymentSessions: SessionRow[]; checkoutTransactions: ReceiptRow[]; paymentReconciliations: ReconciliationRow[] }>(`
+  const result = await platformRequest<{ shop: { timezone: string | null } | null; paymentProviders: ProviderRow[]; paymentSessions: SessionRow[]; checkoutTransactions: ReceiptRow[]; paymentReconciliations: ReconciliationRow[]; giftCards: GiftCardRow[] }>(`
     query Payments($shop: ID!, $since: DateTime!) {
       shop(where: { id: $shop }) { timezone }
       paymentProviders(where: { shop: { id: { equals: $shop } } }, orderBy: [{ name: asc }]) { id name code isInstalled paymentSessionsCount }
       paymentSessions(where: { shop: { id: { equals: $shop } }, status: { in: [pending, authorized] } }, orderBy: [{ createdAt: desc }], take: 50) { id status amount currencyCode createdAt paymentProvider { name } appointment { id serviceTitleSnapshot } }
       checkoutTransactions(where: { shop: { id: { equals: $shop } }, completedAt: { gte: $since } }, orderBy: [{ completedAt: desc }], take: 500) { id status paymentMethod total tipAmount completedAt customer { firstName lastName } }
       paymentReconciliations(where: { shop: { id: { equals: $shop } } }, orderBy: [{ observedAt: desc }], take: 20) { id localStatusBefore remoteStatus localStatusAfter changed amount observedAt }
+      giftCards(where: { shop: { id: { equals: $shop } }, status: { not: { equals: pending } } }, orderBy: [{ createdAt: desc }], take: 20) { id code status initialValue balance purchaserName recipientName activatedAt createdAt paymentSession { id status } }
     }`, { shop: shop.id, since });
   if (!result.ok) return null;
   // Only whether the key exists is read; its value never leaves the server.
-  return { shopName: shop.name, timezone: result.data.shop?.timezone || 'UTC', providers: result.data.paymentProviders, sessions: result.data.paymentSessions, receipts: result.data.checkoutTransactions, reconciliations: result.data.paymentReconciliations, stripeKeyConfigured: Boolean(process.env.STRIPE_SECRET_KEY) };
+  return { shopName: shop.name, timezone: result.data.shop?.timezone || 'UTC', providers: result.data.paymentProviders, sessions: result.data.paymentSessions, receipts: result.data.checkoutTransactions, reconciliations: result.data.paymentReconciliations, giftCards: result.data.giftCards, stripeKeyConfigured: Boolean(process.env.STRIPE_SECRET_KEY) };
 }
 
 const refresh = () => { revalidatePath('/dashboard/platform/payments'); revalidatePath('/dashboard/platform/pos'); };
@@ -62,5 +64,15 @@ export async function setUpStripeAction() {
   if (!result.ok) return { success: false, error: result.error };
   refresh();
   revalidatePath('/book');
+  return { success: true };
+}
+
+/** Refunds an unused online gift card back to the buyer's card and cancels it. */
+export async function refundGiftCardAction(paymentSessionId: string, idempotencyKey: string) {
+  if (!paymentSessionId || !idempotencyKey) return { success: false, error: 'Request key is missing. Reload and try again.' };
+  const result = await platformRequest<{ refundAppointmentPaymentSession: { success: boolean; error: string | null } }>(`mutation($id: ID!, $key: String!) { refundAppointmentPaymentSession(paymentSessionId: $id, idempotencyKey: $key) { success error } }`, { id: paymentSessionId, key: idempotencyKey });
+  if (!result.ok) return { success: false, error: result.error };
+  if (!result.data.refundAppointmentPaymentSession.success) return { success: false, error: result.data.refundAppointmentPaymentSession.error || 'The refund did not go through.' };
+  refresh();
   return { success: true };
 }

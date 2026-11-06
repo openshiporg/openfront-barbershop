@@ -7,7 +7,7 @@ import { formatShopDateTime } from '@/features/shared/shop-time';
 import { DataTable, Empty, Notice, PageHeader, PillLink, Readouts, Section, StatusCell, StatusDot, Td, Track, type Tone } from '@/features/platform/lib/ui';
 import { ReconciliationControls } from '@/features/platform/barbershop/screens/OperationsControls';
 import { getPaymentsAction } from '../actions/payments';
-import { ProviderInstall, SetUpManualPayments, SetUpStripe } from '../components/PaymentControls';
+import { ProviderInstall, RefundGiftCard, SetUpManualPayments, SetUpStripe } from '../components/PaymentControls';
 
 const breadcrumbs = [
   { type: 'link' as const, label: 'Dashboard', href: basePath },
@@ -150,6 +150,29 @@ export default async function PaymentsPage() {
             )}
           </Section>
         </div>
+
+        <Section id="payments-gift-cards" title="Gift cards" count={data.giftCards.length} actions={<Link href="/gift-cards" className="text-xs font-medium underline-offset-4 hover:underline">Storefront page</Link>}>
+          {!data.giftCards.length ? <Empty>No gift cards sold yet.</Empty> : (
+            <DataTable label="Gift cards" className="relative" head={[{ label: 'Card' }, { label: 'For', className: 'max-sm:hidden' }, { label: 'Status' }, { label: 'Balance', className: 'text-right' }, { label: <span className="sr-only">Actions</span>, className: 'text-right' }]}>
+              {data.giftCards.map((card) => {
+                const unused = card.status === 'active' && card.balance === card.initialValue;
+                const refundable = unused && card.paymentSession && ['captured', 'partially_refunded'].includes(card.paymentSession.status);
+                return (
+                  <tr key={card.id}>
+                    <Td>
+                      <p className="font-mono text-sm font-medium">{card.code}</p>
+                      <p className="text-xs tabular-nums text-muted-foreground">{money(card.initialValue)} · {formatShopDateTime(card.activatedAt || card.createdAt, data.timezone)}</p>
+                    </Td>
+                    <Td className="text-muted-foreground max-sm:hidden">{card.recipientName || card.purchaserName || '—'}</Td>
+                    <Td><StatusCell tone={card.status === 'active' ? 'live' : 'off'}><span className="capitalize">{label(card.status)}</span></StatusCell></Td>
+                    <Td className="text-right font-medium tabular-nums">{money(card.balance)}</Td>
+                    <Td className="text-right">{refundable ? <RefundGiftCard paymentSessionId={card.paymentSession!.id} amountLabel={money(card.initialValue)} /> : null}</Td>
+                  </tr>
+                );
+              })}
+            </DataTable>
+          )}
+        </Section>
 
         {data.reconciliations.length > 0 ? (
           <Section id="payments-checks" title="Processor checks" count={data.reconciliations.length}>

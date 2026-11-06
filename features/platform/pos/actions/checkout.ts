@@ -187,3 +187,16 @@ export async function lookupGiftCardAction(code: string): Promise<{ success: boo
     return { success: false, error: interrupted, data: null };
   }
 }
+
+export async function returnGiftCardCheckoutAction(input: { transactionId: string; reason: string; idempotencyKey: string }) {
+  const result = await runCommand<{ giftCardId?: string; amount?: number; balance?: number; replayed?: boolean }>('returnGiftCardCheckout', `
+    mutation ReturnGiftCardCheckout($transactionId: ID!, $reason: String!, $key: String!) {
+      returnGiftCardCheckout(transactionId: $transactionId, reason: $reason, idempotencyKey: $key) { success error data }
+    }
+  `, { transactionId: input.transactionId, reason: input.reason, key: input.idempotencyKey });
+  if (result.success) {
+    revalidatePath('/dashboard/platform/reports');
+    revalidatePath('/dashboard/platform/payments');
+  }
+  return result;
+}

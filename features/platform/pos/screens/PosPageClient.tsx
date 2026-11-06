@@ -14,7 +14,7 @@ import { LocalTabs, Segmented } from '@/features/platform/booking/components/Flo
 import { DeskCardPanel } from '../components/DeskCardPanel';
 import { lookupGiftCardAction, type GiftCardLookup } from '../actions/checkout';
 import { refundDepositAction } from '@/features/platform/booking/actions/appointments';
-import { checkoutAppointmentAction, recordProductSaleAction, refundCashCheckoutAction, returnProductSaleAction, type PosQuery } from '../actions/checkout';
+import { checkoutAppointmentAction, recordProductSaleAction, refundCashCheckoutAction, returnGiftCardCheckoutAction, returnProductSaleAction, type PosQuery } from '../actions/checkout';
 import type { Paging, PosAppointment, PosCustomerSummary, PosProjectionData, PosReceipt, ProductLineSummary } from '../lib/posTypes';
 
 type Feedback = { tone: 'status' | 'alert'; text: string } | null;
@@ -560,6 +560,24 @@ function ReceiptDetail({ receipt, timeZone }: { receipt: PosReceipt; timeZone: s
   const valid = reason.trim().length >= 3 && cashReturned;
   const [cardArmed, setCardArmed] = useState(false);
   const cardKey = useCommandKey(`card-refund:${receipt.id}`);
+  const giftKey = useCommandKey(`gift-return:${receipt.id}`);
+  const giftReturnable = !refunded && receipt.paymentMethod === 'gift_card' && receipt.status === 'paid' && (receipt.total || 0) > 0;
+  const submitGiftReturn = () => {
+    if (!giftReturnable || reason.trim().length < 3) return;
+    const input = { transactionId: receipt.id, reason: reason.trim() };
+    setFeedback(null);
+    startTransition(async () => {
+      try {
+        const result = await returnGiftCardCheckoutAction({ ...input, idempotencyKey: giftKey.keyFor(input) });
+        if (!result.success) { setFeedback({ tone: 'alert', text: result.error || 'The gift card return did not go through.' }); return; }
+        giftKey.settle();
+        setRefunded(true);
+        setFeedback({ tone: 'status', text: `Returned ${formatMoney(result.data?.amount ?? receipt.total)} to the gift card. Balance now ${formatMoney(result.data?.balance)}.` });
+      } catch {
+        setFeedback({ tone: 'alert', text: interrupted });
+      }
+    });
+  };
   const cardRefundable = !refunded && receipt.paymentMethod === 'card' && receipt.status === 'paid' && Boolean(receipt.paymentSessionId) && (receipt.total || 0) > 0;
   const submitCardRefund = () => {
     if (!cardRefundable || !receipt.paymentSessionId) return;
@@ -635,6 +653,17 @@ function ReceiptDetail({ receipt, timeZone }: { receipt: PosReceipt; timeZone: s
             <Label htmlFor={`refund-cash-${receipt.id}`} className="text-xs font-normal">I returned {formatMoney(receipt.total)} in cash to the customer.</Label>
           </div>
           <Track><Pill size="sm" variant="danger" disabled={pending || !valid} onClick={submitRefund}>Record cash refund</Pill></Track>
+        </div>
+      )}
+      {giftReturnable && (
+        <div className="space-y-2 rounded-[6px] border border-destructive/30 p-3">
+          <p className="text-xs font-medium">Return to gift card</p>
+          <p className="text-xs tabular-nums text-muted-foreground">Puts the amount taken back on the client&apos;s gift card · voids unpaid commissions</p>
+          <div className="grid gap-1">
+            <Label htmlFor={`gift-return-reason-${receipt.id}`}>Reason</Label>
+            <Input id={`gift-return-reason-${receipt.id}`} className="rounded-[6px]" value={reason} maxLength={1000} onChange={(event) => setReason(event.target.value)} />
+          </div>
+          <Track><Pill size="sm" variant="danger" disabled={pending || reason.trim().length < 3} onClick={submitGiftReturn}>{pending ? 'Returning…' : `Return ${formatMoney(receipt.total)} to gift card`}</Pill></Track>
         </div>
       )}
       {cardRefundable && (

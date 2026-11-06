@@ -19,7 +19,7 @@ import { recordOf } from './paymentSessionResult';
  */
 
 type Context = { session?: Parameters<typeof permissions.canManagePayments>[0]['session']; prisma: PrismaClient; sudo(): { prisma: PrismaClient } };
-type Ledger = Array<{ at: string; type: 'purchase' | 'redeem'; amount: number; balance: number; ref: string }>;
+type Ledger = Array<{ at: string; type: 'purchase' | 'redeem' | 'return'; amount: number; balance: number; ref: string }>;
 
 export const GIFT_CARD_AMOUNTS = [2500, 5000, 7500, 10000, 15000, 20000];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -203,4 +203,46 @@ export async function redeemGiftCardInTransaction(transaction: Prisma.Transactio
   const ledger = [...(Array.isArray(card.ledger) ? card.ledger as Ledger : []), { at: input.now.toISOString(), type: 'redeem' as const, amount: input.amount, balance, ref: input.transactionId }];
   await transaction.giftCard.update({ where: { id: card.id }, data: { balance, status: balance === 0 ? 'redeemed' : 'active', ledger } });
   return card;
+}
+
+/**
+ * Reverses a visit paid with a gift card: the debited amount goes back on the card (ledger `return`),
+ * the receipt is marked refunded, and unpaid commissions are voided, like a cash refund.
+ */
+export async function returnGiftCardCheckout(_root: unknown, args: { transactionId: string; reason: string; idempotencyKey: string }, context: Context) {
+  if (!permissions.canManagePayments({ session: context.session })) return { success: false, error: 'Not authorized.', data: null };
+  try {
+    const shopId = await requireCurrentShopPermission(context.session, 'canManagePayments');
+    const reason = (args.reason || '').trim();
+    if (reason.length < 3 || reason.length > 1000) throw new Error('Give a reason for the return.');
+    if (!args.idempotencyKey?.trim()) throw new Error('Request key is missing. Reload and try again.');
+    const data = await context.prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))', 'barbershop-cash-refund', args.transactionId);
+      const receipt = await tx.checkoutTransaction.findFirst({ where: { id: args.transactionId, shopId } });
+      if (!receipt || String(receipt.paymentMethod) !== 'gift_card') throw new Error('Only a gift card receipt can be returned to the card.');
+      if (receipt.status === 'refunded') {
+        const card = await tx.giftCard.findFirst({ where: { shopId, ledger: { array_contains: [{ ref: `return:${receipt.id}` }] } } });
+        return { giftCardId: card?.id || null, amount: 0, balance: card?.balance ?? null, replayed: true };
+      }
+      if (receipt.status !== 'paid') throw new Error(`A ${receipt.status} receipt can't be returned.`);
+      const paidCommission = await tx.commission.count({ where: { transactionId: receipt.id, status: 'paid' } });
+      if (paidCommission) throw new Error('A commission on this visit was already paid. Owner reconciliation is required first.');
+      const card = await tx.giftCard.findFirst({ where: { shopId, ledger: { array_contains: [{ ref: receipt.id }] } } });
+      if (!card) throw new Error('The gift card used on this receipt was not found.');
+      const ledger = Array.isArray(card.ledger) ? card.ledger as Array<{ at: string; type: string; amount: number; balance: number; ref: string }> : [];
+      const debit = ledger.filter((entry) => entry.type === 'redeem' && entry.ref === receipt.id).reduce((sum, entry) => sum + entry.amount, 0);
+      if (debit <= 0) throw new Error('Nothing was taken from a gift card on this receipt.');
+      const now = new Date();
+      const balance = card.balance + debit;
+      await tx.giftCard.update({ where: { id: card.id }, data: { balance, status: card.status === 'redeemed' ? 'active' : card.status, ledger: [...ledger, { at: now.toISOString(), type: 'return', amount: debit, balance, ref: `return:${receipt.id}` }] } });
+      await tx.checkoutTransaction.update({ where: { id: receipt.id }, data: { status: 'refunded' } });
+      await tx.appointment.updateMany({ where: { transactionId: receipt.id, shopId }, data: { paymentStatus: 'refunded' } });
+      await tx.commission.updateMany({ where: { transactionId: receipt.id, status: { in: ['projected', 'approved'] } }, data: { status: 'voided' } });
+      await enqueueLifecycleEvent(tx, buildLifecycleEnvelope({ actorId: context.session?.itemId, eventKey: `gift-card-return:${receipt.id}`, eventType: 'checkout.gift_card_returned', aggregateType: 'checkout_transaction', aggregateId: receipt.id, shopId, occurredAt: now, data: { giftCardId: card.id, amount: debit, balance, reason } }));
+      return { giftCardId: card.id, amount: debit, balance, replayed: false };
+    });
+    return { success: true, error: null, data };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unable to return the gift card payment.', data: null };
+  }
 }

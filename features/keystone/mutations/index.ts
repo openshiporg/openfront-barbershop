@@ -30,7 +30,7 @@ import { addShopMemberByEmail, platformTeam } from "./manageTeam";
 import { confirmDepositCheckout, getPublicPaymentOptions, startDepositCheckout } from "./publicDeposits";
 import { sweepStalePaymentSessions } from "../utils/expireStalePaymentSessions";
 import { requireCurrentShopPermission } from "../utils/currentAuthorization";
-import { confirmGiftCardOrder, giftCardOptions, lookupGiftCard, settleOpenGiftCards, startGiftCardCheckout } from "./giftCards";
+import { confirmGiftCardOrder, giftCardOptions, lookupGiftCard, returnGiftCardCheckout, settleOpenGiftCards, startGiftCardCheckout } from "./giftCards";
 import { cancelDeskCardPayment, checkDeskCardPayment, openDeskCardPayment, startDeskCardPayment } from "./deskCardPayment";
 import markAppointmentNoShow from "./markAppointmentNoShow";
 import { createCommissionPayout, transitionCommission } from "./manageCommissions";
@@ -565,6 +565,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         cancelDeskCardPayment(paymentSessionId: ID!): DomainCommandResult!
         expireStalePaymentSessions(force: Boolean): DomainCommandResult!
         startGiftCardCheckout(amount: Int!, purchaserName: String!, purchaserEmail: String!, recipientName: String, recipientEmail: String, message: String): DomainCommandResult!
+        returnGiftCardCheckout(transactionId: ID!, reason: String!, idempotencyKey: String!): DomainCommandResult!
         confirmGiftCardOrder(giftCardId: ID!, token: String!): DomainCommandResult!
         confirmDepositCheckout(appointmentId: ID!, accessToken: String): DomainCommandResult!
 
@@ -693,6 +694,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         checkDeskCardPayment,
         cancelDeskCardPayment,
         startGiftCardCheckout,
+        returnGiftCardCheckout,
         confirmGiftCardOrder,
         expireStalePaymentSessions: async (_root: unknown, _args: unknown, context: any) => {
           try {
