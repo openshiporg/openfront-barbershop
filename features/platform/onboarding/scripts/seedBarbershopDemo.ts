@@ -7,7 +7,7 @@ import { runSerializableTransaction } from '../../../keystone/utils/serializable
 import { strictPrisma } from '../../../keystone/utils/strictPrisma'
 import { assertUsdSettlementCurrency } from '../../../keystone/utils/supportedSettlementCurrency'
 import { sanitizeStoreLogoSvg } from '../../../shared/sanitize-store-logo'
-import { normalizeStoreLogoColor } from '../../store-settings/lib/store-logo'
+import { DEFAULT_STORE_LOGO_COLOR, DEFAULT_STORE_LOGO_ICON, normalizeStoreLogoColor } from '../../store-settings/lib/store-logo'
 
 type SeedRecord = Record<string, unknown>
 type KeystoneItem = SeedRecord & { id: string }
@@ -281,8 +281,9 @@ function seedShopData(shop: SeedRecord) {
   try { new Intl.DateTimeFormat('en', { timeZone: timezone }).format() } catch { throw new Error('Timezone must be a valid IANA timezone.') }
   const currencyCode = text(shop.currencyCode, 'USD')
   assertUsdSettlementCurrency(currencyCode)
-  const logoIcon = typeof shop.logoIcon === 'string' && shop.logoIcon.trim() ? sanitizeStoreLogoSvg(shop.logoIcon) : ''
-  if (typeof shop.logoIcon === 'string' && shop.logoIcon.trim() && !logoIcon) throw new Error('Invalid SVG format.')
+  // Like E-commerce's onboarding, a logo is always written: the seed's, else the registry default.
+  const logoIcon = sanitizeStoreLogoSvg(typeof shop.logoIcon === 'string' && shop.logoIcon.trim() ? shop.logoIcon : DEFAULT_STORE_LOGO_ICON)
+  if (!logoIcon) throw new Error('Invalid SVG format.')
   return {
     name: text(shop.name, 'Barbershop'),
     legalName: text(shop.legalName, text(shop.name, 'Barbershop')),
@@ -295,8 +296,8 @@ function seedShopData(shop: SeedRecord) {
     jurisdictionCode: text(shop.jurisdictionCode, 'US-NY'),
     hours: (shop.hours ?? {}) as object,
     brandColor: text(shop.brandColor, 'amber'),
-    ...(logoIcon ? { logoIcon } : {}),
-    ...(shop.logoColor !== undefined ? { logoColor: normalizeStoreLogoColor(shop.logoColor) } : {}),
+    logoIcon,
+    logoColor: normalizeStoreLogoColor(shop.logoColor ?? DEFAULT_STORE_LOGO_COLOR),
     isDemo: shop.isDemo !== false,
   }
 }
