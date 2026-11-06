@@ -30,6 +30,10 @@ export function shopDayRange(value: string | Date, timeZone: string) {
   next.setUTCDate(next.getUTCDate() + 1);
   return { start: shopWallTime(key, 0, timeZone), end: shopWallTime(next.toISOString().slice(0, 10), 0, timeZone) };
 }
+/** "Nov 6, 2026, 2:30 PM" on every engine (Safari's own join is " at ", which breaks hydration). */
 export function formatShopDateTime(value: string | Date, timeZone: string) {
-  return new Intl.DateTimeFormat('en-US', { timeZone, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+  const date = new Date(value);
+  const day = new Intl.DateTimeFormat('en-US', { timeZone, dateStyle: 'medium' }).format(date);
+  const time = new Intl.DateTimeFormat('en-US', { timeZone, timeStyle: 'short' }).format(date);
+  return `${day}, ${time}`;
 }

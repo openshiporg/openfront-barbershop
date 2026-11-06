@@ -30,7 +30,14 @@ function formatDateTime(value: string | null | undefined, timeZone: string) {
   if (!value) return 'Not recorded';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Not recorded';
-  return new Intl.DateTimeFormat('en-US', { timeZone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(date);
+  // Built from parts: Safari joins date and time with " at ", Node with ", ", which broke hydration.
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).formatToParts(date).map((part) => [part.type, part.value]));
+  return `${parts.month} ${parts.day}, ${parts.hour}:${parts.minute} ${parts.dayPeriod} ${parts.timeZoneName}`;
+}
+function formatDate(value: string | null | undefined, timeZone: string) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return 'Not recorded';
+  return new Intl.DateTimeFormat('en-US', { timeZone, month: 'short', day: 'numeric', year: 'numeric' }).format(date);
 }
 
 function customerName(customer?: PosCustomerSummary | null) {
@@ -304,7 +311,7 @@ function TenderPanel({ appointment, closed, timeZone, onlineCard }: { appointmen
               <Input id={`gift-${id}`} className="rounded-[6px] font-mono uppercase" value={giftCode} onChange={(event) => { setGiftCode(event.target.value); setGiftCard(null); setGiftError(null); }} placeholder="XXXX-XXXX-XXXX" autoComplete="off" />
               <Pill type="submit" disabled={checkingGift || giftCode.trim().length < 12}>{checkingGift ? 'Checking…' : 'Check'}</Pill>
             </form>
-            {giftCard && giftCard.status === 'active' ? <p className="text-xs tabular-nums text-muted-foreground">Balance {formatMoney(giftCard.balance)}{giftCard.expiresAt ? ` · valid until ${formatDateTime(giftCard.expiresAt, timeZone)}` : ''}{giftCard.balance < collect ? ` · ${formatMoney(collect - giftCard.balance)} short, take the rest by card first` : ` · ${formatMoney(giftCard.balance - collect)} left after this visit`}</p> : null}
+            {giftCard && giftCard.status === 'active' ? <p className="text-xs tabular-nums text-muted-foreground">Balance {formatMoney(giftCard.balance)}{giftCard.expiresAt ? ` · valid until ${formatDate(giftCard.expiresAt, timeZone)}` : ''}{giftCard.balance < collect ? ` · ${formatMoney(collect - giftCard.balance)} short, take the rest by card first` : ` · ${formatMoney(giftCard.balance - collect)} left after this visit`}</p> : null}
             {giftError ? <p role="alert" className="text-xs text-destructive">{giftError}</p> : null}
           </div>
         )}

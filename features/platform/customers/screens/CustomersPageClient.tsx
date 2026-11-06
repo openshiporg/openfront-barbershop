@@ -54,7 +54,9 @@ function validDate(value?: string | null) {
 function formatDateTime(value: string | null | undefined, timeZone: string, empty = 'Not recorded') {
   const date = validDate(value);
   if (!date) return empty;
-  return new Intl.DateTimeFormat('en-US', { timeZone, month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(date);
+  const day = new Intl.DateTimeFormat('en-US', { timeZone, month: 'short', day: 'numeric', year: 'numeric' }).format(date);
+  const time = new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(date);
+  return `${day}, ${time}`;
 }
 
 function formatDay(value: string | null | undefined, timeZone: string, empty = 'Not recorded') {
