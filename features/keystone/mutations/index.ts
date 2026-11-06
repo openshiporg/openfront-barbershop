@@ -28,6 +28,10 @@ import selectActiveShop from "./selectActiveShop";
 import claimShopOwnership, { claimableShops } from "./claimShopOwnership";
 import { addShopMemberByEmail, platformTeam } from "./manageTeam";
 import { confirmDepositCheckout, getPublicPaymentOptions, startDepositCheckout } from "./publicDeposits";
+import { expireStalePaymentSessions } from "../utils/expireStalePaymentSessions";
+import { requireCurrentShopPermission } from "../utils/currentAuthorization";
+import { confirmGiftCardOrder, giftCardOptions, lookupGiftCard, settleOpenGiftCards, startGiftCardCheckout } from "./giftCards";
+import { cancelDeskCardPayment, checkDeskCardPayment, openDeskCardPayment, startDeskCardPayment } from "./deskCardPayment";
 import markAppointmentNoShow from "./markAppointmentNoShow";
 import { createCommissionPayout, transitionCommission } from "./manageCommissions";
 import { recordProductSale, returnProductSaleLine } from "./manageProductSales";
@@ -442,6 +446,9 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         claimableShops: [ClaimableShop!]!
         getPublicWalkInStatus: PublicWalkInStatus!
         getPublicPaymentOptions: PublicPaymentOptions!
+        openDeskCardPayment(appointmentId: ID!): DomainCommandResult!
+        giftCardOptions: JSON
+        lookupGiftCard(code: String!): DomainCommandResult!
         platformTeam: PlatformProjectionResult!
         getPublicQueueEntry(
           queueEntryId: ID!
@@ -519,6 +526,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
           taxAmount: Int
           notes: String
           paymentSessionId: ID
+          giftCardCode: String
           idempotencyKey: String
         ): CheckoutAppointmentResult!
 
@@ -552,6 +560,12 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         claimShopOwnership(shopId: ID!): SelectActiveShopResult!
         addShopMemberByEmail(email: String!, membershipRole: String!): DomainCommandResult!
         startDepositCheckout(appointmentId: ID!, accessToken: String): DomainCommandResult!
+        startDeskCardPayment(appointmentId: ID!, tipAmount: Int, discountAmount: Int, taxAmount: Int, notes: String): DomainCommandResult!
+        checkDeskCardPayment(paymentSessionId: ID!): DomainCommandResult!
+        cancelDeskCardPayment(paymentSessionId: ID!): DomainCommandResult!
+        expireStalePaymentSessions: DomainCommandResult!
+        startGiftCardCheckout(amount: Int!, purchaserName: String!, purchaserEmail: String!, recipientName: String, recipientEmail: String, message: String): DomainCommandResult!
+        confirmGiftCardOrder(giftCardId: ID!, token: String!): DomainCommandResult!
         confirmDepositCheckout(appointmentId: ID!, accessToken: String): DomainCommandResult!
 
         markAppointmentNoShow(appointmentId: ID!, policyId: ID, reason: String!, idempotencyKey: String!): DomainCommandResult!
@@ -643,6 +657,9 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         claimableShops,
         getPublicWalkInStatus,
         getPublicPaymentOptions,
+        openDeskCardPayment,
+        giftCardOptions: async (_root: unknown, _args: unknown, context: any) => giftCardOptions(context.sudo().prisma),
+        lookupGiftCard,
         platformTeam,
         getPublicAppointment,
       },
@@ -672,6 +689,18 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         claimShopOwnership,
         addShopMemberByEmail,
         startDepositCheckout,
+        startDeskCardPayment,
+        checkDeskCardPayment,
+        cancelDeskCardPayment,
+        startGiftCardCheckout,
+        confirmGiftCardOrder,
+        expireStalePaymentSessions: async (_root: unknown, _args: unknown, context: any) => {
+          try {
+            const shopId = await requireCurrentShopPermission(context.session, 'canManagePayments');
+            await settleOpenGiftCards(context.prisma, shopId).catch(() => undefined);
+            return { success: true, error: null, data: { expired: await expireStalePaymentSessions(context.prisma, shopId) } };
+          } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Unable to expire payments.', data: null }; }
+        },
         confirmDepositCheckout,
         markAppointmentNoShow: async (root, args, context) => {
           const result = await markAppointmentNoShow(root, args, context); return { success: result.success, error: result.error, data: result.evidence };

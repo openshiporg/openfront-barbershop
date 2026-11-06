@@ -45,6 +45,7 @@ import { PractitionerCredential } from './PractitionerCredential';
 import { BookingPolicy } from './BookingPolicy';
 import { AppointmentChangeEvent } from './AppointmentChangeEvent';
 import { CashRefund } from './CashRefund';
+import { GiftCard } from './GiftCard';
 
 import { enforceRelationshipBoundaries } from '../utils/relationshipBoundaries';
 
@@ -81,6 +82,7 @@ export const models = enforceRelationshipBoundaries({
   MembershipEvent,
   CheckoutTransaction,
   CashRefund,
+  GiftCard,
   PaymentProvider,
   PaymentSession,
   PaymentWebhookEvent,

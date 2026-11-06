@@ -102,8 +102,9 @@ export default async function BarbershopOperationsPage() {
   }
 
   // Card payments still open with the processor.
-  if (data.paymentSessions.length) {
-    items.push({ key: 'payments-open', tone: 'wait', state: 'Open', item: 'Card payments', detail: `${plural(data.paymentSessions.length, 'payment')} awaiting processor status · ${money(data.paymentSessions.reduce((sum, row) => sum + row.amount, 0))}`, href: `${basePath}/platform/payments`, action: 'Check' });
+  const awaiting = data.paymentSessions.filter((row) => row.status === 'pending' || row.status === 'authorized');
+  if (awaiting.length) {
+    items.push({ key: 'payments-open', tone: 'wait', state: 'Open', item: 'Card payments', detail: `${plural(awaiting.length, 'payment')} awaiting processor status · ${money(awaiting.reduce((sum, row) => sum + row.amount, 0))}`, href: `${basePath}/platform/payments`, action: 'Check' });
   }
 
   // Policy gaps.

@@ -10,6 +10,7 @@ import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycl
 import { consumePackageVisitInTransaction } from '../utils/packageUsageLedger';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
 import { assertAuthorityMatches, requireEffectivePractitionerAuthority, type PractitionerAuthoritySnapshot } from '../utils/practitionerAuthority';
+import { normalizeGiftCode, redeemGiftCardInTransaction } from './giftCards';
 import { getAppointmentWaiverRequirement, requireSignedWaiver } from '../utils/waiverEvidence';
 
 type Args = {
@@ -21,6 +22,7 @@ type Args = {
   taxAmount?: number | null;
   notes?: string | null;
   paymentSessionId?: string | null;
+  giftCardCode?: string | null;
   idempotencyKey?: string | null;
 };
 
@@ -40,7 +42,7 @@ function clean(value?: string | null) {
 }
 
 function assertCheckoutReplay(transaction: { paymentMethod: unknown; tipAmount: number | null; discountAmount: number | null; taxAmount: number | null; total: number | null; packageBalanceId: string | null; paymentSessionId: string | null; notes: string | null }, expected: { paymentMethod: string; tipAmount: number; discountAmount: number; taxAmount: number; total: number; packageBalanceId: string; paymentSessionId: string; notes: string }) {
-  if (String(transaction.paymentMethod) !== expected.paymentMethod || (transaction.tipAmount || 0) !== expected.tipAmount || (transaction.discountAmount || 0) !== expected.discountAmount || (transaction.taxAmount || 0) !== expected.taxAmount || (transaction.total || 0) !== expected.total || (transaction.packageBalanceId || '') !== expected.packageBalanceId || (expected.paymentSessionId && (transaction.paymentSessionId || '') !== expected.paymentSessionId) || ((transaction.notes || '') !== expected.notes && !(transaction.notes || '').startsWith(expected.notes ? `${expected.notes} · Deposit ` : 'Deposit '))) throw new Error('This appointment was already checked out with different tender or totals.');
+  if (String(transaction.paymentMethod) !== expected.paymentMethod || (transaction.tipAmount || 0) !== expected.tipAmount || (transaction.discountAmount || 0) !== expected.discountAmount || (transaction.taxAmount || 0) !== expected.taxAmount || (transaction.total || 0) !== expected.total || (transaction.packageBalanceId || '') !== expected.packageBalanceId || (expected.paymentSessionId && (transaction.paymentSessionId || '') !== expected.paymentSessionId) || ((transaction.notes || '') !== expected.notes && !['Deposit ', 'Gift card '].some((suffix) => (transaction.notes || '').startsWith(expected.notes ? `${expected.notes} · ${suffix}` : suffix)))) throw new Error('This appointment was already checked out with different tender or totals.');
 }
 
 const checkoutInclude = {
@@ -81,7 +83,9 @@ export default async function checkoutAppointment(
     const packageBalanceId = clean(args.packageBalanceId);
     // Card is tender taken on the shop's own terminal and recorded here; no
     // online card settlement is connected.
-    if (!['cash', 'card', 'package'].includes(paymentMethod)) throw new Error('Choose cash, card or a prepaid visit.');
+    if (!['cash', 'card', 'package', 'gift_card'].includes(paymentMethod)) throw new Error('Choose cash, card, gift card or a prepaid visit.');
+    const giftCardCode = paymentMethod === 'gift_card' ? normalizeGiftCode(clean(args.giftCardCode)) : '';
+    if (paymentMethod === 'gift_card' && !giftCardCode) throw new Error('Enter the 12-character gift card code.');
     if (preview.shop.currencyCode !== 'USD') throw new Error('This release supports USD settlement only.');
     if (preview.price == null) throw new Error('This legacy appointment has no agreed price. Resolve its commercial evidence before checkout.');
     const subtotal = paymentMethod === 'package' ? 0 : money(preview.price);
@@ -92,7 +96,7 @@ export default async function checkoutAppointment(
 
     if (!Number.isSafeInteger(total) || total > 2_000_000_000) throw new Error('Checkout total exceeds the supported limit.');
     if (paymentMethod === 'package' && total > 0) throw new Error('Package tender covers a visit only. Collect tips/tax separately; mixed tender is not supported.');
-    if (clean(args.paymentSessionId)) throw new Error('Processor settlement is not enabled for this cash-only release.');
+    if (clean(args.paymentSessionId) && paymentMethod !== 'card') throw new Error('A card payment session can only settle card tender.');
     const idempotencyKey = clean(args.idempotencyKey);
     if (idempotencyKey.length > 200) throw new Error('Checkout request key is too long.');
     const commandKeyHash = idempotencyKey ? hashPublicAccessToken(idempotencyKey) : null;
@@ -160,15 +164,17 @@ export default async function checkoutAppointment(
         if (!paymentSession || paymentSession.shopId !== appointment.shopId || paymentSession.appointmentId !== appointment.id) {
           throw new Error('Selected payment session does not belong to this appointment and shop.');
         }
-        if (paymentSession.status !== 'captured' || Number(paymentSession.amount) !== total) {
+        const paidDeposit = appointment.paymentStatus === 'deposit_paid' ? Math.min(appointment.depositAmount || 0, total) : 0;
+        if (paymentSession.status !== 'captured' || Number(paymentSession.amount) !== total - paidDeposit) {
           throw new Error('Payment session must be captured for the exact checkout total.');
         }
       }
 
       const completedAt = new Date();
       // A deposit paid online is part of this receipt's total; staff collect the balance.
-      const depositSession = !paymentSession && appointment.paymentStatus === 'deposit_paid'
-        ? await transaction.paymentSession.findFirst({ where: { appointmentId: appointment.id, status: 'captured', transaction: null }, orderBy: { capturedAt: 'desc' } })
+      const depositSession = appointment.paymentStatus === 'deposit_paid'
+        ? (await transaction.paymentSession.findMany({ where: { appointmentId: appointment.id, status: 'captured', transaction: null, ...(paymentSession ? { id: { not: paymentSession.id } } : {}) }, orderBy: { capturedAt: 'desc' }, take: 5 }))
+          .find((row) => (row.metadata as Record<string, unknown> | null)?.purpose !== 'desk_card') || null
         : null;
       const depositNote = depositSession ? `Deposit ${(depositSession.amount / 100).toFixed(2)} paid online` : '';
       const checkout = await transaction.checkoutTransaction.create({
@@ -191,9 +197,14 @@ export default async function checkoutAppointment(
           currencyCode: 'USD',
           merchantSnapshot: { name: appointment.shop.name, legalName: appointment.shop.legalName, address: appointment.shop.address, phone: appointment.shop.phone, timezone: appointment.shop.timezone },
           taxRuleSnapshot: { mode: 'operator_entered', amount: taxAmount },
-          notes: [clean(args.notes), depositNote].filter(Boolean).join(' · '),
+          notes: [clean(args.notes), depositNote, giftCardCode ? `Gift card ${giftCardCode.slice(-4)}` : ''].filter(Boolean).join(' · '),
         },
       });
+
+      if (giftCardCode) {
+        const owed = total - (depositSession ? Math.min(depositSession.amount, total) : 0);
+        if (owed > 0) await redeemGiftCardInTransaction(transaction, { shopId: appointment.shopId, code: giftCardCode, amount: owed, transactionId: checkout.id, now: completedAt });
+      }
 
       const snapshot = buildAppointmentLineItemSnapshot(appointment, packageBalance);
       const lineItem = await transaction.appointmentLineItem.create({

@@ -120,6 +120,7 @@ model Shop {
   updatedAt                     DateTime                 @default(now()) @updatedAt
   from_GuestBookingCommand_shop GuestBookingCommand[]    @relation("GuestBookingCommand_shop")
   from_CashRefund_shop          CashRefund[]             @relation("CashRefund_shop")
+  from_GiftCard_shop            GiftCard[]               @relation("GiftCard_shop")
 }
 
 model ShopMembership {
@@ -898,6 +899,32 @@ model CashRefund {
   @@index([shopId])
 }
 
+model GiftCard {
+  id               String              @id @default(cuid())
+  shop             Shop                @relation("GiftCard_shop", fields: [shopId], references: [id])
+  shopId           String              @map("shop")
+  code             String              @unique @default("")
+  status           GiftCardStatusType? @default(pending)
+  initialValue     Int
+  balance          Int
+  purchaserName    String              @default("")
+  purchaserEmail   String              @default("")
+  recipientName    String              @default("")
+  recipientEmail   String              @default("")
+  message          String              @default("")
+  paymentSession   PaymentSession?     @relation("GiftCard_paymentSession", fields: [paymentSessionId], references: [id])
+  paymentSessionId String?             @map("paymentSession")
+  expiresAt        DateTime?
+  activatedAt      DateTime?
+  emailedAt        DateTime?
+  ledger           Json?               @default("[]")
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @default(now()) @updatedAt
+
+  @@index([shopId])
+  @@index([paymentSessionId])
+}
+
 model PaymentProvider {
   id                          String           @id @default(cuid())
   shop                        Shop             @relation("PaymentProvider_shop", fields: [shopId], references: [id])
@@ -922,27 +949,28 @@ model PaymentProvider {
 }
 
 model PaymentSession {
-  id                 String                    @id @default(cuid())
-  shop               Shop                      @relation("PaymentSession_shop", fields: [shopId], references: [id])
-  shopId             String                    @map("shop")
-  appointment        Appointment?              @relation("PaymentSession_appointment", fields: [appointmentId], references: [id])
-  appointmentId      String?                   @map("appointment")
-  transaction        CheckoutTransaction?      @relation("CheckoutTransaction_paymentSession")
-  paymentProvider    PaymentProvider?          @relation("PaymentSession_paymentProvider", fields: [paymentProviderId], references: [id])
-  paymentProviderId  String?                   @map("paymentProvider")
-  reconciliations    PaymentReconciliation[]   @relation("PaymentReconciliation_paymentSession")
-  idempotencyKeyHash String                    @unique @default("")
-  status             PaymentSessionStatusType? @default(pending)
-  amount             Int
-  currencyCode       String                    @default("USD")
-  providerPaymentId  String                    @default("")
-  expiresAt          DateTime?
-  capturedAt         DateTime?
-  cancelledAt        DateTime?
-  refundedAmount     Int?                      @default(0)
-  metadata           Json?                     @default("{}")
-  createdAt          DateTime                  @default(now())
-  updatedAt          DateTime                  @default(now()) @updatedAt
+  id                           String                    @id @default(cuid())
+  shop                         Shop                      @relation("PaymentSession_shop", fields: [shopId], references: [id])
+  shopId                       String                    @map("shop")
+  appointment                  Appointment?              @relation("PaymentSession_appointment", fields: [appointmentId], references: [id])
+  appointmentId                String?                   @map("appointment")
+  transaction                  CheckoutTransaction?      @relation("CheckoutTransaction_paymentSession")
+  paymentProvider              PaymentProvider?          @relation("PaymentSession_paymentProvider", fields: [paymentProviderId], references: [id])
+  paymentProviderId            String?                   @map("paymentProvider")
+  reconciliations              PaymentReconciliation[]   @relation("PaymentReconciliation_paymentSession")
+  idempotencyKeyHash           String                    @unique @default("")
+  status                       PaymentSessionStatusType? @default(pending)
+  amount                       Int
+  currencyCode                 String                    @default("USD")
+  providerPaymentId            String                    @default("")
+  expiresAt                    DateTime?
+  capturedAt                   DateTime?
+  cancelledAt                  DateTime?
+  refundedAmount               Int?                      @default(0)
+  metadata                     Json?                     @default("{}")
+  createdAt                    DateTime                  @default(now())
+  updatedAt                    DateTime                  @default(now()) @updatedAt
+  from_GiftCard_paymentSession GiftCard[]                @relation("GiftCard_paymentSession")
 
   @@index([shopId])
   @@index([appointmentId])
@@ -1517,6 +1545,13 @@ enum CheckoutTransactionPaymentMethodType {
   package
   gift_card
   other
+}
+
+enum GiftCardStatusType {
+  pending
+  active
+  redeemed
+  cancelled
 }
 
 enum PaymentSessionStatusType {

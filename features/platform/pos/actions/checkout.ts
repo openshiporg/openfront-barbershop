@@ -12,6 +12,7 @@ export type CheckoutInput = {
   discountAmount?: number;
   taxAmount?: number;
   notes?: string;
+  giftCardCode?: string;
   // Created in the browser for this ticket's checkout intent and reused on retry.
   idempotencyKey: string;
 };
@@ -111,6 +112,7 @@ export async function checkoutAppointmentAction(input: CheckoutInput): Promise<P
       $discountAmount: Int
       $taxAmount: Int
       $notes: String
+      $giftCardCode: String
       $idempotencyKey: String!
     ) {
       checkoutAppointment(
@@ -121,6 +123,7 @@ export async function checkoutAppointmentAction(input: CheckoutInput): Promise<P
         discountAmount: $discountAmount
         taxAmount: $taxAmount
         notes: $notes
+        giftCardCode: $giftCardCode
         idempotencyKey: $idempotencyKey
       ) {
         success
@@ -141,4 +144,46 @@ export async function checkoutAppointmentAction(input: CheckoutInput): Promise<P
   revalidatePath('/dashboard/appointments');
   revalidatePath('/dashboard/checkout-transactions');
   return { success: true, error: null, data: { transaction: result.transaction, appointment: result.appointment } };
+}
+
+export type DeskCard = { sessionId: string; url: string | null; amount: number; status: string; recorded: boolean; transactionId?: string | null };
+type DeskCardResponse = { success: boolean; error: string | null; data: DeskCard | null };
+
+async function deskCardCommand(name: string, query: string, variables: Record<string, unknown>): Promise<DeskCardResponse> {
+  try {
+    const response = await keystoneClient<Record<string, DeskCardResponse>>(query, variables, { cache: 'no-store' });
+    const result = response.data?.[name];
+    if (!response.success || !result) return { success: false, error: response.error || 'Unable to reach card payments.', data: null };
+    if (result.data?.recorded) { revalidatePath('/dashboard/platform/pos'); revalidatePath('/dashboard/platform/payments'); }
+    return result;
+  } catch {
+    return { success: false, error: interrupted, data: null };
+  }
+}
+
+/** Opens a Stripe card page for the ticket's balance (counter screen or texted pay link). */
+export async function startDeskCardAction(input: { appointmentId: string; tipAmount: number; discountAmount: number; taxAmount: number; notes: string }) {
+  return deskCardCommand('startDeskCardPayment', `mutation StartDeskCard($appointmentId: ID!, $tip: Int, $discount: Int, $tax: Int, $notes: String) { startDeskCardPayment(appointmentId: $appointmentId, tipAmount: $tip, discountAmount: $discount, taxAmount: $tax, notes: $notes) { success error data } }`, { appointmentId: input.appointmentId, tip: input.tipAmount, discount: input.discountAmount, tax: input.taxAmount, notes: input.notes });
+}
+
+export async function checkDeskCardAction(paymentSessionId: string) {
+  return deskCardCommand('checkDeskCardPayment', `mutation CheckDeskCard($id: ID!) { checkDeskCardPayment(paymentSessionId: $id) { success error data } }`, { id: paymentSessionId });
+}
+
+export async function cancelDeskCardAction(paymentSessionId: string) {
+  return deskCardCommand('cancelDeskCardPayment', `mutation CancelDeskCard($id: ID!) { cancelDeskCardPayment(paymentSessionId: $id) { success error data } }`, { id: paymentSessionId });
+}
+
+export async function openDeskCardAction(appointmentId: string) {
+  return deskCardCommand('openDeskCardPayment', `query OpenDeskCard($id: ID!) { openDeskCardPayment(appointmentId: $id) { success error data } }`, { id: appointmentId });
+}
+
+export type GiftCardLookup = { id: string; code: string; status: string; balance: number; expiresAt: string | null; recipientName: string | null };
+export async function lookupGiftCardAction(code: string): Promise<{ success: boolean; error: string | null; data: GiftCardLookup | null }> {
+  try {
+    const response = await keystoneClient<{ lookupGiftCard: { success: boolean; error: string | null; data: GiftCardLookup | null } }>(`query LookupGiftCard($code: String!) { lookupGiftCard(code: $code) { success error data } }`, { code }, { cache: 'no-store' });
+    return response.data?.lookupGiftCard || { success: false, error: response.error || 'Unable to look up the gift card.', data: null };
+  } catch {
+    return { success: false, error: interrupted, data: null };
+  }
 }

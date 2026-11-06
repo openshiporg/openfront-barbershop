@@ -5170,6 +5170,132 @@ input CashRefundCreateInput {
   updatedAt: DateTime
 }
 
+type GiftCard {
+  id: ID!
+  shop: Shop
+  code: String
+  status: GiftCardStatusType
+  initialValue: Int
+  balance: Int
+  purchaserName: String
+  purchaserEmail: String
+  recipientName: String
+  recipientEmail: String
+  message: String
+  paymentSession: PaymentSession
+  expiresAt: DateTime
+  activatedAt: DateTime
+  emailedAt: DateTime
+  ledger: JSON
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+enum GiftCardStatusType {
+  pending
+  active
+  redeemed
+  cancelled
+}
+
+input GiftCardWhereUniqueInput {
+  id: ID
+  code: String
+}
+
+input GiftCardWhereInput {
+  AND: [GiftCardWhereInput!]
+  OR: [GiftCardWhereInput!]
+  NOT: [GiftCardWhereInput!]
+  id: IDFilter
+  shop: ShopWhereInput
+  code: StringFilter
+  status: GiftCardStatusTypeNullableFilter
+  initialValue: IntFilter
+  balance: IntFilter
+  purchaserName: StringFilter
+  purchaserEmail: StringFilter
+  recipientName: StringFilter
+  recipientEmail: StringFilter
+  message: StringFilter
+  paymentSession: PaymentSessionWhereInput
+  expiresAt: DateTimeNullableFilter
+  activatedAt: DateTimeNullableFilter
+  emailedAt: DateTimeNullableFilter
+  createdAt: DateTimeFilter
+  updatedAt: DateTimeFilter
+}
+
+input GiftCardStatusTypeNullableFilter {
+  equals: GiftCardStatusType
+  in: [GiftCardStatusType!]
+  notIn: [GiftCardStatusType!]
+  not: GiftCardStatusTypeNullableFilter
+}
+
+input GiftCardOrderByInput {
+  id: OrderDirection
+  code: OrderDirection
+  status: OrderDirection
+  initialValue: OrderDirection
+  balance: OrderDirection
+  purchaserName: OrderDirection
+  purchaserEmail: OrderDirection
+  recipientName: OrderDirection
+  recipientEmail: OrderDirection
+  message: OrderDirection
+  expiresAt: OrderDirection
+  activatedAt: OrderDirection
+  emailedAt: OrderDirection
+  createdAt: OrderDirection
+  updatedAt: OrderDirection
+}
+
+input GiftCardUpdateInput {
+  shop: ShopRelateToOneForUpdateInput
+  code: String
+  status: GiftCardStatusType
+  initialValue: Int
+  balance: Int
+  purchaserName: String
+  purchaserEmail: String
+  recipientName: String
+  recipientEmail: String
+  message: String
+  paymentSession: PaymentSessionRelateToOneForUpdateInput
+  expiresAt: DateTime
+  activatedAt: DateTime
+  emailedAt: DateTime
+  ledger: JSON
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input GiftCardUpdateArgs {
+  where: GiftCardWhereUniqueInput!
+  data: GiftCardUpdateInput!
+}
+
+input GiftCardCreateInput {
+  shop: ShopRelateToOneForCreateInput
+  code: String
+  status: GiftCardStatusType
+  initialValue: Int
+  balance: Int
+  purchaserName: String
+  purchaserEmail: String
+  recipientName: String
+  recipientEmail: String
+  message: String
+  paymentSession: PaymentSessionRelateToOneForCreateInput
+  expiresAt: DateTime
+  activatedAt: DateTime
+  emailedAt: DateTime
+  ledger: JSON
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
 type PaymentProvider {
   id: ID!
   shop: Shop
@@ -7044,6 +7170,12 @@ type Mutation {
   updateCashRefunds(data: [CashRefundUpdateArgs!]!): [CashRefund]
   deleteCashRefund(where: CashRefundWhereUniqueInput!): CashRefund
   deleteCashRefunds(where: [CashRefundWhereUniqueInput!]!): [CashRefund]
+  createGiftCard(data: GiftCardCreateInput!): GiftCard
+  createGiftCards(data: [GiftCardCreateInput!]!): [GiftCard]
+  updateGiftCard(where: GiftCardWhereUniqueInput!, data: GiftCardUpdateInput!): GiftCard
+  updateGiftCards(data: [GiftCardUpdateArgs!]!): [GiftCard]
+  deleteGiftCard(where: GiftCardWhereUniqueInput!): GiftCard
+  deleteGiftCards(where: [GiftCardWhereUniqueInput!]!): [GiftCard]
   createPaymentProvider(data: PaymentProviderCreateInput!): PaymentProvider
   createPaymentProviders(data: [PaymentProviderCreateInput!]!): [PaymentProvider]
   updatePaymentProvider(where: PaymentProviderWhereUniqueInput!, data: PaymentProviderUpdateInput!): PaymentProvider
@@ -7152,7 +7284,7 @@ type Mutation {
   captureAppointmentPaymentSession(paymentSessionId: ID!): AppointmentPaymentSessionResult!
   refundAppointmentPaymentSession(paymentSessionId: ID!, amount: Int, idempotencyKey: String!): AppointmentPaymentSessionResult!
   cancelAppointmentPaymentSession(paymentSessionId: ID!): AppointmentPaymentSessionResult!
-  checkoutAppointment(appointmentId: ID!, paymentMethod: String, packageBalanceId: ID, tipAmount: Int, discountAmount: Int, taxAmount: Int, notes: String, paymentSessionId: ID, idempotencyKey: String): CheckoutAppointmentResult!
+  checkoutAppointment(appointmentId: ID!, paymentMethod: String, packageBalanceId: ID, tipAmount: Int, discountAmount: Int, taxAmount: Int, notes: String, paymentSessionId: ID, giftCardCode: String, idempotencyKey: String): CheckoutAppointmentResult!
   recordInventoryMovement(inventoryLotId: ID!, movementType: String!, quantityDelta: Int!, reason: String!, referenceKey: String!): InventoryMovementResult!
   receiveInventoryLot(productId: ID!, supplierId: ID, lotNumber: String!, quantity: Int!, unitCost: Int, receivedAt: String, expiresAt: String, idempotencyKey: String!): DomainCommandResult!
   seatWalkInQueueEntry(queueEntryId: ID!): SeatWalkInQueueEntryResult!
@@ -7162,6 +7294,12 @@ type Mutation {
   claimShopOwnership(shopId: ID!): SelectActiveShopResult!
   addShopMemberByEmail(email: String!, membershipRole: String!): DomainCommandResult!
   startDepositCheckout(appointmentId: ID!, accessToken: String): DomainCommandResult!
+  startDeskCardPayment(appointmentId: ID!, tipAmount: Int, discountAmount: Int, taxAmount: Int, notes: String): DomainCommandResult!
+  checkDeskCardPayment(paymentSessionId: ID!): DomainCommandResult!
+  cancelDeskCardPayment(paymentSessionId: ID!): DomainCommandResult!
+  expireStalePaymentSessions: DomainCommandResult!
+  startGiftCardCheckout(amount: Int!, purchaserName: String!, purchaserEmail: String!, recipientName: String, recipientEmail: String, message: String): DomainCommandResult!
+  confirmGiftCardOrder(giftCardId: ID!, token: String!): DomainCommandResult!
   confirmDepositCheckout(appointmentId: ID!, accessToken: String): DomainCommandResult!
   markAppointmentNoShow(appointmentId: ID!, policyId: ID, reason: String!, idempotencyKey: String!): DomainCommandResult!
   transitionCommission(commissionId: ID!, toStatus: String!, reason: String, idempotencyKey: String!): DomainCommandResult!
@@ -7313,6 +7451,9 @@ type Query {
   cashRefund(where: CashRefundWhereUniqueInput!): CashRefund
   cashRefunds(where: CashRefundWhereInput! = {}, orderBy: [CashRefundOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: CashRefundWhereUniqueInput): [CashRefund!]
   cashRefundsCount(where: CashRefundWhereInput! = {}): Int
+  giftCard(where: GiftCardWhereUniqueInput!): GiftCard
+  giftCards(where: GiftCardWhereInput! = {}, orderBy: [GiftCardOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: GiftCardWhereUniqueInput): [GiftCard!]
+  giftCardsCount(where: GiftCardWhereInput! = {}): Int
   paymentProvider(where: PaymentProviderWhereUniqueInput!): PaymentProvider
   paymentProviders(where: PaymentProviderWhereInput! = {}, orderBy: [PaymentProviderOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: PaymentProviderWhereUniqueInput): [PaymentProvider!]
   paymentProvidersCount(where: PaymentProviderWhereInput! = {}): Int
@@ -7386,6 +7527,9 @@ type Query {
   claimableShops: [ClaimableShop!]!
   getPublicWalkInStatus: PublicWalkInStatus!
   getPublicPaymentOptions: PublicPaymentOptions!
+  openDeskCardPayment(appointmentId: ID!): DomainCommandResult!
+  giftCardOptions: JSON
+  lookupGiftCard(code: String!): DomainCommandResult!
   platformTeam: PlatformProjectionResult!
   getPublicQueueEntry(queueEntryId: ID!, accessToken: String!): PublicQueueEntry
   getPublicAppointment(appointmentId: ID!, accessToken: String): PublicAppointment

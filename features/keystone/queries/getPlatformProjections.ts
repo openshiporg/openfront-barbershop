@@ -1,4 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
+import { expireStalePaymentSessions } from '../utils/expireStalePaymentSessions';
+import { onlineDepositProvider } from '../mutations/publicDeposits';
 
 import { shopDayRange, shopDateKey } from '../../shared/shop-time';
 import { dayKeyForDate } from '../utils/availability';
@@ -442,6 +444,7 @@ type PosArgs = { appointmentId?: string | null; ticketPage?: number | null; tick
 
 export async function getPosProjection(_root: unknown, args: PosArgs, context: Context) {
   const shopId = await scope(context, 'canManagePayments', 'Not authorized to access POS settlement.');
+  await expireStalePaymentSessions(context.prisma, shopId).catch(() => 0);
   // Tickets display accepted service/barber snapshots, so live staff/service grants are not required.
   for (const permission of ['canManageAppointments', 'canManageCustomers', 'canManageMemberships'] as const) await requireCurrentShopPermission(context.session, permission, context.prisma);
   const shop = await context.prisma.shop.findUnique({ where: { id: shopId }, select: { currencyCode: true } });
@@ -502,6 +505,7 @@ export async function getPosProjection(_root: unknown, args: PosArgs, context: C
   } : ticket;
   return {
     timeZone,
+    onlineCard: Boolean(await onlineDepositProvider(context.prisma, shopId)),
     appointments: appointments.map(eligible),
     requestedAppointment: requested ? eligible(requested) : null,
     requestedAppointmentId: args?.appointmentId || null,
@@ -687,6 +691,7 @@ const SUPPLIER_OPTION_LIMIT = 200;
 
 export async function getOperationsProjection(_root: unknown, _args: unknown, context: Context) {
   const shopId = await scope(context, 'canManagePayments', 'Not authorized to access owner operations.');
+  await expireStalePaymentSessions(context.prisma, shopId).catch(() => 0);
   // Each section is gated by its own current same-shop authority BEFORE it is read;
   // a restricted section is null (shown as restricted), never an empty list.
   const sectionAccess = async (permission: 'canManageStaff' | 'canManageServices' | 'canManageQueue' | 'canManageCustomers' | 'canManageAppointments'): Promise<RelationAccess> =>

@@ -64,6 +64,11 @@ export default async function refundAppointmentPaymentSession(_root: unknown, ar
         throw new Error('The payment provider changed after this session started. Reconcile it before refunding.');
       }
       if (!paymentSession.providerPaymentId) throw new Error('This session has no processor payment reference to refund.');
+      if (metadata.purpose === 'gift_card') {
+        const card = await transaction.giftCard.findFirst({ where: { paymentSessionId: paymentSession.id, shopId } });
+        if (card && card.balance < card.initialValue) throw new Error('This gift card has been used. Only an unused gift card can be refunded.');
+        if (requestedAmount != null && requestedAmount < paymentSession.amount) throw new Error('Gift cards are refunded in full.');
+      }
 
       const capturedAmount = Math.max(0, paymentSession.amount);
       const alreadyRefunded = Math.max(0, paymentSession.refundedAmount || 0);
@@ -104,6 +109,10 @@ export default async function refundAppointmentPaymentSession(_root: unknown, ar
           where: { id: paymentSession.appointmentId, shopId, paymentStatus: 'deposit_paid', transactionId: null },
           data: { paymentStatus: 'refunded' },
         });
+      }
+      // A refunded gift card sale voids the unspent card.
+      if (fullyRefunded && recordOf(paymentSession.metadata).purpose === 'gift_card') {
+        await transaction.giftCard.updateMany({ where: { paymentSessionId: paymentSession.id, shopId }, data: { status: 'cancelled', balance: 0 } });
       }
       if (paymentSession.transaction?.id) {
         await transaction.checkoutTransaction.update({

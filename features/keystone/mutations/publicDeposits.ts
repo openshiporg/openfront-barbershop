@@ -48,7 +48,8 @@ export async function startDepositCheckout(_root: unknown, args: Args, context: 
     const provider = await onlineDepositProvider(prisma, appointment.shopId);
     if (!provider) throw new Error('Online deposits are not available. Pay the deposit in the shop.');
 
-    const open = await prisma.paymentSession.findFirst({ where: { appointmentId: appointment.id, paymentProviderId: provider.id, status: 'pending', amount }, orderBy: { createdAt: 'desc' } });
+    const open = (await prisma.paymentSession.findMany({ where: { appointmentId: appointment.id, paymentProviderId: provider.id, status: 'pending', amount }, orderBy: { createdAt: 'desc' }, take: 5 }))
+      .find((row) => (row.metadata as Record<string, unknown> | null)?.purpose !== 'desk_card');
     const openUrl = open && typeof (open.metadata as Record<string, unknown> | null)?.checkoutUrl === 'string' ? String((open.metadata as Record<string, unknown>).checkoutUrl) : '';
     if (open && openUrl && (!open.expiresAt || open.expiresAt > new Date())) return { success: true, error: null, data: { url: openUrl } };
 
@@ -78,7 +79,8 @@ export async function confirmDepositCheckout(_root: unknown, args: Args, context
   try {
     const { prisma, appointment } = await loadAppointment(context, args);
     if (appointment.paymentStatus === 'deposit_paid') return { success: true, error: null, data: { paid: true } };
-    const session = await prisma.paymentSession.findFirst({ where: { appointmentId: appointment.id, status: 'pending', paymentProvider: { code: STRIPE_CODE } }, orderBy: { createdAt: 'desc' }, include: { paymentProvider: { select: { code: true } } } });
+    const session = (await prisma.paymentSession.findMany({ where: { appointmentId: appointment.id, status: 'pending', paymentProvider: { code: STRIPE_CODE } }, orderBy: { createdAt: 'desc' }, take: 5, include: { paymentProvider: { select: { code: true } } } }))
+      .find((row) => (row.metadata as Record<string, unknown> | null)?.purpose !== 'desk_card');
     if (!session || !session.paymentProvider) return { success: true, error: null, data: { paid: false } };
     const status = await getPaymentStatus({ provider: { code: session.paymentProvider.code }, paymentId: session.providerPaymentId }) as { status?: string; amount?: number | null };
     if (status.status === 'expired') {

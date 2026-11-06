@@ -78,6 +78,7 @@ export type Paging = { page: number; pageSize: number; total: number };
 
 export type PosProjectionData = {
   timeZone: string;
+  onlineCard?: boolean;
   appointments: PosAppointment[];
   requestedAppointment: PosAppointment | null;
   requestedAppointmentId: string | null;

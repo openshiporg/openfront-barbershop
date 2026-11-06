@@ -13,6 +13,8 @@ export type PaymentsData = { shopName: string; timezone: string; providers: Prov
 export async function getPaymentsAction(): Promise<PaymentsData | null> {
   const shop = await activeShop();
   if (!shop) return null;
+  // Unpaid card pages past their lifetime close on their own before the list is read.
+  await platformRequest('mutation { expireStalePaymentSessions { success } }').catch(() => null);
   const since = new Date(Date.now() - 30 * 86400_000).toISOString();
   const result = await platformRequest<{ shop: { timezone: string | null } | null; paymentProviders: ProviderRow[]; paymentSessions: SessionRow[]; checkoutTransactions: ReceiptRow[]; paymentReconciliations: ReconciliationRow[] }>(`
     query Payments($shop: ID!, $since: DateTime!) {

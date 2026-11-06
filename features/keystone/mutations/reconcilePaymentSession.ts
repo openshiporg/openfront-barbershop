@@ -124,7 +124,7 @@ export default async function reconcilePaymentSession(_root: unknown, args: Args
         const appointment = paymentSession.appointmentId
           ? await transaction.appointment.findFirst({ where: { id: paymentSession.appointmentId, shopId }, select: { id: true, paymentStatus: true, transactionId: true } })
           : null;
-        if (appointment && !appointmentSettledElsewhere(appointment.paymentStatus) && next === 'captured') {
+        if (appointment && recordOf(paymentSession.metadata).purpose !== 'desk_card' && !appointmentSettledElsewhere(appointment.paymentStatus) && next === 'captured') {
           await transaction.appointment.update({ where: { id: appointment.id }, data: { paymentStatus: 'deposit_paid' } });
         }
         if (appointment && next === 'refunded' && appointment.paymentStatus === 'deposit_paid' && !appointment.transactionId) {

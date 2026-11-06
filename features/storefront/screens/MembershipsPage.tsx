@@ -16,7 +16,7 @@ export default async function MembershipsPage() {
         <section className="sf-container sf-page-head">
           <div className="sf-page-head-row">
             <h1 className="sf-display">Memberships</h1>
-            <div className="sf-actions"><Link href="/account" className="sf-btn">Your balances</Link><Link href="/book" className="sf-btn is-primary">Book a time</Link></div>
+            <div className="sf-actions"><Link href="/gift-cards" className="sf-btn">Gift cards</Link><Link href="/account" className="sf-btn">Your balances</Link><Link href="/book" className="sf-btn is-primary">Book a time</Link></div>
           </div>
           <p className="sf-lead">Bought in the shop, used when you book.</p>
         </section>

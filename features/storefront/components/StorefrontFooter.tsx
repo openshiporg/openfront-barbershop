@@ -19,6 +19,7 @@ export function StorefrontFooter({ settings }: { settings: PublicStorefrontSetti
           <Link href="/barbers">Barbers</Link>
           <Link href="/shop">Shop</Link>
           <Link href="/memberships">Memberships</Link>
+          <Link href="/gift-cards">Gift cards</Link>
           <Link href="/appointment">My appointment</Link>
           <Link href="/account">Account</Link>
         </nav>

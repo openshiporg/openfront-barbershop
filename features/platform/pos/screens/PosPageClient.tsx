@@ -11,6 +11,8 @@ import { shopDateKey } from '@/features/shared/shop-time';
 import { cn } from '@/lib/utils';
 import { Empty, Notice, Pager as KitPager, Pill, PillLink, selectClass, StatusCell, StatusDot, Track, type Tone } from '@/features/platform/lib/ui';
 import { LocalTabs, Segmented } from '@/features/platform/booking/components/FloorKit';
+import { DeskCardPanel } from '../components/DeskCardPanel';
+import { lookupGiftCardAction, type GiftCardLookup } from '../actions/checkout';
 import { checkoutAppointmentAction, recordProductSaleAction, refundCashCheckoutAction, returnProductSaleAction, type PosQuery } from '../actions/checkout';
 import type { Paging, PosAppointment, PosCustomerSummary, PosProjectionData, PosReceipt, ProductLineSummary } from '../lib/posTypes';
 
@@ -163,7 +165,7 @@ export function PosPageClient({ data, query }: { data: PosProjectionData; query:
         <section id="pos-tender" aria-labelledby="pos-tender-heading" className="min-w-0 xl:sticky xl:top-4">
           <h2 id="pos-tender-heading" className="sr-only">Take payment</h2>
           {selected
-            ? <TenderPanel key={selected.id} appointment={selected} closed={requestedClosed && selected.id === requestedAppointment?.id} timeZone={timeZone} />
+            ? <TenderPanel key={selected.id} onlineCard={Boolean(data.onlineCard)} appointment={selected} closed={requestedClosed && selected.id === requestedAppointment?.id} timeZone={timeZone} />
             : <div className="rounded-[6px] border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">{appointments.length ? 'Choose a ticket to take payment.' : 'Nothing to check out.'}</div>}
         </section>
       </div>
@@ -193,13 +195,17 @@ export function PosPageClient({ data, query }: { data: PosProjectionData; query:
 type CounterTab = 'retail' | 'returns' | 'receipts';
 
 // Keyed by appointment id: tender drafts belong to exactly this ticket.
-function TenderPanel({ appointment, closed, timeZone }: { appointment: PosAppointment; closed: boolean; timeZone: string }) {
-  const [paymentMethod, setPaymentMethod] = useState<string>('cash');
+function TenderPanel({ appointment, closed, timeZone, onlineCard }: { appointment: PosAppointment; closed: boolean; timeZone: string; onlineCard: boolean }) {
+  const [paymentMethod, setPaymentMethod] = useState<string>(onlineCard ? 'stripe' : 'cash');
   const [packageBalanceId, setPackageBalanceId] = useState('');
   const [tipAmount, setTipAmount] = useState('0');
   const [discountAmount, setDiscountAmount] = useState('0');
   const [taxAmount, setTaxAmount] = useState('0');
   const [notes, setNotes] = useState('');
+  const [giftCode, setGiftCode] = useState('');
+  const [giftCard, setGiftCard] = useState<GiftCardLookup | null>(null);
+  const [giftError, setGiftError] = useState<string | null>(null);
+  const [checkingGift, setCheckingGift] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [paid, setPaid] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -214,7 +220,8 @@ function TenderPanel({ appointment, closed, timeZone }: { appointment: PosAppoin
   // A deposit paid online counts toward the receipt; only the balance is collected here.
   const depositPaid = appointment.paymentStatus === 'deposit_paid' && paymentMethod !== 'package' ? Math.min(appointment.depositAmount || 0, total) : 0;
   const collect = total - depositPaid;
-  const eligible = !closed && !paid && appointment.status === 'in_chair' && amountsValid && (paymentMethod !== 'package' || (total === 0 && Boolean(packageBalanceId)));
+  const giftCovers = Boolean(giftCard && giftCard.status === 'active' && giftCard.balance >= collect);
+  const eligible = !closed && !paid && appointment.status === 'in_chair' && amountsValid && (paymentMethod !== 'package' || (total === 0 && Boolean(packageBalanceId))) && (paymentMethod !== 'gift_card' || giftCovers);
   const id = appointment.id;
 
   const submitCheckout = () => {
@@ -223,6 +230,7 @@ function TenderPanel({ appointment, closed, timeZone }: { appointment: PosAppoin
     const input = {
       appointmentId: id, paymentMethod,
       packageBalanceId: paymentMethod === 'package' ? packageBalanceId : undefined,
+      giftCardCode: paymentMethod === 'gift_card' ? giftCard?.code : undefined,
       tipAmount: tip, discountAmount: discount, taxAmount: tax, notes,
     };
     const idempotencyKey = checkoutKey.keyFor(input);
@@ -270,14 +278,35 @@ function TenderPanel({ appointment, closed, timeZone }: { appointment: PosAppoin
           value={paymentMethod}
           onChange={(value) => { setPaymentMethod(value); if (value !== 'package') setPackageBalanceId(''); }}
           options={[
+            ...(onlineCard ? [{ value: 'stripe', label: 'Charge card' }] : []),
             { value: 'cash', label: 'Cash' },
-            { value: 'card', label: 'Card terminal' },
+            { value: 'card', label: onlineCard ? 'Other terminal' : 'Card terminal' },
+            { value: 'gift_card', label: 'Gift card' },
             ...(packageBalances.length > 0 ? [{ value: 'package', label: 'Package visit' }] : []),
           ]}
         />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
+        {paymentMethod === 'gift_card' && (
+          <div className="grid gap-1 sm:col-span-3">
+            <Label htmlFor={`gift-${id}`} className="text-xs text-muted-foreground">Gift card code</Label>
+            <form className="flex gap-2" onSubmit={async (event) => {
+              event.preventDefault();
+              setCheckingGift(true); setGiftError(null); setGiftCard(null);
+              const result = await lookupGiftCardAction(giftCode);
+              setCheckingGift(false);
+              if (!result.success || !result.data) { setGiftError(result.error || 'Gift card not found.'); return; }
+              setGiftCard(result.data);
+              if (result.data.status !== 'active') setGiftError(result.data.status === 'pending' ? 'This gift card hasn’t been paid for yet.' : `This gift card is ${statusLabel(result.data.status)}.`);
+            }}>
+              <Input id={`gift-${id}`} className="rounded-[6px] font-mono uppercase" value={giftCode} onChange={(event) => { setGiftCode(event.target.value); setGiftCard(null); setGiftError(null); }} placeholder="XXXX-XXXX-XXXX" autoComplete="off" />
+              <Pill type="submit" disabled={checkingGift || giftCode.trim().length < 12}>{checkingGift ? 'Checking…' : 'Check'}</Pill>
+            </form>
+            {giftCard && giftCard.status === 'active' ? <p className="text-xs tabular-nums text-muted-foreground">Balance {formatMoney(giftCard.balance)}{giftCard.expiresAt ? ` · valid until ${formatDateTime(giftCard.expiresAt, timeZone)}` : ''}{giftCard.balance < collect ? ` · ${formatMoney(collect - giftCard.balance)} short, take the rest by card first` : ` · ${formatMoney(giftCard.balance - collect)} left after this visit`}</p> : null}
+            {giftError ? <p role="alert" className="text-xs text-destructive">{giftError}</p> : null}
+          </div>
+        )}
         {paymentMethod === 'package' && (
           <div className="grid gap-1 sm:col-span-3">
             <Label htmlFor={`balance-${id}`} className="text-xs text-muted-foreground">Balance</Label>
@@ -311,11 +340,20 @@ function TenderPanel({ appointment, closed, timeZone }: { appointment: PosAppoin
       </div>
 
       <FeedbackMessage feedback={feedback} />
-      <Track block>
-        <Pill variant="primary" className="h-11 text-base" disabled={pending || !eligible} onClick={submitCheckout}>
-          {pending ? 'Processing…' : paymentMethod === 'package' ? 'Redeem visit' : paymentMethod === 'card' ? `Record ${formatMoney(collect)} card` : `Take ${formatMoney(collect)} cash`}
-        </Pill>
-      </Track>
+      {paymentMethod === 'stripe' ? (
+        <DeskCardPanel
+          appointmentId={id}
+          disabled={!eligible || collect <= 0}
+          ticket={amountsValid ? { tipAmount: tip || 0, discountAmount: discount || 0, taxAmount: tax || 0, notes: notes.trim() } : null}
+          onPaid={(text) => { setPaid(true); setFeedback({ tone: 'status', text }); }}
+        />
+      ) : (
+        <Track block>
+          <Pill variant="primary" className="h-11 text-base" disabled={pending || !eligible} onClick={submitCheckout}>
+            {pending ? 'Processing…' : paymentMethod === 'package' ? 'Redeem visit' : paymentMethod === 'card' ? `Record ${formatMoney(collect)} card` : paymentMethod === 'gift_card' ? `Redeem ${formatMoney(collect)} gift card` : `Take ${formatMoney(collect)} cash`}
+          </Pill>
+        </Track>
+      )}
     </div>
   );
 }
