@@ -4,10 +4,12 @@ import { json, relationship, select, text } from '@keystone-6/core/fields';
 import { permissions, rules } from '../access';
 import { trackingFields } from './trackingFields';
 import { validateShopRelationships } from '../utils/shopRelationshipHooks';
+import { historyDeleteGuard } from '../utils/deleteHistoryGuard';
 
 export const Supplier = list({
   hooks: {
     validate: {
+      delete: historyDeleteGuard('Supplier'),
       create: (args) => validateShopRelationships(args, []),
       update: (args) => validateShopRelationships(args, []),
     },

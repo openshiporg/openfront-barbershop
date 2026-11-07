@@ -5,6 +5,7 @@ import { checkbox, json, relationship, text } from "@keystone-6/core/fields";
 import { permissions, rules } from "../access";
 import { trackingFields } from "./trackingFields";
 import { validateShopRelationships } from "../utils/shopRelationshipHooks";
+import { historyDeleteGuard } from '../utils/deleteHistoryGuard';
 
 const adapterDescription = "Name of the payment adapter module to use for this operation";
 
@@ -45,6 +46,7 @@ async function rejectAdapterChangeWithOpenSessions(args: {
 export const PaymentProvider = list({
   hooks: {
     validate: {
+      delete: historyDeleteGuard('PaymentProvider'),
       create: (args) => validateShopRelationships(args, []),
       update: async (args) => {
         await validateShopRelationships(args, []);

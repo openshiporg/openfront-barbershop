@@ -4,6 +4,7 @@ import { json, relationship, select, text } from '@keystone-6/core/fields';
 import { permissions, rules } from '../access';
 import { trackingFields } from './trackingFields';
 import { validateShopRelationships } from '../utils/shopRelationshipHooks';
+import { historyDeleteGuard } from '../utils/deleteHistoryGuard';
 
 export const BarberChair = list({
   db: {
@@ -14,6 +15,7 @@ export const BarberChair = list({
   },
   hooks: {
     validate: {
+      delete: historyDeleteGuard('BarberChair'),
       create: (args) => validateShopRelationships(args, []),
       update: (args) => validateShopRelationships(args, []),
     },

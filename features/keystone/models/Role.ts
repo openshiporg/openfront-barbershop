@@ -4,6 +4,7 @@ import { checkbox, relationship, text } from '@keystone-6/core/fields'
 import { trackingFields } from './trackingFields'
 import { permissions, type Session } from '../access'
 import { hasCurrentRolePermission } from '../utils/currentAuthorization'
+import { historyDeleteGuard } from '../utils/deleteHistoryGuard';
 
 type CurrentRolePrisma = {
   user: {
@@ -31,6 +32,7 @@ async function currentRoleScope(session: Session | undefined, prisma: CurrentRol
 }
 
 export const Role = list({
+  hooks: { validate: { delete: historyDeleteGuard('Role') } },
   access: {
     operation: {
       query: async ({ session, context }) => Boolean(await currentRoleScope(session, context.prisma)),

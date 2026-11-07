@@ -34,6 +34,14 @@ const eslintConfig = defineConfig([
       "react/no-unescaped-entities": "warn",
     },
   },
+  {
+    // CommonJS test harnesses: require() and a local `module` object are the point.
+    files: ["**/*.cjs"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+      "@next/next/no-assign-module-variable": "off",
+    },
+  },
   globalIgnores([
     ".next/**",
     ".runtime/**",

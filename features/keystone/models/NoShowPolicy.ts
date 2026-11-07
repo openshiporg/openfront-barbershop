@@ -4,9 +4,11 @@ import { checkbox, integer, json, relationship, select, text } from '@keystone-6
 import { permissions, rules } from '../access';
 import { validateShopRelationships } from '../utils/shopRelationshipHooks';
 import { trackingFields } from './trackingFields';
+import { historyDeleteGuard } from '../utils/deleteHistoryGuard';
 
 export const NoShowPolicy = list({
   hooks: { validate: {
+    delete: historyDeleteGuard('NoShowPolicy'),
     create: (args) => validateShopRelationships(args, []),
     update: (args) => validateShopRelationships(args, []),
   } },

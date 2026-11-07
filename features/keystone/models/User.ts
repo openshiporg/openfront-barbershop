@@ -6,6 +6,7 @@ import { trackingFields } from './trackingFields'
 import { isSignedIn, permissions } from '../access'
 import { currentActiveShopIds, hasCurrentRolePermission } from '../utils/currentAuthorization'
 import { canReadPeople, canUpdatePeople } from '../utils/peopleAccess'
+import { historyDeleteGuard } from '../utils/deleteHistoryGuard';
 
 // role is listed because createAuth merges initFirstItem itemData into the
 // input; public callers still cannot set it (role field create access).
@@ -27,6 +28,7 @@ export const User = list({
     },
   },
   hooks: {
+    validate: { delete: historyDeleteGuard('User') },
     resolveInput: async ({ operation, inputData, resolvedData, context }) => {
       if (operation !== 'create') return resolvedData;
       if (await hasCurrentRolePermission(context.session, 'canManageRoles', context.prisma)) return resolvedData;
