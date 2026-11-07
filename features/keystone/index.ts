@@ -9,6 +9,7 @@ import { s3ForcePathStyle } from "./lib/s3-storage";
 
 import { bindDomainPrisma } from './utils/domainPrisma';
 import { runtimeConfig } from './utils/runtimeConfig';
+import { pooledDatabaseUrl } from './database-url';
 
 const { databaseURL, sessionConfig } = runtimeConfig();
 
@@ -94,7 +95,7 @@ export default withAuth(
   config({
     db: {
       provider: "postgresql",
-      url: databaseURL,
+      url: pooledDatabaseUrl(databaseURL),
       extendPrismaClient: bindDomainPrisma,
     },
     lists: models,
