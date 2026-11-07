@@ -3,6 +3,7 @@ import { createTransport } from "nodemailer";
 
 import { domainPrisma } from "../utils/domainPrisma";
 import { trustedOrigin } from "../../shared/trusted-origin";
+import { emailButton, emailLayout, emailMuted, emailPanel, emailParagraph } from "./email-layout";
 
 // Reset links must be absolute and point at this application. A missing or
 // malformed origin never produces a relative or attacker-shaped link.
@@ -42,38 +43,13 @@ function mailTransport() {
 }
 
 function passwordResetEmail({ url }: { url: string }): string {
-  const backgroundColor = "#f9f9f9";
-  const textColor = "#444444";
-  const mainBackgroundColor = "#ffffff";
-  const buttonBackgroundColor = "#346df1";
-  const buttonBorderColor = "#346df1";
-  const buttonTextColor = "#ffffff";
-
-  return `
-    <body style="background: ${backgroundColor};">
-      <table width="100%" border="0" cellspacing="20" cellpadding="0" style="background: ${mainBackgroundColor}; max-width: 600px; margin: auto; border-radius: 10px;">
-        <tr>
-          <td align="center" style="padding: 10px 0px 0px 0px; font-size: 18px; font-family: Helvetica, Arial, sans-serif; color: ${textColor};">
-            Please click below to reset your password
-          </td>
-        </tr>
-        <tr>
-          <td align="center" style="padding: 20px 0;">
-            <table border="0" cellspacing="0" cellpadding="0">
-              <tr>
-                <td align="center" style="border-radius: 5px;" bgcolor="${buttonBackgroundColor}"><a href="${escapeHtmlAttribute(url)}" target="_blank" style="font-size: 18px; font-family: Helvetica, Arial, sans-serif; color: ${buttonTextColor}; text-decoration: none; border-radius: 5px; padding: 10px 20px; border: 1px solid ${buttonBorderColor}; display: inline-block; font-weight: bold;">Reset Password</a></td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td align="center" style="padding: 0px 0px 10px 0px; font-size: 16px; line-height: 22px; font-family: Helvetica, Arial, sans-serif; color: ${textColor};">
-            If you did not request this email you can safely ignore it.
-          </td>
-        </tr>
-      </table>
-    </body>
-  `;
+  return emailLayout({
+    preheader: "Use this link to choose a new password.",
+    title: "Reset your password",
+    body: `${emailParagraph("We received a request to reset the password for your account. Use the button below to choose a new one.")}
+${emailButton("Reset password", url)}
+${emailMuted("If you did not request this, you can safely ignore this email. Your password will not change.")}`,
+  });
 }
 
 export async function sendPasswordResetEmail(resetToken: string, to: string, baseUrl?: string): Promise<void> {
@@ -98,16 +74,12 @@ function escapeHtml(value: string) {
 }
 
 function appointmentEmail({ heading, lines, url, action }: { heading: string; lines: string[]; url: string; action: string }) {
-  const rows = lines.map((line) => `<tr><td style="padding: 2px 24px; font-size: 15px; font-family: Helvetica, Arial, sans-serif; color: #444444;">${escapeHtml(line)}</td></tr>`).join("");
-  return `
-    <body style="background: #f6f3ee;">
-      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background: #ffffff; max-width: 560px; margin: 24px auto; border-radius: 10px;">
-        <tr><td style="padding: 24px 24px 8px; font-size: 20px; font-weight: bold; font-family: Helvetica, Arial, sans-serif; color: #111a33;">${escapeHtml(heading)}</td></tr>
-        ${rows}
-        <tr><td style="padding: 20px 24px 24px;"><a href="${escapeHtmlAttribute(url)}" target="_blank" style="font-size: 15px; font-family: Helvetica, Arial, sans-serif; color: #ffffff; background: #111a33; text-decoration: none; border-radius: 999px; padding: 10px 20px; display: inline-block; font-weight: bold;">${escapeHtml(action)}</a></td></tr>
-      </table>
-    </body>
-  `;
+  return emailLayout({
+    preheader: lines[0] || heading,
+    title: heading,
+    body: `${emailPanel(lines.map(escapeHtml).join("<br>"))}
+${emailButton(action, url)}`,
+  });
 }
 
 /**
