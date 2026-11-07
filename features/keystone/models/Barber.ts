@@ -7,12 +7,10 @@ import { validateShopRelationships } from "../utils/shopRelationshipHooks";
 import { createCrudLifecycleAfterOperation } from "../utils/crudLifecycleHooks";
 import { connectedRelationshipId } from "../utils/shopRelationshipHooks";
 import { upcomingBarberAppointments } from "../utils/childRecordValidation";
-import { historyDeleteGuard } from '../utils/deleteHistoryGuard';
 
 export const Barber = list({
   hooks: {
     validate: {
-      delete: historyDeleteGuard('Barber'),
       create: (args) => validateShopRelationships(args, [
         { field: "chair", delegate: "barberChair" },
         { field: "specialties", delegate: "service", many: true },

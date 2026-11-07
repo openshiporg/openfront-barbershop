@@ -18,9 +18,15 @@ test('every delete-history reference is a real foreign key to that parent', () =
 const prismaWith = (counts: Record<string, number>) => new Proxy({}, { get: (_t, model: string) => ({ count: async () => counts[model] || 0 }) });
 
 test('records with history name it and how to retire them; unused records can go', async () => {
-  assert.equal(await deleteHistoryProblem(prismaWith({ appointment: 12, commission: 1 }), 'Barber', 'b'), 'This has 12 appointments, 1 commission. Set the barber to Inactive instead of deleting them.');
+  assert.equal(await deleteHistoryProblem(prismaWith({ noShowEvent: 2 }), 'NoShowPolicy', 'p'), 'This has 2 no-show charges. Archive the policy instead; charged no-shows keep the policy they were charged under.');
   assert.equal(await deleteHistoryProblem(prismaWith({ user: 1 }), 'Role', 'r'), '1 person still has this role. Give them another role first.');
-  assert.equal(await deleteHistoryProblem(prismaWith({}), 'Service', 's'), null);
+  assert.equal(await deleteHistoryProblem(prismaWith({}), 'NoShowPolicy', 'p'), null);
+});
+
+test('archive-only roots stay delete-denied by the relationship boundary', () => {
+  const source = readFileSync(new URL('../features/keystone/utils/relationshipBoundaries.ts', import.meta.url), 'utf8');
+  for (const list of ['Barber', 'Customer', 'Service', 'MembershipPlan', 'ServicePackage', 'BarberChair', 'Product', 'Supplier', 'PaymentProvider']) assert.ok(source.includes(`'${list}'`), list);
+  assert.match(source, /delete: \(\) => false/);
 });
 
 test('nobody deletes their own account', async () => {

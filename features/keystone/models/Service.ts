@@ -6,7 +6,6 @@ import { trackingFields } from "./trackingFields";
 import { validateShopRelationships } from "../utils/shopRelationshipHooks";
 import { createCrudLifecycleAfterOperation } from "../utils/crudLifecycleHooks";
 import { hashWaiverText } from "../utils/waiverEvidence";
-import { historyDeleteGuard } from '../utils/deleteHistoryGuard';
 
 function validateWaiverTemplate(args: { item?: Record<string, unknown>; resolvedData: Record<string, unknown>; addValidationError(message: string): void }) {
   const required = args.resolvedData.waiverRequired ?? args.item?.waiverRequired;
@@ -40,7 +39,6 @@ const formatCurrency = (cents?: number | null) =>
 export const Service = list({
   hooks: {
     validate: {
-      delete: historyDeleteGuard('Service'),
       create: async (args) => {
         validateWaiverTemplate(args as never);
         validateDeposit(args as never);

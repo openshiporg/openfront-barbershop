@@ -1,79 +1,19 @@
 /**
- * Most relations here are ON DELETE SET NULL, so deleting a record that history points at would
- * quietly detach that history: appointments and commissions lose their barber, sales and packages
- * their customer, sold packages their plan. Such records are retired (inactive) instead, and a
- * record nothing points at can still be deleted. Customer merges delete through Prisma directly and
- * repoint everything first, so this list-level guard does not affect them.
- * `tests/invariants.test.ts` checks every entry against the Prisma schema.
+ * Shop, Service, ServiceCategory, Barber, BarberChair, Customer, ServicePackage, MembershipPlan,
+ * Product, Supplier and PaymentProvider are archive-only: enforceRelationshipBoundaries denies their
+ * delete operation outright. The lists below can still be deleted, and their history is ON DELETE
+ * SET NULL, so a delete would quietly detach it: charged no-shows would lose the policy they were
+ * charged under, and people would lose their role. Those deletes are refused while history exists;
+ * a record nothing points at can still be deleted. `tests/invariants.test.ts` checks every entry
+ * against the Prisma schema.
  */
 type Ref = { model: string; field: string; one: string; many: string };
 const ref = (model: string, field: string, one: string, many = `${one}s`): Ref => ({ model, field, one, many });
 
 export const DELETE_HISTORY: Record<string, { references: Ref[]; instead: string }> = {
-  Barber: {
-    instead: 'Set the barber to Inactive instead of deleting them.',
-    references: [
-      ref('appointment', 'barberId', 'appointment'),
-      ref('checkoutTransaction', 'barberId', 'sale'),
-      ref('commission', 'barberId', 'commission'),
-      ref('commissionPayout', 'barberId', 'commission payout'),
-      ref('tip', 'barberId', 'tip'),
-      ref('staffShift', 'barberId', 'shift'),
-      ref('groomingNote', 'barberId', 'grooming note'),
-    ],
-  },
-  Customer: {
-    instead: 'Customers with history are kept; merge duplicates instead of deleting.',
-    references: [
-      ref('appointment', 'customerId', 'appointment'),
-      ref('checkoutTransaction', 'customerId', 'sale'),
-      ref('customerPackage', 'customerId', 'package or membership', 'packages or memberships'),
-      ref('tip', 'customerId', 'tip'),
-      ref('noShowEvent', 'customerId', 'no-show'),
-      ref('waiverForm', 'customerId', 'signed waiver'),
-      ref('membershipEvent', 'customerId', 'membership event'),
-    ],
-  },
-  Service: {
-    instead: 'Archive the service instead of deleting it.',
-    references: [
-      ref('appointment', 'serviceId', 'appointment'),
-      ref('appointmentLineItem', 'serviceId', 'appointment line', 'appointment lines'),
-      ref('servicePackageItem', 'serviceId', 'package item'),
-      ref('waiverForm', 'serviceId', 'signed waiver'),
-    ],
-  },
-  ServiceCategory: {
-    instead: 'Move those services to another category first.',
-    references: [ref('service', 'categoryId', 'service')],
-  },
-  MembershipPlan: {
-    instead: 'Pause or archive the plan instead so nobody new can join.',
-    references: [ref('customerPackage', 'membershipPlanId', 'customer membership'), ref('membershipEvent', 'membershipPlanId', 'membership event')],
-  },
-  ServicePackage: {
-    instead: 'Archive the package instead so it is no longer sold.',
-    references: [ref('customerPackage', 'servicePackageId', 'sold package')],
-  },
-  BarberChair: {
-    instead: 'Put the chair in Maintenance instead of deleting it.',
-    references: [ref('appointment', 'chairId', 'appointment'), ref('barber', 'chairId', 'assigned barber'), ref('staffShift', 'chairId', 'shift')],
-  },
-  Product: {
-    instead: 'Archive the product instead of deleting it.',
-    references: [ref('productSaleLine', 'productId', 'sale line'), ref('inventoryLot', 'productId', 'inventory lot'), ref('inventoryMovement', 'productId', 'stock movement')],
-  },
-  Supplier: {
-    instead: 'Keep the supplier on file for its received stock.',
-    references: [ref('inventoryLot', 'supplierId', 'inventory lot')],
-  },
   NoShowPolicy: {
     instead: 'Archive the policy instead; charged no-shows keep the policy they were charged under.',
     references: [ref('noShowEvent', 'policyId', 'no-show charge')],
-  },
-  PaymentProvider: {
-    instead: 'Turn off Installed instead of deleting the provider.',
-    references: [ref('paymentSession', 'paymentProviderId', 'payment')],
   },
   Role: {
     instead: 'Give them another role first.',
