@@ -19,11 +19,25 @@ const running = new Set<string>();
 
 export type SweepResult = { expired: number; reconciled: number; checked: number };
 
-async function expireAtStripe(checkoutId: string) {
+export async function expireAtStripe(checkoutId: string) {
   if (!checkoutId || !process.env.STRIPE_SECRET_KEY) return;
   await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(checkoutId)}/expire`, {
     method: 'POST', headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` }, redirect: 'error',
   }).catch(() => undefined);
+}
+
+/**
+ * A cancelled visit must not stay payable. Closes the appointment's open online deposit checkouts
+ * inside the cancel transaction and returns the processor ids to expire once it commits.
+ * Pay-in-person and desk-card sessions are left to their own flows.
+ */
+export async function closeOpenDepositSessions(tx: Prisma.TransactionClient, appointmentId: string): Promise<string[]> {
+  const open = await tx.paymentSession.findMany({ where: { appointmentId, status: 'pending' }, include: { paymentProvider: true } });
+  const online = open.filter((row) => (row.metadata as Record<string, unknown> | null)?.purpose !== 'desk_card'
+    && row.paymentProvider && !isOfflinePaymentProvider(row.paymentProvider));
+  if (!online.length) return [];
+  await tx.paymentSession.updateMany({ where: { id: { in: online.map((row) => row.id) }, status: 'pending' }, data: { status: 'expired', cancelledAt: new Date() } });
+  return online.map((row) => row.providerPaymentId).filter((id): id is string => Boolean(id));
 }
 
 /** Fire-and-forget from read paths (storefront, dashboard). Never blocks or fails the page. */

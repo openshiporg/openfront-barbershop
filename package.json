@@ -7,6 +7,7 @@
     "dev": "keystone build --no-ui && npm run migrate && next dev",
     "build": "keystone build --no-ui && next build",
     "start": "next start",
+    "test:state": "node --import tsx --test tests/cancel-closes-deposit.test.ts",
     "lint": "eslint .",
     "migrate:gen": "keystone build --no-ui && tsx features/keystone/view-order/generate-view-order.ts && prisma migrate dev",
     "migrate": "prisma migrate deploy"

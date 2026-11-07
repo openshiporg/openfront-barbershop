@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { closeOpenDepositSessions, expireAtStripe } from '../utils/expireStalePaymentSessions';
 import type { Prisma, PrismaClient } from '@prisma/client';
 
 import { shopMinute } from '../../shared/shop-time';
@@ -96,6 +97,7 @@ export default async function managePublicAppointment(_root: unknown, args: Args
   if (requestedStart && Number.isNaN(requestedStart.getTime())) return fail('Choose a new appointment time.');
   const eventKey = `public-appointment-change:${appointmentId}:${digest(key)}`;
   try {
+    let staleCheckouts: string[] = [];
     const data = await runSerializableBookingTransaction(context.prisma, async (rawTransaction) => {
       const transaction = rawTransaction as Prisma.TransactionClient;
       await transaction.$executeRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', 'barbershop-public-appointment', appointmentId);
@@ -131,6 +133,7 @@ export default async function managePublicAppointment(_root: unknown, args: Args
         await transaction.$executeRawUnsafe('UPDATE "Appointment" SET "startsAt" = $2, "endsAt" = $3, "bookingAuthoritySnapshot" = $4::jsonb, "customerRescheduleCount" = "customerRescheduleCount" + 1, "updatedAt" = $5 WHERE id = $1', appointmentId, nextStartsAt, nextEndsAt, JSON.stringify(nextAuthority), new Date());
       } else {
         await transaction.appointment.update({ where: { id: appointmentId }, data: { status: 'cancelled', cancellationReason: reason } });
+        staleCheckouts = await closeOpenDepositSessions(transaction, appointmentId);
       }
       const occurredAt = new Date();
       const actorReference = appointment.accountId ? `account:${appointment.accountId}` : appointment.publicAccessTokenHash || '';
@@ -138,6 +141,7 @@ export default async function managePublicAppointment(_root: unknown, args: Args
       await enqueueLifecycleEvent(transaction as never, buildLifecycleEnvelope({ eventKey: `${eventKey}:outbox`, eventType: action === 'cancel' ? 'appointment.customer_cancelled' : 'appointment.customer_rescheduled', aggregateType: 'appointment', aggregateId: appointment.id, shopId: appointment.shopId, occurredAt, data: { appointmentId, action, previousStartsAt: appointment.startsAt.toISOString(), nextStartsAt: nextStartsAt?.toISOString() || null, feeAmount: consequence.feeAmount, depositConsequence: consequence.depositConsequence, policy: snapshot.bookingPolicySnapshot, authority: nextAuthority } }));
       return { appointmentId, action, startsAt: nextStartsAt?.toISOString() || appointment.startsAt.toISOString(), feeAmount: consequence.feeAmount, depositConsequence: consequence.depositConsequence, replayed: false };
     });
+    await Promise.all(staleCheckouts.map((id) => expireAtStripe(id)));
     return { success: true, error: null, data };
   } catch (error) { return fail(error instanceof Error && !error.message.includes('Invalid `') ? error.message : 'Unable to change this appointment. Contact the shop.'); }
 }

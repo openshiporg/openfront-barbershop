@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { closeOpenDepositSessions, expireAtStripe } from '../utils/expireStalePaymentSessions';
 import type { Prisma, PrismaClient } from '@prisma/client';
 
 import { shopMinute } from '../../shared/shop-time';
@@ -302,6 +303,7 @@ export async function manageStaffAppointment(_root: unknown, args: ManageArgs, c
   catch (error) { return fail(safeError(error, 'Not authorized to change appointments for this shop.')); }
   const eventKey = `staff-appointment-change:${appointmentId}:${digest(`${shopId}:${key}`)}`;
   try {
+    let staleCheckouts: string[] = [];
     const data = await runSerializableBookingTransaction(context.prisma, async (rawTransaction) => {
       const transaction = rawTransaction as Prisma.TransactionClient;
       await transaction.$executeRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', 'barbershop-appointment-transition', appointmentId);
@@ -340,6 +342,7 @@ export async function manageStaffAppointment(_root: unknown, args: ManageArgs, c
         );
       } else {
         await transaction.appointment.update({ where: { id: appointmentId }, data: { status: 'cancelled', cancellationReason: reason } });
+        staleCheckouts = await closeOpenDepositSessions(transaction, appointmentId);
       }
       await transaction.$executeRawUnsafe(`INSERT INTO "AppointmentChangeEvent" (id, "eventKey", action, "actorType", "actorReferenceHash", reason, "previousStartsAt", "previousEndsAt", "nextStartsAt", "nextEndsAt", "policySnapshot", "authoritySnapshot", "feeAmount", "depositConsequence", "occurredAt", "shop", "appointment", "createdAt", "updatedAt") VALUES ($1,$2,$3::"AppointmentChangeEventActionType",'operator',$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13::"AppointmentChangeEventDepositConsequenceType",$14,$15,$16,$14,$14)`,
         randomUUID(), eventKey, action === 'cancel' ? 'cancelled' : 'rescheduled', digest(context.session?.itemId || ''), reason,
@@ -356,6 +359,7 @@ export async function manageStaffAppointment(_root: unknown, args: ManageArgs, c
         feeAmount: consequence.feeAmount, depositConsequence: consequence.depositConsequence, replayed: false,
       };
     });
+    await Promise.all(staleCheckouts.map((id) => expireAtStripe(id)));
     return { success: true, error: null, data };
   } catch (error) {
     return fail(safeError(error, 'Unable to change this appointment. Refresh the booking board before retrying.'));
