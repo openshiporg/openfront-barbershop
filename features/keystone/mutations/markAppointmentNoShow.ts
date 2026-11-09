@@ -2,7 +2,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 
 import { permissions } from '../access';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { calculateNoShowEvidence } from '../utils/remainingLifecycle';
 import { hashPublicAccessToken } from '../utils/publicAccessToken';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
@@ -78,8 +78,8 @@ export default async function markAppointmentNoShow(_root: unknown, args: Args, 
         },
       });
       await transaction.appointment.update({ where: { id: appointmentId }, data: { status: 'no_show', cancellationReason: reason } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId,
-        eventKey: `${eventKey}:outbox`, eventType: 'appointment.no_show', aggregateType: 'appointment', aggregateId: appointmentId,
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId,
+        eventKey: `${eventKey}:receipt`, eventType: 'appointment.no_show', aggregateType: 'appointment', aggregateId: appointmentId,
         shopId: appointment.shopId, occurredAt: markedAt,
         data: { noShow: { evidenceId: created.id, policyId: policy.id, policyName: policy.name, ...snapshot, reason, actorId: context.session?.itemId ?? null } },
       }));

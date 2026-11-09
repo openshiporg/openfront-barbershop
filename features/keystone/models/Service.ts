@@ -4,7 +4,6 @@ import { checkbox, image, integer, relationship, select, text, virtual } from "@
 import { permissions, rules } from "../access";
 import { trackingFields } from "./trackingFields";
 import { validateShopRelationships } from "../utils/shopRelationshipHooks";
-import { createCrudLifecycleAfterOperation } from "../utils/crudLifecycleHooks";
 import { hashWaiverText } from "../utils/waiverEvidence";
 
 function validateWaiverTemplate(args: { item?: Record<string, unknown>; resolvedData: Record<string, unknown>; addValidationError(message: string): void }) {
@@ -56,7 +55,6 @@ export const Service = list({
         ]);
       },
     },
-    afterOperation: createCrudLifecycleAfterOperation("service"),
   },
   access: {
     operation: {

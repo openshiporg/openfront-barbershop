@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { Prisma, PrismaClient } from '@prisma/client';
 
 import { runSerializableBookingTransaction } from '../utils/bookingCapacity';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { assertAppointmentAccess, assertWaiverSigner, getAppointmentWaiverRequirement } from '../utils/waiverEvidence';
 
 type Args = { appointmentId: string; accessToken?: string | null; signerName: string; signerRole: string; guardianName?: string | null; affirmation: boolean; idempotencyKey: string };
@@ -41,7 +41,7 @@ export default async function signPublicWaiver(_root: unknown, args: Args, conte
       const waiverId = randomUUID();
       const affirmationHash = hash(JSON.stringify({ appointmentId, serviceId: appointment.serviceId, customerId: appointment.customerId, templateKey: requirement.templateKey, templateVersion: requirement.templateVersion, templateHash: requirement.templateHash, signerName: signer.signerName, signerRole: signer.signerRole, guardianName: signer.guardianName, affirmation: true, signedAt: occurredAt.toISOString() }));
       await transaction.$executeRawUnsafe(`INSERT INTO "WaiverForm" (id, title, "waiverType", status, "templateKey", "templateVersion", "templateHash", "signatureKeyHash", "signedByName", "signerRole", "guardianName", affirmation, "affirmationHash", "signedAt", metadata, "shop", "customer", "appointment", "service", "createdAt", "updatedAt") VALUES ($1,$2,'service','signed',$3,$4,$5,$6,$7,$8,$9,true,$10,$11,$12::jsonb,$13,$14,$15,$16,$11,$11)`, waiverId, `${requirement.templateKey} ${requirement.templateVersion}`, requirement.templateKey, requirement.templateVersion, requirement.templateHash, signatureKeyHash, signer.signerName, signer.signerRole, signer.guardianName || null, affirmationHash, occurredAt, JSON.stringify({ source: 'public_appointment', signerControlled: true }), appointment.shopId, appointment.customerId, appointment.id, appointment.serviceId);
-      await enqueueLifecycleEvent(transaction as never, buildLifecycleEnvelope({ eventKey: `waiver:${waiverId}:signed:v1`, eventType: 'waiver.signed', aggregateType: 'waiver', aggregateId: waiverId, shopId: appointment.shopId, occurredAt, data: { waiverId, appointmentId, serviceId: appointment.serviceId, customerId: appointment.customerId, templateKey: requirement.templateKey, templateVersion: requirement.templateVersion, templateHash: requirement.templateHash, signerRole: signer.signerRole, guardianAuthorityRecorded: signer.signerRole === 'guardian', signedAt: occurredAt.toISOString(), affirmationHash } }));
+      await recordCommandReceipt(transaction as never, buildCommandReceipt({ eventKey: `waiver:${waiverId}:signed:v1`, eventType: 'waiver.signed', aggregateType: 'waiver', aggregateId: waiverId, shopId: appointment.shopId, occurredAt, data: { waiverId, appointmentId, serviceId: appointment.serviceId, customerId: appointment.customerId, templateKey: requirement.templateKey, templateVersion: requirement.templateVersion, templateHash: requirement.templateHash, signerRole: signer.signerRole, guardianAuthorityRecorded: signer.signerRole === 'guardian', signedAt: occurredAt.toISOString(), affirmationHash } }));
       return { waiverId, templateKey: requirement.templateKey, templateVersion: requirement.templateVersion, signedAt: occurredAt.toISOString(), replayed: false };
     });
     return { success: true, error: null, data };

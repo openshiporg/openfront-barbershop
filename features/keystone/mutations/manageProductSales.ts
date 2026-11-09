@@ -2,7 +2,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 
 import { permissions } from '../access';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { calculateProductSale } from '../utils/remainingLifecycle';
 import { hashPublicAccessToken } from '../utils/publicAccessToken';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
@@ -109,7 +109,7 @@ export async function recordProductSale(_root: unknown, args: { productId: strin
         } });
         await transaction.inventoryLot.update({ where: { id: allocation.lotId }, data: { quantityRemaining: allocation.quantityAfter, ...(allocation.becomesConsumed ? { status: 'consumed' } : {}) } });
       }
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId,
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId,
         eventKey: `product-sale:${created.id}:paid:v1`, eventType: 'product_sale.paid', aggregateType: 'product_sale_line', aggregateId: created.id,
         shopId, occurredAt, data: { sale: { lineId: created.id, transactionId: checkout.id, productId: product.id, productName: product.name, sku: product.sku, ...totals, paymentMethod: args.paymentMethod, lots: allocations.map(({ lotId, quantity }) => ({ lotId, quantity })), actorId: context.session?.itemId ?? null } },
       }));
@@ -197,7 +197,7 @@ export async function returnProductSaleLine(_root: unknown, args: { saleLineId: 
         await transaction.inventoryLot.update({ where: { id: restockLot.id }, data: { quantityRemaining: quantityAfter, ...(restockLot.status === 'consumed' ? { status: 'active' } : {}) } });
       }
       await transaction.productSaleLine.update({ where: { id: original.id }, data: { returnedQuantity: returnedBefore + quantity } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId,
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId,
         eventKey: `product-return:${created.id}:refunded:v1`, eventType: 'product_sale.returned', aggregateType: 'product_sale_line', aggregateId: created.id,
         shopId, occurredAt, data: { return: { lineId: created.id, originalLineId: original.id, transactionId: checkout.id, productId: original.productId, quantity, subtotal, taxAmount, total, reason: args.reason.trim(), cashReturned: true, restocked: Boolean(restockLot), restockLotId: restockLot?.id ?? null, actorId: context.session?.itemId ?? null } },
       }));

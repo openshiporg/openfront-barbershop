@@ -3,7 +3,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 
 import { permissions, type Session } from '../access';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
-import { buildLifecycleEnvelope, canonicalJson, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, canonicalJson, recordCommandReceipt } from '../utils/commandReceipt';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
 
 // Private front-desk queue intake and assignment. Authorized by the operator's
@@ -31,7 +31,7 @@ async function assertQueueChoices(transaction: Prisma.TransactionClient, shopId:
 }
 
 async function readReplay(transaction: Prisma.TransactionClient, eventKey: string, shopId: string, request: string) {
-  const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+  const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
   if (!replay) return null;
   const saved = (replay.payload as { data?: { command?: { request?: string; queueEntryId?: string } } } | null)?.data?.command;
   if (replay.shopId !== shopId || !saved?.queueEntryId || saved.request !== request) throw new Error('This request key was already used for a different queue command.');
@@ -79,7 +79,7 @@ export async function createStaffQueueEntry(_root: unknown, args: CreateArgs, co
         data: { shopId, customerName, phone, partySize, status: 'waiting', quotedWaitMinutes, notes, requestedServiceId: serviceId || null, requestedBarberId: barberId || null },
         select: { id: true, status: true, createdAt: true },
       });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         eventKey, eventType: 'queue.checked_in', aggregateType: 'walk_in_queue_entry', aggregateId: created.id, shopId, occurredAt: created.createdAt,
         data: { command: { request, queueEntryId: created.id }, queueEntry: { id: created.id, status: created.status, requestedServiceId: serviceId || null, requestedBarberId: barberId || null, partySize, source: 'operator' } },
       }));
@@ -118,7 +118,7 @@ export async function assignWalkInQueueEntry(_root: unknown, args: AssignArgs, c
       if (!['waiting', 'texted'].includes(String(entry.status)) || entry.appointment) throw new Error('Only waiting guests can be reassigned.');
       await assertQueueChoices(transaction, shopId, serviceId, barberId);
       const updated = await transaction.walkInQueueEntry.update({ where: { id: entry.id }, data: { requestedServiceId: serviceId, requestedBarberId: barberId || null }, select: { id: true, updatedAt: true } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         eventKey, eventType: 'queue.assigned', aggregateType: 'walk_in_queue_entry', aggregateId: updated.id, shopId, occurredAt: updated.updatedAt,
         data: { command: { request, queueEntryId: updated.id }, queueEntry: { id: updated.id, requestedServiceId: serviceId, requestedBarberId: barberId || null } },
       }));

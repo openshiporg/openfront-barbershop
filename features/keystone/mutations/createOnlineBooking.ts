@@ -3,7 +3,6 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 import { formatShopDateTime, shopMinute } from '../../shared/shop-time';
 import { dayKeyForDate, dayRange, isSlotAvailable, occupiedBufferMinutes } from '../utils/availability';
 import { clipToPostedHours } from '../../shared/shop-hours';
-import { sendAppointmentEmail } from '../lib/mail';
 import { onlineDepositProvider } from './publicDeposits';
 import {
   assertAppointmentCandidateSetComplete,
@@ -14,7 +13,7 @@ import {
 import { createPublicAccessToken, hashPublicAccessToken } from '../utils/publicAccessToken';
 import { type GuestBookingCommand, validateGuestBookingCommand } from '../../shared/guest-booking-command';
 import { lockGuestCommand, persistGuestCommand, readGuestCommand, runGuestCommand, unresolvedGuestCommand, type GuestCommandResult } from '../utils/guestBookingCommand';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { requireEffectivePractitionerAuthority } from '../utils/practitionerAuthority';
 import { requireEffectiveBookingPolicy } from '../utils/bookingPolicy';
 import { resolvePublishedShop } from '../utils/publicShop';
@@ -311,7 +310,7 @@ export async function createLockedAppointment({
         "waiverRequirementSnapshot" = $4::jsonb
     WHERE id = $1
   `, appointment.id, JSON.stringify(bookingAuthority), JSON.stringify(bookingPolicy), JSON.stringify(waiverRequirement));
-  await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+  await recordCommandReceipt(transaction, buildCommandReceipt({
     eventKey: `appointment:${appointment.id}:created:v1`,
     eventType: 'appointment.created',
     aggregateType: 'appointment',
@@ -338,22 +337,6 @@ export async function createLockedAppointment({
   return { ...appointment, bookingEligibility: publicBookingEligibilityView(bookingPolicy), bookingTimezone: timeZone };
 }
 
-function sendBookingReceived(notice: { to: string; shopName: string; timeZone: string; receipt: { id: string; startsAt: string; service: { name: string | null }; barber: { displayName: string | null } } }, accessToken: string) {
-  const path = `/appointment?id=${encodeURIComponent(notice.receipt.id)}&token=${encodeURIComponent(accessToken)}`;
-  sendAppointmentEmail({
-    to: notice.to,
-    subject: `Booking request received · ${notice.shopName}`,
-    heading: 'Booking request received',
-    lines: [
-      `${notice.receipt.service.name || 'Appointment'} with ${notice.receipt.barber.displayName || 'first available'}`,
-      formatShopDateTime(notice.receipt.startsAt, notice.timeZone),
-      `${notice.shopName} confirms it shortly.`,
-    ],
-    path,
-    action: 'View or change booking',
-  }).catch(() => undefined);
-}
-
 export default async function createOnlineBooking(
   _root: unknown,
   args: GuestBookingCommand,
@@ -373,7 +356,6 @@ export async function createAccountBooking(_root: unknown, args: GuestBookingCom
 async function createBookingForActor(args: GuestBookingCommand, context: BookingContext, accountId?: string): Promise<GuestCommandResult> {
   const actor = accountId ? `account:${accountId}` : 'guest';
   // Set only for a newly accepted request, so a replayed command never re-sends mail.
-  let notice: { to: string; shopName: string; timeZone: string; receipt: { id: string; startsAt: string; service: { name: string | null }; barber: { displayName: string | null } } } | null = null;
   try {
     const body = validateGuestBookingCommand(args);
     const result = await runGuestCommand(async (transaction) => {
@@ -449,10 +431,8 @@ async function createBookingForActor(args: GuestBookingCommand, context: Booking
         barber: { id: appointment.barberId, displayName: appointment.barberNameSnapshot, chairNumber: appointment.barberChairNumberSnapshot },
       };
       await persistGuestCommand(transaction, args, { version: 1, disposition: 'accepted', appointment: receipt }, actor);
-      if (body.customerEmail) notice = { to: body.customerEmail, shopName: publishedShop.name || 'the shop', timeZone: appointment.bookingTimezone, receipt };
       return { success: true, disposition: 'accepted' as const, error: null, appointment: receipt, accessToken: args.guestProof };
     });
-    if (notice) sendBookingReceived(notice, args.guestProof);
     return result;
   } catch (error) {
     // Our own refusals happen before any write, so nothing was booked.

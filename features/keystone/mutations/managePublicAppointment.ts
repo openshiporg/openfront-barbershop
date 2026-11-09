@@ -12,7 +12,7 @@ import {
   shopDayAppointmentCandidateFilter,
 } from '../utils/bookingCapacity';
 import { appointmentChangeConsequences, type BookingPolicySnapshot } from '../utils/bookingPolicy';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { requireEffectivePractitionerAuthority } from '../utils/practitionerAuthority';
 import { assertAppointmentAccess } from '../utils/waiverEvidence';
 
@@ -135,7 +135,7 @@ export default async function managePublicAppointment(_root: unknown, args: Args
       const occurredAt = new Date();
       const actorReference = appointment.accountId ? `account:${appointment.accountId}` : appointment.publicAccessTokenHash || '';
       await transaction.$executeRawUnsafe(`INSERT INTO "AppointmentChangeEvent" (id, "eventKey", action, "actorType", "actorReferenceHash", reason, "previousStartsAt", "previousEndsAt", "nextStartsAt", "nextEndsAt", "policySnapshot", "authoritySnapshot", "feeAmount", "depositConsequence", "occurredAt", "shop", "appointment", "createdAt", "updatedAt") VALUES ($1,$2,$3::"AppointmentChangeEventActionType",'customer',$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13::"AppointmentChangeEventDepositConsequenceType",$14,$15,$16,$14,$14)`, randomUUID(), eventKey, action === 'cancel' ? 'cancelled' : 'rescheduled', digest(actorReference), reason, appointment.startsAt, appointment.endsAt, nextStartsAt, nextEndsAt, JSON.stringify(snapshot.bookingPolicySnapshot), JSON.stringify(nextAuthority), consequence.feeAmount, consequence.depositConsequence, occurredAt, appointment.shopId, appointment.id);
-      await enqueueLifecycleEvent(transaction as never, buildLifecycleEnvelope({ eventKey: `${eventKey}:outbox`, eventType: action === 'cancel' ? 'appointment.customer_cancelled' : 'appointment.customer_rescheduled', aggregateType: 'appointment', aggregateId: appointment.id, shopId: appointment.shopId, occurredAt, data: { appointmentId, action, previousStartsAt: appointment.startsAt.toISOString(), nextStartsAt: nextStartsAt?.toISOString() || null, feeAmount: consequence.feeAmount, depositConsequence: consequence.depositConsequence, policy: snapshot.bookingPolicySnapshot, authority: nextAuthority } }));
+      await recordCommandReceipt(transaction as never, buildCommandReceipt({ eventKey: `${eventKey}:receipt`, eventType: action === 'cancel' ? 'appointment.customer_cancelled' : 'appointment.customer_rescheduled', aggregateType: 'appointment', aggregateId: appointment.id, shopId: appointment.shopId, occurredAt, data: { appointmentId, action, previousStartsAt: appointment.startsAt.toISOString(), nextStartsAt: nextStartsAt?.toISOString() || null, feeAmount: consequence.feeAmount, depositConsequence: consequence.depositConsequence, policy: snapshot.bookingPolicySnapshot, authority: nextAuthority } }));
       return { appointmentId, action, startsAt: nextStartsAt?.toISOString() || appointment.startsAt.toISOString(), feeAmount: consequence.feeAmount, depositConsequence: consequence.depositConsequence, replayed: false };
     });
     return { success: true, error: null, data };

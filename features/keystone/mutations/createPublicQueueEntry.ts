@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { createPublicAccessToken, hashPublicAccessToken } from '../utils/publicAccessToken';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { resolvePublishedShop } from '../utils/publicShop';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
 import { walkInStatus } from '../utils/walkInCapacity';
@@ -125,7 +125,7 @@ export default async function createPublicQueueEntry(_root: unknown, args: Args,
         },
         select: QUEUE_ENTRY_SELECT,
       });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         eventKey: `queue:${created.id}:checked_in:v1`,
         eventType: 'queue.checked_in',
         aggregateType: 'walk_in_queue_entry',

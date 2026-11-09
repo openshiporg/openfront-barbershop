@@ -33,7 +33,7 @@ import { InventoryMovement } from './InventoryMovement';
 import { PackageUsage } from './PackageUsage';
 import { Shop } from './Shop';
 import { ShopMembership } from './ShopMembership';
-import { LifecycleOutboxEvent } from './LifecycleOutboxEvent';
+import { CommandReceipt } from './CommandReceipt';
 import { NoShowEvent } from './NoShowEvent';
 import { CommissionPayout } from './CommissionPayout';
 import { ProductSaleLine } from './ProductSaleLine';
@@ -53,7 +53,7 @@ export const models = enforceRelationshipBoundaries({
   Role,
   Shop,
   ShopMembership,
-  LifecycleOutboxEvent,
+  CommandReceipt,
   NoShowEvent,
   CommissionPayout,
   ProductSaleLine,

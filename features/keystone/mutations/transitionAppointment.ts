@@ -3,37 +3,13 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 import { permissions } from '../access';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
 import { lockBookingResources } from '../utils/bookingCapacity';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { assertAppointmentTransition } from '../utils/lifecycleState';
 import { hashPublicAccessToken } from '../utils/publicAccessToken';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
 import { assertAuthorityMatches, requireEffectivePractitionerAuthority, type PractitionerAuthoritySnapshot } from '../utils/practitionerAuthority';
 import { getAppointmentWaiverRequirement, requireSignedWaiver } from '../utils/waiverEvidence';
 import { formatShopDateTime, shopDateKey } from '../../shared/shop-time';
-import { sendAppointmentEmail } from '../lib/mail';
-
-/** Tells the customer the shop confirmed their visit; mail failures are ignored. */
-async function sendConfirmedNotice(prisma: PrismaClient, appointmentId: string) {
-  try {
-    const appointment = await prisma.appointment.findUnique({
-      where: { id: appointmentId },
-      select: { id: true, startsAt: true, serviceTitleSnapshot: true, barberNameSnapshot: true, customer: { select: { email: true } }, shop: { select: { name: true, timezone: true } } },
-    });
-    const to = appointment?.customer?.email?.trim();
-    if (!appointment || !to) return;
-    await sendAppointmentEmail({
-      to,
-      subject: `Booking confirmed · ${appointment.shop.name}`,
-      heading: 'Your visit is confirmed',
-      lines: [
-        `${appointment.serviceTitleSnapshot || 'Appointment'} with ${appointment.barberNameSnapshot || 'your barber'}`,
-        formatShopDateTime(appointment.startsAt, appointment.shop.timezone || 'UTC'),
-      ],
-      path: `/appointment?id=${encodeURIComponent(appointment.id)}`,
-      action: 'View booking',
-    });
-  } catch { /* best effort */ }
-}
 
 type Args = { appointmentId: string; toStatus: string; idempotencyKey: string };
 type Context = { session?: Parameters<typeof permissions.canManageAppointments>[0]['session']; prisma: PrismaClient };
@@ -72,7 +48,7 @@ export default async function transitionAppointment(_root: unknown, args: Args, 
 
       const commandHash = hashPublicAccessToken(idempotencyKey);
       const eventKey = `appointment-command:${commandHash}:v1`;
-      const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+      const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
       if (replay) {
         const payload = replay.payload as { aggregateId?: string; shopId?: string; data?: { transition?: { toStatus?: string; actorId?: string | null } } } | null;
         if (payload?.aggregateId !== appointmentId || payload.shopId !== shopId || payload.data?.transition?.toStatus !== toStatus
@@ -153,7 +129,7 @@ export default async function transitionAppointment(_root: unknown, args: Args, 
       if (toStatus === 'completed') {
         await transaction.$executeRawUnsafe('UPDATE "Appointment" SET "serviceCompletedAt" = $2 WHERE id = $1', current.id, updated.updatedAt);
       }
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId,
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId,
         eventKey,
         eventType: `appointment.${toStatus}`,
         aggregateType: 'appointment',
@@ -168,7 +144,6 @@ export default async function transitionAppointment(_root: unknown, args: Args, 
       }));
       return updated;
     });
-    if (confirmedNow) void sendConfirmedNotice(context.prisma, appointment.id);
 
     return {
       success: true,

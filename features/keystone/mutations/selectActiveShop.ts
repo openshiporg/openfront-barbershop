@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Prisma, PrismaClient } from '@prisma/client';
 
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
 
 type Args = { shopId: string };
@@ -25,7 +25,7 @@ export default async function selectActiveShop(_root: unknown, args: Args, conte
 
       const selectedAt = new Date();
       await transaction.user.update({ where: { id: userId }, data: { activeShopId: shopId } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId,
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId,
         eventKey: `user:${userId}:active-shop:${shopId}:${randomUUID()}:v1`,
         eventType: 'user.active_shop_selected',
         aggregateType: 'user',

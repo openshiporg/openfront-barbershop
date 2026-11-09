@@ -142,7 +142,7 @@ export const Shop = list({
     inventoryMovements: relationship({ ref: 'InventoryMovement.shop', many: true, access: { create: () => false, update: () => false } }),
     productSaleLines: relationship({ ref: 'ProductSaleLine.shop', many: true, access: { create: () => false, update: () => false } }),
     paymentReconciliations: relationship({ ref: 'PaymentReconciliation.shop', many: true, access: { create: () => false, update: () => false } }),
-    lifecycleEvents: relationship({ ref: 'LifecycleOutboxEvent.shop', many: true, access: { create: () => false, update: () => false } }),
+    commandReceipts: relationship({ ref: 'CommandReceipt.shop', many: true, access: { create: () => false, update: () => false } }),
     ...trackingFields,
   },
 });

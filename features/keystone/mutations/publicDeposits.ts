@@ -3,7 +3,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 
 import { stripeConfigured } from '../../integrations/payment/stripe';
 import { trustedOrigin } from '../../shared/trusted-origin';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { createPayment, getPaymentStatus } from '../utils/paymentProviderAdapter';
 import { resolvePublishedShop } from '../utils/publicShop';
 import { hashPublicAccessToken } from '../utils/publicAccessToken';
@@ -92,7 +92,7 @@ export async function confirmDepositCheckout(_root: unknown, args: Args, context
       const claimed = await transaction.paymentSession.updateMany({ where: { id: session.id, status: 'pending' }, data: { status: 'captured', capturedAt } });
       if (!claimed.count) return;
       await transaction.appointment.update({ where: { id: appointment.id }, data: { paymentStatus: 'deposit_paid' } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         eventKey: `payment-session:${session.id}:captured:v1`, eventType: 'payment_session.captured', aggregateType: 'payment_session', aggregateId: session.id,
         shopId: appointment.shopId, occurredAt: capturedAt, data: { paymentSession: { id: session.id, appointmentId: appointment.id, amount: session.amount, purpose: 'deposit' } },
       }));

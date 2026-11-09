@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { Prisma, type PrismaClient } from '@prisma/client';
 
 import { permissions, type Session } from '../access';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
 import { assertUsdSettlementCurrency } from '../utils/supportedSettlementCurrency';
@@ -124,7 +124,7 @@ export default async function manageMembership(_root: unknown, args: Args, conte
           eventType: 'purchased', planNameSnapshot: servicePackage.name, amount, visitsDelta: visits, resultingVisits: visits,
           occurredAt: now, reason: args.reason?.trim() || '',
         } });
-        await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId,
+        await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId,
           eventKey: `membership:${event.id}:purchased:v1`, eventType: 'service_package.purchased',
           aggregateType: 'customer_package', aggregateId: balance.id, shopId, occurredAt: now,
           data: { servicePackage: { id: balance.id, packageId: servicePackage.id, amount, visits, actorId: context.session?.itemId ?? null } },
@@ -227,7 +227,7 @@ export default async function manageMembership(_root: unknown, args: Args, conte
         planNameSnapshot: plan.name, amount, visitsDelta, resultingVisits: membership.remainingVisits || 0,
         occurredAt: now, reason: args.reason?.trim() || '',
       } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId,
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId,
         eventKey: `membership:${event.id}:${eventType}:v1`, eventType: `membership.${eventType}`,
         aggregateType: 'customer_package', aggregateId: membership.id, shopId, occurredAt: now,
         data: { membership: { id: membership.id, customerId: customer.id, planId: plan.id, action: eventType, amount, visitsDelta, resultingVisits: membership.remainingVisits || 0, status: membership.status, actorId: context.session?.itemId ?? null } },

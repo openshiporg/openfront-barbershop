@@ -2,7 +2,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 
 import { permissions } from '../access';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { assertQueueTransition } from '../utils/lifecycleState';
 import { hashPublicAccessToken } from '../utils/publicAccessToken';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
@@ -36,7 +36,7 @@ export default async function transitionQueueEntry(_root: unknown, args: Args, c
 
       const commandHash = hashPublicAccessToken(idempotencyKey);
       const eventKey = `queue-command:${commandHash}:v1`;
-      const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+      const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
       if (replay) {
         const payload = replay.payload as { aggregateId?: string; data?: { transition?: { toStatus?: string } } } | null;
         if (payload?.aggregateId !== queueEntryId || payload.data?.transition?.toStatus !== toStatus) {
@@ -54,7 +54,7 @@ export default async function transitionQueueEntry(_root: unknown, args: Args, c
         where: { id: current.id },
         data: { status: toStatus as Prisma.WalkInQueueEntryUpdateInput['status'] },
       });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId,
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId,
         eventKey,
         eventType: `queue.${toStatus}`,
         aggregateType: 'walk_in_queue_entry',

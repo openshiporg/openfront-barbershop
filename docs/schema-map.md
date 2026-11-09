@@ -4,7 +4,7 @@ This map comes from reading all 49 Keystone lists in `features/keystone/models/`
 
 **Tenancy:** every merchant record belongs to one `Shop`. All reads and writes are scoped to the caller's *active shop* (`features/keystone/access.ts`). That shop comes from an active `ShopMembership`, and the membership role (owner / manager / front_desk / barber / viewer) narrows the caller's global `Role` flags.
 
-**Records that change state through commands:** many state-bearing lists can't be created or updated through the generic CRUD API (`create/update: () => false`). They change only through custom commands that keep a ledger, record a lifecycle event in the outbox, and take an idempotency key.
+**Records that change state through commands:** many state-bearing lists can't be created or updated through the generic CRUD API (`create/update: () => false`). They change only through custom commands that keep a ledger, record a command receipt, and take an idempotency key.
 
 ## 1. Lists
 
@@ -99,7 +99,7 @@ Who creates it:
 
 | List | Purpose | Key fields | Relationships | Created by | States / transitions |
 |---|---|---|---|---|---|
-| LifecycleOutboxEvent | Domain event outbox and audit trail. | eventType, aggregate, payload, status, attempts | shop | S | pending → processing → delivered / dead_letter. System list, read-only. |
+| CommandReceipt | Idempotency receipt for commands; nothing is delivered from it. | eventType, aggregate, payload | shop | S | System list, read-only. |
 
 ## 2. Merchant workflows
 
@@ -152,7 +152,7 @@ Who creates it:
 | W13 InventoryLot / InventoryMovement | `/platform/barbershop` (receive delivery). No ledger, adjust or waste. | **THIN** |
 | W14 Customer / notes / waivers / consent | `/platform/customers` · customers | OK |
 | W15 Reports | `/platform/reports` · reports | OK |
-| System: GuestBookingCommand, PaymentWebhookEvent, LifecycleOutboxEvent | No page needed: these are system ledgers. | n/a |
+| System: GuestBookingCommand, PaymentWebhookEvent, CommandReceipt | No page needed: these are system ledgers. | n/a |
 | Join and ledger lists: ServicePackageItem, AppointmentLineItem, AppointmentChangeEvent, NoShowEvent, PackageUsage, MembershipEvent, CashRefund, ProductSaleLine | Covered by their parent pages: package, POS receipt, appointment, customer, product | n/a |
 
 ### Storefront, before this pass

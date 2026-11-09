@@ -6,7 +6,7 @@ import { hashPublicAccessToken } from '../utils/publicAccessToken';
 import { assertPackageRedeemableForService } from '../utils/packageUsageLedger';
 import { buildAppointmentLineItemSnapshot } from '../utils/appointmentLineItemSnapshot';
 import { calculateServiceCommission } from '../utils/commissionAccrual';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { consumePackageVisitInTransaction } from '../utils/packageUsageLedger';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
 import { assertAuthorityMatches, requireEffectivePractitionerAuthority, type PractitionerAuthoritySnapshot } from '../utils/practitionerAuthority';
@@ -121,7 +121,7 @@ export default async function checkoutAppointment(
         const replayTransaction = await transaction.checkoutTransaction.findUniqueOrThrow({ where: { id: appointment.transactionId }, include: { lineItems: true } });
         assertCheckoutReplay(replayTransaction, replayInput);
         if (commandKeyHash) {
-          const event = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey: `checkout:${replayTransaction.id}:paid:v1` } });
+          const event = await transaction.commandReceipt.findUnique({ where: { eventKey: `checkout:${replayTransaction.id}:paid:v1` } });
           const saved = (event?.payload as { data?: { command?: { keyHash?: string | null } } } | null)?.data?.command?.keyHash;
           if (saved && saved !== commandKeyHash) throw new Error('This appointment was already checked out by another request.');
         }
@@ -271,7 +271,7 @@ export default async function checkoutAppointment(
         await transaction.customer.update({ where: { id: appointment.customerId }, data: { lastVisitAt: completedAt } });
       }
 
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId,
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId,
         eventKey: `checkout:${checkout.id}:paid:v1`,
         eventType: 'checkout.paid',
         aggregateType: 'checkout_transaction',

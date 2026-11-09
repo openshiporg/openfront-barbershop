@@ -115,7 +115,7 @@ model Shop {
   inventoryMovements            InventoryMovement[]      @relation("InventoryMovement_shop")
   productSaleLines              ProductSaleLine[]        @relation("ProductSaleLine_shop")
   paymentReconciliations        PaymentReconciliation[]  @relation("PaymentReconciliation_shop")
-  lifecycleEvents               LifecycleOutboxEvent[]   @relation("LifecycleOutboxEvent_shop")
+  commandReceipts               CommandReceipt[]         @relation("CommandReceipt_shop")
   createdAt                     DateTime                 @default(now())
   updatedAt                     DateTime                 @default(now()) @updatedAt
   from_GuestBookingCommand_shop GuestBookingCommand[]    @relation("GuestBookingCommand_shop")
@@ -138,30 +138,21 @@ model ShopMembership {
   @@index([userId])
 }
 
-model LifecycleOutboxEvent {
-  id            String                          @id @default(cuid())
-  eventKey      String                          @unique @default("")
-  eventType     String                          @default("")
-  schemaVersion Int                             @default(1)
-  aggregateType String                          @default("")
-  aggregateId   String                          @default("")
-  shop          Shop                            @relation("LifecycleOutboxEvent_shop", fields: [shopId], references: [id])
-  shopId        String                          @map("shop")
+model CommandReceipt {
+  id            String   @id @default(cuid())
+  eventKey      String   @unique @default("")
+  eventType     String   @default("")
+  schemaVersion Int      @default(1)
+  aggregateType String   @default("")
+  aggregateId   String   @default("")
+  shop          Shop     @relation("CommandReceipt_shop", fields: [shopId], references: [id])
+  shopId        String   @map("shop")
   payload       Json?
-  actorId       String                          @default("")
-  payloadHash   String                          @default("")
+  actorId       String   @default("")
+  payloadHash   String   @default("")
   occurredAt    DateTime
-  status        LifecycleOutboxEventStatusType? @default(pending)
-  attempts      Int?                            @default(0)
-  maxAttempts   Int?                            @default(8)
-  availableAt   DateTime
-  lockedAt      DateTime?
-  lastAttemptAt DateTime?
-  deliveredAt   DateTime?
-  lastError     String                          @default("")
-  replayCount   Int?                            @default(0)
-  createdAt     DateTime                        @default(now())
-  updatedAt     DateTime                        @default(now()) @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
 
   @@index([shopId])
 }
@@ -1298,13 +1289,6 @@ enum ShopMembershipStatusType {
   active
   suspended
   revoked
-}
-
-enum LifecycleOutboxEventStatusType {
-  pending
-  processing
-  delivered
-  dead_letter
 }
 
 enum CommissionPayoutStatusType {

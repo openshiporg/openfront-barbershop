@@ -4,7 +4,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 import type { PaymentProviderConfig } from '../../integrations/payment/types';
 import { permissions } from '../access';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
-import { buildLifecycleEnvelope, canonicalJson, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, canonicalJson, recordCommandReceipt } from '../utils/commandReceipt';
 import { getPaymentStatus, isOfflinePaymentProvider } from '../utils/paymentProviderAdapter';
 import { hashPublicAccessToken } from '../utils/publicAccessToken';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
@@ -140,9 +140,9 @@ export default async function reconcilePaymentSession(_root: unknown, args: Args
         localStatusBefore: before, remoteStatus, localStatusAfter: next,
         changed, amount: paymentSession.amount, providerPayloadHash, observedAt,
       } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
-        eventKey: `${eventKey}:outbox`, eventType: 'payment_session.reconciled', aggregateType: 'payment_session', aggregateId: paymentSession.id,
+        eventKey: `${eventKey}:receipt`, eventType: 'payment_session.reconciled', aggregateType: 'payment_session', aggregateId: paymentSession.id,
         shopId, occurredAt: observedAt,
         data: { reconciliation: { id: created.id, localStatusBefore: before, remoteStatus, localStatusAfter: next, changed, amount: paymentSession.amount, refundedAmount } },
       }));

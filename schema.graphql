@@ -521,8 +521,8 @@ type Shop {
   productSaleLinesCount(where: ProductSaleLineWhereInput! = {}): Int
   paymentReconciliations(where: PaymentReconciliationWhereInput! = {}, orderBy: [PaymentReconciliationOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: PaymentReconciliationWhereUniqueInput): [PaymentReconciliation!]
   paymentReconciliationsCount(where: PaymentReconciliationWhereInput! = {}): Int
-  lifecycleEvents(where: LifecycleOutboxEventWhereInput! = {}, orderBy: [LifecycleOutboxEventOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: LifecycleOutboxEventWhereUniqueInput): [LifecycleOutboxEvent!]
-  lifecycleEventsCount(where: LifecycleOutboxEventWhereInput! = {}): Int
+  commandReceipts(where: CommandReceiptWhereInput! = {}, orderBy: [CommandReceiptOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: CommandReceiptWhereUniqueInput): [CommandReceipt!]
+  commandReceiptsCount(where: CommandReceiptWhereInput! = {}): Int
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -602,7 +602,7 @@ input ShopWhereInput {
   inventoryMovements: InventoryMovementManyRelationFilter
   productSaleLines: ProductSaleLineManyRelationFilter
   paymentReconciliations: PaymentReconciliationManyRelationFilter
-  lifecycleEvents: LifecycleOutboxEventManyRelationFilter
+  commandReceipts: CommandReceiptManyRelationFilter
   createdAt: DateTimeFilter
   updatedAt: DateTimeFilter
 }
@@ -819,10 +819,10 @@ input PaymentReconciliationManyRelationFilter {
   none: PaymentReconciliationWhereInput
 }
 
-input LifecycleOutboxEventManyRelationFilter {
-  every: LifecycleOutboxEventWhereInput
-  some: LifecycleOutboxEventWhereInput
-  none: LifecycleOutboxEventWhereInput
+input CommandReceiptManyRelationFilter {
+  every: CommandReceiptWhereInput
+  some: CommandReceiptWhereInput
+  none: CommandReceiptWhereInput
 }
 
 input ShopOrderByInput {
@@ -899,7 +899,7 @@ input ShopUpdateInput {
   inventoryMovements: InventoryMovementRelateToManyForUpdateInput
   productSaleLines: ProductSaleLineRelateToManyForUpdateInput
   paymentReconciliations: PaymentReconciliationRelateToManyForUpdateInput
-  lifecycleEvents: LifecycleOutboxEventRelateToManyForUpdateInput
+  commandReceipts: CommandReceiptRelateToManyForUpdateInput
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -1135,11 +1135,11 @@ input PaymentReconciliationRelateToManyForUpdateInput {
   connect: [PaymentReconciliationWhereUniqueInput!]
 }
 
-input LifecycleOutboxEventRelateToManyForUpdateInput {
-  disconnect: [LifecycleOutboxEventWhereUniqueInput!]
-  set: [LifecycleOutboxEventWhereUniqueInput!]
-  create: [LifecycleOutboxEventCreateInput!]
-  connect: [LifecycleOutboxEventWhereUniqueInput!]
+input CommandReceiptRelateToManyForUpdateInput {
+  disconnect: [CommandReceiptWhereUniqueInput!]
+  set: [CommandReceiptWhereUniqueInput!]
+  create: [CommandReceiptCreateInput!]
+  connect: [CommandReceiptWhereUniqueInput!]
 }
 
 input ShopUpdateArgs {
@@ -1200,7 +1200,7 @@ input ShopCreateInput {
   inventoryMovements: InventoryMovementRelateToManyForCreateInput
   productSaleLines: ProductSaleLineRelateToManyForCreateInput
   paymentReconciliations: PaymentReconciliationRelateToManyForCreateInput
-  lifecycleEvents: LifecycleOutboxEventRelateToManyForCreateInput
+  commandReceipts: CommandReceiptRelateToManyForCreateInput
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -1370,9 +1370,9 @@ input PaymentReconciliationRelateToManyForCreateInput {
   connect: [PaymentReconciliationWhereUniqueInput!]
 }
 
-input LifecycleOutboxEventRelateToManyForCreateInput {
-  create: [LifecycleOutboxEventCreateInput!]
-  connect: [LifecycleOutboxEventWhereUniqueInput!]
+input CommandReceiptRelateToManyForCreateInput {
+  create: [CommandReceiptCreateInput!]
+  connect: [CommandReceiptWhereUniqueInput!]
 }
 
 type ShopMembership {
@@ -1479,7 +1479,7 @@ input UserRelateToOneForCreateInput {
   connect: UserWhereUniqueInput
 }
 
-type LifecycleOutboxEvent {
+type CommandReceipt {
   id: ID!
   eventKey: String
   eventType: String
@@ -1491,35 +1491,19 @@ type LifecycleOutboxEvent {
   actorId: String
   payloadHash: String
   occurredAt: DateTime
-  status: LifecycleOutboxEventStatusType
-  attempts: Int
-  maxAttempts: Int
-  availableAt: DateTime
-  lockedAt: DateTime
-  lastAttemptAt: DateTime
-  deliveredAt: DateTime
-  lastError: String
-  replayCount: Int
   createdAt: DateTime
   updatedAt: DateTime
 }
 
-enum LifecycleOutboxEventStatusType {
-  pending
-  processing
-  delivered
-  dead_letter
-}
-
-input LifecycleOutboxEventWhereUniqueInput {
+input CommandReceiptWhereUniqueInput {
   id: ID
   eventKey: String
 }
 
-input LifecycleOutboxEventWhereInput {
-  AND: [LifecycleOutboxEventWhereInput!]
-  OR: [LifecycleOutboxEventWhereInput!]
-  NOT: [LifecycleOutboxEventWhereInput!]
+input CommandReceiptWhereInput {
+  AND: [CommandReceiptWhereInput!]
+  OR: [CommandReceiptWhereInput!]
+  NOT: [CommandReceiptWhereInput!]
   id: IDFilter
   eventKey: StringFilter
   eventType: StringFilter
@@ -1530,15 +1514,6 @@ input LifecycleOutboxEventWhereInput {
   actorId: StringFilter
   payloadHash: StringFilter
   occurredAt: DateTimeFilter
-  status: LifecycleOutboxEventStatusTypeNullableFilter
-  attempts: IntNullableFilter
-  maxAttempts: IntNullableFilter
-  availableAt: DateTimeFilter
-  lockedAt: DateTimeNullableFilter
-  lastAttemptAt: DateTimeNullableFilter
-  deliveredAt: DateTimeNullableFilter
-  lastError: StringFilter
-  replayCount: IntNullableFilter
   createdAt: DateTimeFilter
   updatedAt: DateTimeFilter
 }
@@ -1554,25 +1529,7 @@ input IntFilter {
   not: IntFilter
 }
 
-input LifecycleOutboxEventStatusTypeNullableFilter {
-  equals: LifecycleOutboxEventStatusType
-  in: [LifecycleOutboxEventStatusType!]
-  notIn: [LifecycleOutboxEventStatusType!]
-  not: LifecycleOutboxEventStatusTypeNullableFilter
-}
-
-input IntNullableFilter {
-  equals: Int
-  in: [Int!]
-  notIn: [Int!]
-  lt: Int
-  lte: Int
-  gt: Int
-  gte: Int
-  not: IntNullableFilter
-}
-
-input LifecycleOutboxEventOrderByInput {
+input CommandReceiptOrderByInput {
   id: OrderDirection
   eventKey: OrderDirection
   eventType: OrderDirection
@@ -1582,20 +1539,11 @@ input LifecycleOutboxEventOrderByInput {
   actorId: OrderDirection
   payloadHash: OrderDirection
   occurredAt: OrderDirection
-  status: OrderDirection
-  attempts: OrderDirection
-  maxAttempts: OrderDirection
-  availableAt: OrderDirection
-  lockedAt: OrderDirection
-  lastAttemptAt: OrderDirection
-  deliveredAt: OrderDirection
-  lastError: OrderDirection
-  replayCount: OrderDirection
   createdAt: OrderDirection
   updatedAt: OrderDirection
 }
 
-input LifecycleOutboxEventUpdateInput {
+input CommandReceiptUpdateInput {
   eventKey: String
   eventType: String
   schemaVersion: Int
@@ -1606,25 +1554,16 @@ input LifecycleOutboxEventUpdateInput {
   actorId: String
   payloadHash: String
   occurredAt: DateTime
-  status: LifecycleOutboxEventStatusType
-  attempts: Int
-  maxAttempts: Int
-  availableAt: DateTime
-  lockedAt: DateTime
-  lastAttemptAt: DateTime
-  deliveredAt: DateTime
-  lastError: String
-  replayCount: Int
   createdAt: DateTime
   updatedAt: DateTime
 }
 
-input LifecycleOutboxEventUpdateArgs {
-  where: LifecycleOutboxEventWhereUniqueInput!
-  data: LifecycleOutboxEventUpdateInput!
+input CommandReceiptUpdateArgs {
+  where: CommandReceiptWhereUniqueInput!
+  data: CommandReceiptUpdateInput!
 }
 
-input LifecycleOutboxEventCreateInput {
+input CommandReceiptCreateInput {
   eventKey: String
   eventType: String
   schemaVersion: Int
@@ -1635,15 +1574,6 @@ input LifecycleOutboxEventCreateInput {
   actorId: String
   payloadHash: String
   occurredAt: DateTime
-  status: LifecycleOutboxEventStatusType
-  attempts: Int
-  maxAttempts: Int
-  availableAt: DateTime
-  lockedAt: DateTime
-  lastAttemptAt: DateTime
-  deliveredAt: DateTime
-  lastError: String
-  replayCount: Int
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -1930,6 +1860,17 @@ input ProductSaleLineLineTypeTypeNullableFilter {
   in: [ProductSaleLineLineTypeType!]
   notIn: [ProductSaleLineLineTypeType!]
   not: ProductSaleLineLineTypeTypeNullableFilter
+}
+
+input IntNullableFilter {
+  equals: Int
+  in: [Int!]
+  notIn: [Int!]
+  lt: Int
+  lte: Int
+  gt: Int
+  gte: Int
+  not: IntNullableFilter
 }
 
 input ProductSaleLineOrderByInput {
@@ -6876,12 +6817,12 @@ type Mutation {
   updateShopMemberships(data: [ShopMembershipUpdateArgs!]!): [ShopMembership]
   deleteShopMembership(where: ShopMembershipWhereUniqueInput!): ShopMembership
   deleteShopMemberships(where: [ShopMembershipWhereUniqueInput!]!): [ShopMembership]
-  createLifecycleOutboxEvent(data: LifecycleOutboxEventCreateInput!): LifecycleOutboxEvent
-  createLifecycleOutboxEvents(data: [LifecycleOutboxEventCreateInput!]!): [LifecycleOutboxEvent]
-  updateLifecycleOutboxEvent(where: LifecycleOutboxEventWhereUniqueInput!, data: LifecycleOutboxEventUpdateInput!): LifecycleOutboxEvent
-  updateLifecycleOutboxEvents(data: [LifecycleOutboxEventUpdateArgs!]!): [LifecycleOutboxEvent]
-  deleteLifecycleOutboxEvent(where: LifecycleOutboxEventWhereUniqueInput!): LifecycleOutboxEvent
-  deleteLifecycleOutboxEvents(where: [LifecycleOutboxEventWhereUniqueInput!]!): [LifecycleOutboxEvent]
+  createCommandReceipt(data: CommandReceiptCreateInput!): CommandReceipt
+  createCommandReceipts(data: [CommandReceiptCreateInput!]!): [CommandReceipt]
+  updateCommandReceipt(where: CommandReceiptWhereUniqueInput!, data: CommandReceiptUpdateInput!): CommandReceipt
+  updateCommandReceipts(data: [CommandReceiptUpdateArgs!]!): [CommandReceipt]
+  deleteCommandReceipt(where: CommandReceiptWhereUniqueInput!): CommandReceipt
+  deleteCommandReceipts(where: [CommandReceiptWhereUniqueInput!]!): [CommandReceipt]
   createNoShowEvent(data: NoShowEventCreateInput!): NoShowEvent
   createNoShowEvents(data: [NoShowEventCreateInput!]!): [NoShowEvent]
   updateNoShowEvent(where: NoShowEventWhereUniqueInput!, data: NoShowEventUpdateInput!): NoShowEvent
@@ -7229,9 +7170,9 @@ type Query {
   shopMembership(where: ShopMembershipWhereUniqueInput!): ShopMembership
   shopMemberships(where: ShopMembershipWhereInput! = {}, orderBy: [ShopMembershipOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: ShopMembershipWhereUniqueInput): [ShopMembership!]
   shopMembershipsCount(where: ShopMembershipWhereInput! = {}): Int
-  lifecycleOutboxEvent(where: LifecycleOutboxEventWhereUniqueInput!): LifecycleOutboxEvent
-  lifecycleOutboxEvents(where: LifecycleOutboxEventWhereInput! = {}, orderBy: [LifecycleOutboxEventOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: LifecycleOutboxEventWhereUniqueInput): [LifecycleOutboxEvent!]
-  lifecycleOutboxEventsCount(where: LifecycleOutboxEventWhereInput! = {}): Int
+  commandReceipt(where: CommandReceiptWhereUniqueInput!): CommandReceipt
+  commandReceipts(where: CommandReceiptWhereInput! = {}, orderBy: [CommandReceiptOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: CommandReceiptWhereUniqueInput): [CommandReceipt!]
+  commandReceiptsCount(where: CommandReceiptWhereInput! = {}): Int
   noShowEvent(where: NoShowEventWhereUniqueInput!): NoShowEvent
   noShowEvents(where: NoShowEventWhereInput! = {}, orderBy: [NoShowEventOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: NoShowEventWhereUniqueInput): [NoShowEvent!]
   noShowEventsCount(where: NoShowEventWhereInput! = {}): Int

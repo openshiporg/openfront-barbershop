@@ -4,7 +4,7 @@ import type { PaymentProviderConfig } from '../../integrations/payment/types';
 import { permissions } from '../access';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
 import { capturePayment, isOfflinePaymentProvider } from '../utils/paymentProviderAdapter';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
 import {
   appointmentSettledElsewhere,
@@ -96,7 +96,7 @@ export default async function captureAppointmentPaymentSession(_root: unknown, a
           data: { paymentStatus: 'deposit_paid' },
         });
       }
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
         eventKey: `payment-session:${paymentSession.id}:captured:v1`,
         eventType: 'payment_session.captured',

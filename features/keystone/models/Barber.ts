@@ -4,7 +4,6 @@ import { checkbox, image, integer, relationship, select, text, virtual } from "@
 import { permissions, rules } from "../access";
 import { trackingFields } from "./trackingFields";
 import { validateShopRelationships } from "../utils/shopRelationshipHooks";
-import { createCrudLifecycleAfterOperation } from "../utils/crudLifecycleHooks";
 import { connectedRelationshipId } from "../utils/shopRelationshipHooks";
 import { upcomingBarberAppointments } from "../utils/childRecordValidation";
 
@@ -32,7 +31,6 @@ export const Barber = list({
         }
       },
     },
-    afterOperation: createCrudLifecycleAfterOperation("barber"),
   },
   access: {
     operation: {
