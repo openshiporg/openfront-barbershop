@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { Prisma, type PrismaClient } from '@prisma/client';
 
 import { permissions, type Session } from '../access';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
 
@@ -84,7 +84,7 @@ export async function manageStaffShift(_root: unknown, args: {
           shopId, barberId: barber.id, chairId, idempotencyKeyHash: commandHash, status: 'scheduled',
           scheduledStart: startsAt, scheduledEnd: endsAt, notes: args.notes?.trim() || '',
         } });
-        await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId,
+        await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId,
           eventKey: `shift:${created.id}:scheduled:v1`, eventType: 'shift.scheduled', aggregateType: 'staff_shift', aggregateId: created.id,
           shopId, occurredAt: created.createdAt, data: { shift: { id: created.id, barberId: barber.id, chairId, scheduledStart: startsAt.toISOString(), scheduledEnd: endsAt.toISOString() } },
         }));
@@ -93,7 +93,7 @@ export async function manageStaffShift(_root: unknown, args: {
 
       if (!args.shiftId) throw new Error('Shift is required.');
       const eventKey = `shift-command:${commandHash}:v1`;
-      const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+      const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
       if (replay) {
         const payload = replay.payload as { data?: { shift?: { id?: string; action?: string } } } | null;
         if (replay.shopId !== shopId || payload?.data?.shift?.id !== args.shiftId || payload.data.shift.action !== action) throw new Error('Shift idempotency key was reused for different input.');
@@ -116,7 +116,7 @@ export async function manageStaffShift(_root: unknown, args: {
         if (stranded) throw new Error(`${stranded} booked appointment(s) rely on this shift. Reschedule or reassign them before cancelling it.`);
       }
       const updated = await transaction.staffShift.update({ where: { id: current.id }, data });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId,
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId,
         eventKey, eventType: `shift.${updated.status}`, aggregateType: 'staff_shift', aggregateId: updated.id, shopId,
         occurredAt: now, data: { shift: { id: updated.id, action, fromStatus: current.status, toStatus: updated.status } },
       }));
@@ -167,7 +167,7 @@ export async function manageScheduleException(_root: unknown, args: {
           shopId, barberId: barber?.id || null, chairId: chair?.id || null, idempotencyKeyHash: commandHash,
           exceptionType: type as never, status: 'active', startsAt, endsAt, reason: args.reason.trim(),
         } });
-        await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId,
+        await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId,
           eventKey: `schedule-exception:${created.id}:created:v1`, eventType: 'schedule_exception.created', aggregateType: 'schedule_exception', aggregateId: created.id,
           shopId, occurredAt: created.createdAt, data: { exception: { id: created.id, type, barberId: barber?.id || null, chairId: chair?.id || null, startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() } },
         }));
@@ -175,7 +175,7 @@ export async function manageScheduleException(_root: unknown, args: {
       }
       if (!args.exceptionId) throw new Error('Schedule exception is required.');
       const eventKey = `schedule-exception-command:${commandHash}:v1`;
-      const replayEvent = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+      const replayEvent = await transaction.commandReceipt.findUnique({ where: { eventKey } });
       if (replayEvent) {
         const payload = replayEvent.payload as { data?: { exception?: { id?: string; action?: string } } } | null;
         if (replayEvent.shopId !== shopId || payload?.data?.exception?.id !== args.exceptionId || payload.data.exception.action !== 'cancel') throw new Error('Schedule-exception idempotency key was reused for different input.');
@@ -185,7 +185,7 @@ export async function manageScheduleException(_root: unknown, args: {
       if (!current || current.shopId !== shopId) throw new Error('Schedule exception was not found in the active shop.');
       if (current.status === 'cancelled') return current;
       const updated = await transaction.scheduleException.update({ where: { id: current.id }, data: { status: 'cancelled' } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId,
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId,
         eventKey, eventType: 'schedule_exception.cancelled', aggregateType: 'schedule_exception', aggregateId: updated.id,
         shopId, occurredAt: updated.updatedAt, data: { exception: { id: updated.id, action: 'cancel', fromStatus: current.status, toStatus: updated.status } },
       }));
@@ -224,7 +224,7 @@ export async function linkBarberAccount(_root: unknown, args: { barberId: string
         if (linked) throw new Error('This account is already linked to another barber profile.');
       }
       const updated = await transaction.barber.update({ where: { id: current.id }, data: { userId } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId,
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId,
         eventKey: `barber-account:${hash(key)}:v1`, eventType: userId ? 'barber.account_linked' : 'barber.account_unlinked', aggregateType: 'barber', aggregateId: current.id,
         shopId, occurredAt: updated.updatedAt, data: { barberAccount: { barberId: current.id, previousUserId: current.userId, userId, actorId: context.session?.itemId ?? null } },
       }));

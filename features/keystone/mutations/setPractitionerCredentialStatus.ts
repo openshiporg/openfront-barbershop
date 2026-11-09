@@ -3,7 +3,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 
 import { permissions } from '../access';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
 
 type Args = { credentialId: string; status: string; reason: string; idempotencyKey: string };
@@ -22,12 +22,12 @@ export default async function setPractitionerCredentialStatus(_root: unknown, ar
       const rows = await transaction.$queryRawUnsafe<Array<{ id: string; shopId: string; status: string; barberId: string; serviceId: string; evidenceHash: string }>>('SELECT id, "shop" AS "shopId", status, "barber" AS "barberId", "service" AS "serviceId", "evidenceHash" FROM "PractitionerCredential" WHERE id = $1 AND "shop" = $2 FOR UPDATE', credentialId, shopId);
       const credential = rows[0]; if (!credential) throw new Error('Practitioner credential not found.');
       const eventKey = `credential:${credentialId}:status:${hash(key)}`;
-      const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+      const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
       if (replay) { const payload = replay.payload as { data?: { status?: string; reason?: string } } | null; if (payload?.data?.status !== status || payload.data.reason !== reason) throw new Error('Idempotency key was reused with different credential status evidence.'); return { credentialId, status, replayed: true }; }
       if (credential.status !== 'active') throw new Error('Only an active credential can transition to a terminal authority status.');
       const occurredAt = new Date();
       await transaction.$executeRawUnsafe('UPDATE "PractitionerCredential" SET status = $2, "updatedAt" = $3 WHERE id = $1 AND status = \'active\'', credentialId, status, occurredAt);
-      await enqueueLifecycleEvent(transaction as never, buildLifecycleEnvelope({ actorId: context.session?.itemId, eventKey, eventType: `practitioner_credential.${status}`, aggregateType: 'practitioner_credential', aggregateId: credentialId, shopId: credential.shopId, occurredAt, data: { status, previousStatus: credential.status, reason, barberId: credential.barberId, serviceId: credential.serviceId, evidenceHash: credential.evidenceHash, actorId: context.session?.itemId ?? null } }));
+      await recordCommandReceipt(transaction as never, buildCommandReceipt({ actorId: context.session?.itemId, eventKey, eventType: `practitioner_credential.${status}`, aggregateType: 'practitioner_credential', aggregateId: credentialId, shopId: credential.shopId, occurredAt, data: { status, previousStatus: credential.status, reason, barberId: credential.barberId, serviceId: credential.serviceId, evidenceHash: credential.evidenceHash, actorId: context.session?.itemId ?? null } }));
       return { credentialId, status, replayed: false };
     });
     return { success: true, error: null, data };

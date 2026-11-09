@@ -4,7 +4,7 @@ import { permissions } from '../access';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
 import { applyInventoryDelta } from '../utils/balanceLedgers';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 
 type Args = {
   inventoryLotId: string;
@@ -97,7 +97,7 @@ export default async function recordInventoryMovement(_root: unknown, args: Args
             status: expired ? 'expired' : balance.after === 0 ? 'consumed' : 'active',
           },
         });
-        await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId,
+        await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId,
           eventKey: `inventory:${created.id}:${referenceKey}:v1`,
           eventType: 'inventory.moved',
           aggregateType: 'inventory_movement',

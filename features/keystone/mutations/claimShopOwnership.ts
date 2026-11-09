@@ -3,7 +3,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 
 import type { Session } from '../access';
 import { hasCurrentRolePermission } from '../utils/currentAuthorization';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
 
 type Context = { session?: Session; prisma: PrismaClient };
@@ -58,7 +58,7 @@ export default async function claimShopOwnership(_root: unknown, args: { shopId:
         transaction.barber.count({ where: { shopId } }),
       ]);
       await transaction.user.update({ where: { id: userId }, data: { activeShopId: shopId, ...(services && barbers ? { onboardingStatus: 'completed' } : {}) } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: userId,
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: userId,
         eventKey: `shop:${shopId}:owner-claimed:${userId}:${randomUUID()}:v1`,
         eventType: 'shop.owner_claimed',
         aggregateType: 'shop',

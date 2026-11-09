@@ -5,7 +5,6 @@ import { type Session } from "../access";
 import { currentShopForPermission } from '../utils/currentAuthorization';
 import { trackingFields } from "./trackingFields";
 import { validateShopRelationships } from "../utils/shopRelationshipHooks";
-import { createCrudLifecycleAfterOperation } from "../utils/crudLifecycleHooks";
 
 const currentCustomerAccess = async ({ session }: { session?: Session }) =>
   Boolean(await currentShopForPermission(session, 'canManageCustomers'));
@@ -21,7 +20,6 @@ export const Customer = list({
       create: (args) => validateShopRelationships(args, [{ field: "preferredBarber", delegate: "barber" }]),
       update: (args) => validateShopRelationships(args, [{ field: "preferredBarber", delegate: "barber" }]),
     },
-    afterOperation: createCrudLifecycleAfterOperation("customer"),
   },
   access: {
     operation: {

@@ -3,7 +3,7 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 
 import { permissions, type Session } from '../access';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
 
 const ACTIONS = new Set(['create', 'notify', 'expire']);
@@ -20,11 +20,11 @@ export default async function manageWaitlist(_root: unknown, args: Args, context
     const entry = await runSerializableTransaction(context.prisma, async (client) => {
       const transaction = client as Prisma.TransactionClient; const commandHash = hash(key); const eventKey = `waitlist-command:${commandHash}:v1`;
       await requireCurrentShopPermission(context.session, 'canManageQueue', transaction);
-      // The outbox carries IDs only; contact details stay in the waitlist row.
+      // The command receipt carries IDs only; contact details stay in the waitlist row.
       // The full request is bound by a fingerprint so a reused key cannot differ.
       const inputHash = hash(JSON.stringify([action, args.waitlistEntryId || null, args.customerName?.trim() || null, args.phone?.trim() || null, args.customerId || null, args.requestedServiceId || null, args.requestedBarberId || null, args.preferredAt || null, args.notes?.trim() || null, context.session?.itemId || null]));
       await transaction.$executeRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', 'barbershop-waitlist', args.waitlistEntryId || `${shopId}:${args.phone || commandHash}`);
-      const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+      const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
       if (replay) {
         if (replay.shopId !== shopId) throw new Error('Waitlist idempotency key belongs to another shop.');
         const payload = replay.payload as { data?: { waitlist?: Record<string, unknown> } } | null; const saved = payload?.data?.waitlist;
@@ -40,7 +40,7 @@ export default async function manageWaitlist(_root: unknown, args: Args, context
         const duplicate = await transaction.waitlistEntry.findFirst({ where: { shopId, phone, status: { in: ['waiting', 'notified'] }, requestedServiceId: service?.id || null } });
         if (duplicate) throw new Error('This customer already has an active waitlist request for that service.');
         const created = await transaction.waitlistEntry.create({ data: { shopId, customerName, phone, customerId: customer?.id || null, requestedServiceId: service?.id || null, requestedBarberId: barber?.id || null, status: 'waiting', preferredAt, notes: args.notes?.trim() || '', metadata: { source: 'operator' } } });
-        await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId, eventKey, eventType: 'waitlist.created', aggregateType: 'waitlist_entry', aggregateId: created.id, shopId, occurredAt: created.createdAt, data: { waitlist: { id: created.id, action, inputHash, customerId: customer?.id || null, requestedServiceId: service?.id || null, requestedBarberId: barber?.id || null, preferredAt: args.preferredAt || null, actorId: context.session?.itemId ?? null } } }));
+        await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId, eventKey, eventType: 'waitlist.created', aggregateType: 'waitlist_entry', aggregateId: created.id, shopId, occurredAt: created.createdAt, data: { waitlist: { id: created.id, action, inputHash, customerId: customer?.id || null, requestedServiceId: service?.id || null, requestedBarberId: barber?.id || null, preferredAt: args.preferredAt || null, actorId: context.session?.itemId ?? null } } }));
         return created;
       }
       if (!args.waitlistEntryId) throw new Error('Waitlist entry is required.');
@@ -48,7 +48,7 @@ export default async function manageWaitlist(_root: unknown, args: Args, context
       if (!current) throw new Error('Waitlist entry was not found in the active shop.');
       if (action === 'notify' ? current.status !== 'waiting' : !['waiting', 'notified'].includes(String(current.status))) throw new Error(`Waitlist entry in ${current.status} state cannot ${action}.`);
       const updated = await transaction.waitlistEntry.update({ where: { id: current.id }, data: action === 'notify' ? { status: 'notified', notifiedAt: new Date() } : { status: 'expired' } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId, eventKey, eventType: `waitlist.${updated.status}`, aggregateType: 'waitlist_entry', aggregateId: updated.id, shopId, occurredAt: updated.updatedAt, data: { waitlist: { id: updated.id, action, inputHash, fromStatus: current.status, toStatus: updated.status, actorId: context.session?.itemId ?? null } } }));
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId, eventKey, eventType: `waitlist.${updated.status}`, aggregateType: 'waitlist_entry', aggregateId: updated.id, shopId, occurredAt: updated.updatedAt, data: { waitlist: { id: updated.id, action, inputHash, fromStatus: current.status, toStatus: updated.status, actorId: context.session?.itemId ?? null } } }));
       return updated;
     });
     return { success: true, error: null, entry: { id: entry.id, status: entry.status, customerName: entry.customerName, preferredAt: entry.preferredAt?.toISOString() || null, notifiedAt: entry.notifiedAt?.toISOString() || null } };

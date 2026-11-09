@@ -2,7 +2,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 
 import { permissions } from '../access';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { isOfflinePaymentProvider } from '../utils/paymentProviderAdapter';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
 import { serializePaymentSession } from './paymentSessionResult';
@@ -51,7 +51,7 @@ export default async function cancelAppointmentPaymentSession(_root: unknown, ar
         data: { status: 'cancelled', cancelledAt },
         include: { appointment: true, paymentProvider: true },
       });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
         eventKey: `payment-session:${paymentSession.id}:cancelled:v1`,
         eventType: 'payment_session.cancelled',

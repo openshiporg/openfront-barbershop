@@ -2,7 +2,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 
 import { permissions } from '../access';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { assertCommissionTransition } from '../utils/remainingLifecycle';
 import { hashPublicAccessToken } from '../utils/publicAccessToken';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
@@ -23,7 +23,7 @@ export async function transitionCommission(_root: unknown, args: { commissionId:
       const commission = await transaction.commission.findFirst({ where: { id: args.commissionId, shopId } });
       if (!commission) throw new Error('Commission not found.');
       const eventKey = `commission-command:${commandHash}:v1`;
-      const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+      const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
       if (replay) {
         const payload = replay.payload as { data?: { transition?: { commissionId?: string; toStatus?: string } } } | null;
         if (
@@ -35,7 +35,7 @@ export async function transitionCommission(_root: unknown, args: { commissionId:
       }
       assertCommissionTransition(String(commission.status), args.toStatus);
       const updated = await transaction.commission.update({ where: { id: commission.id }, data: { status: args.toStatus as Prisma.CommissionUpdateInput['status'] } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId,
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId,
         eventKey, eventType: `commission.${args.toStatus}`, aggregateType: 'commission', aggregateId: commission.id,
         shopId: commission.shopId, occurredAt: updated.updatedAt,
         data: { transition: { commissionId: commission.id, fromStatus: commission.status, toStatus: args.toStatus, reason: args.reason?.trim() || '', actorId: context.session?.itemId ?? null }, amount: commission.commissionAmount },
@@ -80,7 +80,7 @@ export async function createCommissionPayout(_root: unknown, args: { commissionI
         data: { shopId, payoutNumber: `payout-${hash.slice(0, 20)}`, idempotencyKeyHash: hash, barberId, commissionCount: commissions.length, totalAmount, paidAt, notes: args.notes?.trim() || '' },
       });
       await transaction.commission.updateMany({ where: { id: { in: ids }, status: 'approved' }, data: { status: 'paid', paidAt, payoutId: created.id } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId,
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId,
         eventKey: `commission-payout:${created.id}:paid:v1`, eventType: 'commission_payout.paid', aggregateType: 'commission_payout', aggregateId: created.id,
         shopId, occurredAt: paidAt, data: { payout: { id: created.id, barberId, commissionIds: ids.sort(), commissionCount: commissions.length, totalAmount, payoutReference: args.notes!.trim(), actorId: context.session?.itemId ?? null } },
       }));

@@ -3,7 +3,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 import type { PaymentProviderConfig } from '../../integrations/payment/types';
 import { permissions } from '../access';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { isOfflinePaymentProvider, refundPayment } from '../utils/paymentProviderAdapter';
 import { hashPublicAccessToken } from '../utils/publicAccessToken';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
@@ -47,7 +47,7 @@ export default async function refundAppointmentPaymentSession(_root: unknown, ar
       }
 
       const eventKey = `payment-refund:${shopId}:${hashPublicAccessToken(idempotencyKey)}:v1`;
-      const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+      const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
       if (replay) {
         const payload = recordOf(replay.payload);
         const refund = recordOf(recordOf(payload.data).refund);
@@ -129,7 +129,7 @@ export default async function refundAppointmentPaymentSession(_root: unknown, ar
           await transaction.commission.updateMany({ where: { transactionId: paymentSession.transaction.id, status: { in: ['projected', 'approved'] } }, data: { status: 'voided' } });
         }
       }
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
         eventKey,
         eventType: fullyRefunded ? 'payment_session.refunded' : 'payment_session.partially_refunded',

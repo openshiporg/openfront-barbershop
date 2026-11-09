@@ -6,7 +6,7 @@ import { dayKeyForDate, dayRange, occupiedBufferMinutes } from '../utils/availab
 import { shopMinute } from '../../shared/shop-time';
 import { lockBookingResources } from '../utils/bookingCapacity';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { requireEffectivePractitionerAuthority } from '../utils/practitionerAuthority';
 import { getWaiverRequirement } from '../utils/waiverEvidence';
 
@@ -215,7 +215,7 @@ export default async function seatWalkInQueueEntry(_root: unknown, args: Args, c
         },
       });
 
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId,
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId,
         eventKey: `queue:${entry.id}:seated:${appointment.id}:v1`,
         eventType: 'queue.seated',
         aggregateType: 'walk_in_queue_entry',

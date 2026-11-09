@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { Session } from '../access';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
 import { assertUsdSettlementCurrency } from '../utils/supportedSettlementCurrency';
 
@@ -34,7 +34,7 @@ export default async function refundCashCheckout(_root: unknown, args: Args, con
       await tx.checkoutTransaction.update({ where: { id: receipt.id }, data: { status: 'refunded' } });
       await tx.appointment.updateMany({ where: { transactionId: receipt.id, shopId }, data: { paymentStatus: 'refunded' } });
       await tx.commission.updateMany({ where: { transactionId: receipt.id, status: { in: ['projected', 'approved'] } }, data: { status: 'voided' } });
-      await enqueueLifecycleEvent(tx, buildLifecycleEnvelope({ actorId: context.session?.itemId, eventKey: `${eventKey}:outbox`, eventType: 'checkout.cash_refunded', aggregateType: 'checkout_transaction', aggregateId: receipt.id, shopId, occurredAt: refundedAt, data: { refundId: refund.id, amount: refund.amount, tipAmount: refund.tipAmount, taxAmount: refund.taxAmount, reason, actorId: context.session!.itemId, settlement: 'owner_attested_cash_return' } }));
+      await recordCommandReceipt(tx, buildCommandReceipt({ actorId: context.session?.itemId, eventKey: `${eventKey}:receipt`, eventType: 'checkout.cash_refunded', aggregateType: 'checkout_transaction', aggregateId: receipt.id, shopId, occurredAt: refundedAt, data: { refundId: refund.id, amount: refund.amount, tipAmount: refund.tipAmount, taxAmount: refund.taxAmount, reason, actorId: context.session!.itemId, settlement: 'owner_attested_cash_return' } }));
       return { id: refund.id, amount: refund.amount, replayed: false };
     });
     return { success: true, error: null, data };

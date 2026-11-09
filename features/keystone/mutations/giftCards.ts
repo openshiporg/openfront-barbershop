@@ -2,10 +2,9 @@ import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto
 import type { Prisma, PrismaClient } from '@prisma/client';
 
 import { permissions } from '../access';
-import { sendAppointmentEmail } from '../lib/mail';
 import { trustedOrigin } from '../../shared/trusted-origin';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { createPayment, getPaymentStatus } from '../utils/paymentProviderAdapter';
 import { hashPublicAccessToken } from '../utils/publicAccessToken';
 import { resolvePublishedShop } from '../utils/publicShop';
@@ -119,7 +118,7 @@ export async function settleGiftCard(prisma: PrismaClient, giftCardId: string) {
         if (!claimed.count) return;
         const ledger: Ledger = [{ at: now.toISOString(), type: 'purchase', amount: card.initialValue, balance: card.initialValue, ref: session.id }];
         await tx.giftCard.update({ where: { id: card.id }, data: { status: 'active', activatedAt: now, ledger } });
-        await enqueueLifecycleEvent(tx, buildLifecycleEnvelope({
+        await recordCommandReceipt(tx, buildCommandReceipt({
           eventKey: `gift-card:${card.id}:sold:v1`, eventType: 'gift_card.sold', aggregateType: 'gift_card', aggregateId: card.id,
           shopId: card.shopId, occurredAt: now, data: { giftCard: { id: card.id, amount: card.initialValue, paymentSessionId: session.id } },
         }));
@@ -127,33 +126,7 @@ export async function settleGiftCard(prisma: PrismaClient, giftCardId: string) {
     }
   }
   const fresh = await prisma.giftCard.findUniqueOrThrow({ where: { id: card.id } });
-  if (fresh.status === 'active') await emailOnce(prisma, fresh);
   return fresh;
-}
-
-/** The code goes to the recipient exactly once, whichever reader settles the order first. */
-async function emailOnce(prisma: PrismaClient, card: { id: string; shopId: string; code: string; initialValue: number; recipientEmail: string | null; recipientName: string | null; purchaserName: string | null; message: string | null; expiresAt: Date | null }) {
-  if (!card.recipientEmail || process.env.NODE_ENV === 'test' || !process.env.SMTP_HOST) return;
-  const claimed = await prisma.giftCard.updateMany({ where: { id: card.id, emailedAt: null }, data: { emailedAt: new Date() } });
-  if (!claimed.count) return;
-  try {
-    const shop = await prisma.shop.findUnique({ where: { id: card.shopId }, select: { name: true } });
-    await sendAppointmentEmail({
-      to: card.recipientEmail,
-      subject: `${usd(card.initialValue)} gift card from ${card.purchaserName || 'a friend'}`,
-      heading: `${usd(card.initialValue)} at ${shop?.name || 'the shop'}`,
-      lines: [
-        `Hi ${card.recipientName || 'there'}, ${card.purchaserName || 'a friend'} sent you a gift card.`,
-        ...(card.message ? [`“${card.message}”`] : []),
-        `Code: ${card.code}`,
-        `Show this code at checkout.${card.expiresAt ? ` Valid until ${card.expiresAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.` : ''}`,
-      ],
-      path: '/book', action: 'Book a cut',
-    });
-  } catch (error) {
-    console.error('Gift card email failed:', error);
-    await prisma.giftCard.update({ where: { id: card.id }, data: { emailedAt: null } }).catch(() => undefined);
-  }
 }
 
 export async function confirmGiftCardOrder(_root: unknown, args: { giftCardId: string; token: string }, context: Context) {
@@ -238,7 +211,7 @@ export async function returnGiftCardCheckout(_root: unknown, args: { transaction
       await tx.checkoutTransaction.update({ where: { id: receipt.id }, data: { status: 'refunded' } });
       await tx.appointment.updateMany({ where: { transactionId: receipt.id, shopId }, data: { paymentStatus: 'refunded' } });
       await tx.commission.updateMany({ where: { transactionId: receipt.id, status: { in: ['projected', 'approved'] } }, data: { status: 'voided' } });
-      await enqueueLifecycleEvent(tx, buildLifecycleEnvelope({ actorId: context.session?.itemId, eventKey: `gift-card-return:${receipt.id}`, eventType: 'checkout.gift_card_returned', aggregateType: 'checkout_transaction', aggregateId: receipt.id, shopId, occurredAt: now, data: { giftCardId: card.id, amount: debit, balance, reason } }));
+      await recordCommandReceipt(tx, buildCommandReceipt({ actorId: context.session?.itemId, eventKey: `gift-card-return:${receipt.id}`, eventType: 'checkout.gift_card_returned', aggregateType: 'checkout_transaction', aggregateId: receipt.id, shopId, occurredAt: now, data: { giftCardId: card.id, amount: debit, balance, reason } }));
       return { giftCardId: card.id, amount: debit, balance, replayed: false };
     });
     return { success: true, error: null, data };

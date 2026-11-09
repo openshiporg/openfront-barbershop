@@ -4,7 +4,6 @@ import { checkbox, image, integer, json, relationship, select, text } from '@key
 import { permissions, rules } from '../access';
 import { trackingFields } from './trackingFields';
 import { validateShopRelationships } from '../utils/shopRelationshipHooks';
-import { createCrudLifecycleAfterOperation } from '../utils/crudLifecycleHooks';
 
 export const Product = list({
   db: {
@@ -18,7 +17,6 @@ export const Product = list({
       create: (args) => validateShopRelationships(args, []),
       update: (args) => validateShopRelationships(args, []),
     },
-    afterOperation: createCrudLifecycleAfterOperation('product'),
   },
   access: {
     operation: { query: permissions.canAccessDashboard, create: permissions.canManageServices, update: permissions.canManageServices, delete: permissions.canManageServices },

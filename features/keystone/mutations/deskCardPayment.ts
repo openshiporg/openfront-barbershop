@@ -4,7 +4,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 import { permissions } from '../access';
 import { trustedOrigin } from '../../shared/trusted-origin';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { createPayment, getPaymentStatus, refundPayment } from '../utils/paymentProviderAdapter';
 import { hashPublicAccessToken } from '../utils/publicAccessToken';
 import { onlineDepositProvider } from './publicDeposits';
@@ -117,7 +117,7 @@ export async function checkDeskCardPayment(_root: unknown, args: { paymentSessio
       await context.prisma.$transaction(async (transaction) => {
         const claimed = await transaction.paymentSession.updateMany({ where: { id: session!.id, status: 'pending' }, data: { status: 'captured', capturedAt } });
         if (!claimed.count) return;
-        await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+        await recordCommandReceipt(transaction, buildCommandReceipt({
           actorId: context.session?.itemId, eventKey: `payment-session:${session!.id}:captured:v1`, eventType: 'payment_session.captured', aggregateType: 'payment_session', aggregateId: session!.id,
           shopId, occurredAt: capturedAt, data: { paymentSession: { id: session!.id, appointmentId: session!.appointmentId, amount: session!.amount, purpose: 'desk_card' } },
         }));

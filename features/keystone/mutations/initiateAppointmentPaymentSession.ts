@@ -3,7 +3,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 import type { PaymentProviderConfig } from '../../integrations/payment/types';
 import { permissions } from '../access';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { createPayment, paymentProviderSettlement } from '../utils/paymentProviderAdapter';
 import { hashPublicAccessToken } from '../utils/publicAccessToken';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
@@ -167,7 +167,7 @@ export default async function initiateAppointmentPaymentSession(_root: unknown, 
         data: { providerPaymentId: externalId ?? '', status, metadata: { request, providerCode: provider.code, settlement, adapterStatus } },
         include: { appointment: true, paymentProvider: true },
       });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
         eventKey: `payment-session:${created.id}:initiated:v1`,
         eventType: 'payment_session.initiated',

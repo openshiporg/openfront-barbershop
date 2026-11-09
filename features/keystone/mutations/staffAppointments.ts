@@ -14,7 +14,7 @@ import {
 } from '../utils/bookingCapacity';
 import { appointmentChangeConsequences, requireEffectiveBookingPolicy, type BookingPolicySnapshot } from '../utils/bookingPolicy';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
-import { buildLifecycleEnvelope, canonicalJson, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, canonicalJson, recordCommandReceipt } from '../utils/commandReceipt';
 import { requireEffectivePractitionerAuthority } from '../utils/practitionerAuthority';
 import { createPublicAccessToken } from '../utils/publicAccessToken';
 import { getWaiverRequirement } from '../utils/waiverEvidence';
@@ -117,7 +117,7 @@ async function assertStaffSlot(transaction: Prisma.TransactionClient, input: Slo
 type StoredCommand = { request: string; appointmentId: string };
 
 async function readReplay(transaction: Prisma.TransactionClient, eventKey: string, shopId: string, request: string) {
-  const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+  const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
   if (!replay) return null;
   const payload = replay.payload as { data?: { command?: StoredCommand } } | null;
   const saved = payload?.data?.command;
@@ -255,7 +255,7 @@ export async function createStaffAppointment(_root: unknown, args: CreateArgs, c
         await transaction.waitlistEntry.update({ where: { id: waitlist.id }, data: { status: 'booked', customerId: customer.id, metadata: { ...metadata, appointmentId: appointment.id, bookedAt: appointment.createdAt.toISOString() } } });
       }
 
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         eventKey, eventType: 'appointment.created', aggregateType: 'appointment', aggregateId: appointment.id, shopId, occurredAt: appointment.createdAt,
         data: {
           command: { request, appointmentId: appointment.id },
@@ -348,8 +348,8 @@ export async function manageStaffAppointment(_root: unknown, args: ManageArgs, c
         randomUUID(), eventKey, action === 'cancel' ? 'cancelled' : 'rescheduled', digest(context.session?.itemId || ''), reason,
         appointment.startsAt, appointment.endsAt, nextStartsAt, nextEndsAt, JSON.stringify(policy ?? null), JSON.stringify(nextAuthority ?? null),
         consequence.feeAmount, consequence.depositConsequence, now, shopId, appointment.id);
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
-        eventKey: `${eventKey}:outbox`, eventType: action === 'cancel' ? 'appointment.operator_cancelled' : 'appointment.operator_rescheduled',
+      await recordCommandReceipt(transaction, buildCommandReceipt({
+        eventKey: `${eventKey}:receipt`, eventType: action === 'cancel' ? 'appointment.operator_cancelled' : 'appointment.operator_rescheduled',
         aggregateType: 'appointment', aggregateId: appointment.id, shopId, occurredAt: now,
         data: { appointmentId, action, reason, previousStartsAt: appointment.startsAt.toISOString(), nextStartsAt: nextStartsAt?.toISOString() || null, previousBarberId: appointment.barberId, nextBarberId: nextBarber?.id || null, feeAmount: consequence.feeAmount, depositConsequence: consequence.depositConsequence },
       }));

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-export type LifecycleEnvelope = {
+export type CommandReceiptEnvelope = {
   eventKey: string;
   eventType: string;
   schemaVersion: 1;
@@ -13,9 +13,9 @@ export type LifecycleEnvelope = {
   data: Record<string, unknown>;
 };
 
-type LifecycleTransaction = {
+type CommandReceiptTransaction = {
   $executeRawUnsafe(query: string, namespace: string, resource: string): Promise<unknown>;
-  lifecycleOutboxEvent: {
+  commandReceipt: {
     findUnique(args: { where: { eventKey: string } }): Promise<{
       id: string;
       eventKey: string;
@@ -43,7 +43,7 @@ export function canonicalJson(value: unknown) {
   return JSON.stringify(canonicalize(value));
 }
 
-export function buildLifecycleEnvelope(input: Omit<LifecycleEnvelope, 'schemaVersion' | 'occurredAt'> & { occurredAt: Date }) {
+export function buildCommandReceipt(input: Omit<CommandReceiptEnvelope, 'schemaVersion' | 'occurredAt'> & { occurredAt: Date }) {
   return {
     ...input,
     schemaVersion: 1 as const,
@@ -51,35 +51,35 @@ export function buildLifecycleEnvelope(input: Omit<LifecycleEnvelope, 'schemaVer
   };
 }
 
-export function lifecyclePayloadHash(envelope: LifecycleEnvelope) {
+export function commandReceiptHash(envelope: CommandReceiptEnvelope) {
   return createHash('sha256').update(JSON.stringify(canonicalize(envelope))).digest('hex');
 }
 
-export async function enqueueLifecycleEvent(transaction: LifecycleTransaction, envelope: LifecycleEnvelope) {
+export async function recordCommandReceipt(transaction: CommandReceiptTransaction, envelope: CommandReceiptEnvelope) {
   const serialized = JSON.stringify(canonicalize(envelope));
   if (Buffer.byteLength(serialized) > 1_000_000) {
-    throw new Error('Lifecycle event snapshot exceeds the supported size.');
+    throw new Error('Command receipt snapshot exceeds the supported size.');
   }
 
   await transaction.$executeRawUnsafe(
     'SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))',
-    'barbershop-outbox',
+    'barbershop-command-receipt',
     envelope.eventKey
   );
-  const payloadHash = lifecyclePayloadHash(envelope);
-  const existing = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey: envelope.eventKey } });
+  const payloadHash = commandReceiptHash(envelope);
+  const existing = await transaction.commandReceipt.findUnique({ where: { eventKey: envelope.eventKey } });
   if (existing) {
     if (
       existing.eventType !== envelope.eventType
       || existing.shopId !== envelope.shopId
       || existing.payloadHash !== payloadHash
     ) {
-      throw new Error('Lifecycle event idempotency key was reused with a different snapshot.');
+      throw new Error('Command receipt idempotency key was reused with a different snapshot.');
     }
     return { id: existing.id, created: false };
   }
 
-  const event = await transaction.lifecycleOutboxEvent.create({
+  const event = await transaction.commandReceipt.create({
     data: {
       eventKey: envelope.eventKey,
       eventType: envelope.eventType,
@@ -91,10 +91,6 @@ export async function enqueueLifecycleEvent(transaction: LifecycleTransaction, e
       payload: envelope,
       payloadHash,
       occurredAt: new Date(envelope.occurredAt),
-      status: 'pending',
-      attempts: 0,
-      maxAttempts: 8,
-      availableAt: new Date(envelope.occurredAt),
     },
   });
   return { id: event.id, created: true };

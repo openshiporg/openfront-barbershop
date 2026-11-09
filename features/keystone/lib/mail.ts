@@ -2,8 +2,7 @@
 import { createTransport } from "nodemailer";
 
 import { domainPrisma } from "../utils/domainPrisma";
-import { trustedOrigin } from "../../shared/trusted-origin";
-import { emailButton, emailLayout, emailMuted, emailPanel, emailParagraph } from "./email-layout";
+import { emailButton, emailLayout, emailMuted, emailParagraph } from "./email-layout";
 
 // Reset links must be absolute and point at this application. A missing or
 // malformed origin never produces a relative or attacker-shaped link.
@@ -67,31 +66,4 @@ export async function sendPasswordResetEmail(resetToken: string, to: string, bas
   if ((info.rejected || []).length || !accepted.includes(to.toLowerCase())) {
     throw new Error("The mail server did not accept the password reset email.");
   }
-}
-
-function escapeHtml(value: string) {
-  return escapeHtmlAttribute(value).replace(/'/g, "&#39;");
-}
-
-function appointmentEmail({ heading, lines, url, action }: { heading: string; lines: string[]; url: string; action: string }) {
-  return emailLayout({
-    preheader: lines[0] || heading,
-    title: heading,
-    body: `${emailPanel(lines.map(escapeHtml).join("<br>"))}
-${emailButton(action, url)}`,
-  });
-}
-
-/**
- * Appointment notices go to the email the customer gave. Delivery is best
- * effort: callers never fail a booking because mail is unavailable.
- */
-export async function sendAppointmentEmail(input: { to: string; subject: string; heading: string; lines: string[]; path: string; action: string }): Promise<void> {
-  const url = new URL(input.path, resetLinkOrigin(trustedOrigin()));
-  await mailTransport().sendMail({
-    to: input.to,
-    from: process.env.SMTP_FROM,
-    subject: input.subject,
-    html: appointmentEmail({ heading: input.heading, lines: input.lines, url: url.toString(), action: input.action }),
-  });
 }

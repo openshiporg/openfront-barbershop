@@ -3,7 +3,7 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 
 import { permissions, type Session } from '../access';
 import { requireCurrentShopPermission } from '../utils/currentAuthorization';
-import { buildLifecycleEnvelope, enqueueLifecycleEvent } from '../utils/lifecycleOutbox';
+import { buildCommandReceipt, recordCommandReceipt } from '../utils/commandReceipt';
 import { runSerializableTransaction } from '../utils/serializableTransaction';
 
 type Context = { session?: Session; prisma: PrismaClient };
@@ -38,7 +38,7 @@ export default async function receiveInventoryLot(_root: unknown, args: Args, co
       await transaction.$executeRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', 'barbershop-inventory-lot', `${product.shopId}:${lotNumber}`);
       const lot = await transaction.inventoryLot.create({ data: { shopId: product.shopId, productId: product.id, supplierId: supplier?.id || null, lotNumber, quantityReceived: quantity, quantityRemaining: quantity, unitCost, receivedAt, expiresAt, status: expiresAt && expiresAt <= new Date() ? 'expired' : 'active', metadata: { source: 'operator_receipt' } } });
       const movement = await transaction.inventoryMovement.create({ data: { shopId: product.shopId, productId: product.id, inventoryLotId: lot.id, movementType: 'receive', quantityDelta: quantity, quantityAfter: quantity, reason: `Received lot ${lotNumber}`, referenceKey, occurredAt: receivedAt } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId, eventKey: `inventory-receipt:${movement.id}:recorded:v1`, eventType: 'inventory.received', aggregateType: 'inventory_lot', aggregateId: lot.id, shopId: product.shopId, occurredAt: receivedAt, data: { receipt: { lotId: lot.id, productId: product.id, supplierId: supplier?.id || null, lotNumber, quantity, unitCost, receivedAt: receivedAt.toISOString(), expiresAt: expiresAt?.toISOString() ?? null, actorId: context.session?.itemId ?? null } } }));
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId, eventKey: `inventory-receipt:${movement.id}:recorded:v1`, eventType: 'inventory.received', aggregateType: 'inventory_lot', aggregateId: lot.id, shopId: product.shopId, occurredAt: receivedAt, data: { receipt: { lotId: lot.id, productId: product.id, supplierId: supplier?.id || null, lotNumber, quantity, unitCost, receivedAt: receivedAt.toISOString(), expiresAt: expiresAt?.toISOString() ?? null, actorId: context.session?.itemId ?? null } } }));
       return lot;
     });
     return { success: true, error: null, received: { id: received.id, lotNumber: received.lotNumber, quantityReceived: received.quantityReceived, quantityRemaining: received.quantityRemaining, status: received.status } };
