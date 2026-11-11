@@ -112,7 +112,7 @@ export function CustomMultiSelect({
           }
         }}
       >
-        <div className="flex flex-wrap gap-1">
+        <div className="flex min-w-0 flex-1 flex-wrap gap-1">
           {value.map((option) => (
             <div
               key={option.value}
@@ -139,13 +139,13 @@ export function CustomMultiSelect({
             value={inputValue}
             onChange={(e) => handleInputChange(e.target.value)}
             className={cn(
-              "placeholder:text-muted-foreground flex-1 bg-transparent outline-none",
+              "placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent outline-none",
               value.length === 0 ? "w-full" : "w-20"
             )}
             placeholder={value.length === 0 ? placeholder : ""}
           />
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           {isClearable && value.length > 0 && !isDisabled && (
             <button
               type="button"

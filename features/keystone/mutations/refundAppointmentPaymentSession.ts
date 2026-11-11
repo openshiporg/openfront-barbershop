@@ -113,6 +113,11 @@ export default async function refundAppointmentPaymentSession(_root: unknown, ar
           where: { id: paymentSession.appointmentId, shopId, paymentStatus: 'deposit_paid', transactionId: null },
           data: { paymentStatus: 'refunded' },
         });
+        // A refunded deposit releases the request: the held slot goes back to the shop.
+        await transaction.appointment.updateMany({
+          where: { id: paymentSession.appointmentId, shopId, paymentStatus: 'refunded', transactionId: null, status: { in: ['requested', 'confirmed'] } },
+          data: { status: 'cancelled', cancellationReason: 'Deposit refunded' },
+        });
       }
       // A refunded gift card sale voids the unspent card.
       if (fullyRefunded && recordOf(paymentSession.metadata).purpose === 'gift_card') {

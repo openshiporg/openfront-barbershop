@@ -316,7 +316,7 @@ export async function manageStaffAppointment(_root: unknown, args: ManageArgs, c
         return { appointmentId, action, status: appointment.status, startsAt: appointment.startsAt.toISOString(), barberId: appointment.barberId, replayed: true };
       }
       if (!['requested', 'confirmed'].includes(String(appointment.status))) throw new Error('Only requested or confirmed appointments can be cancelled or rescheduled. Use the board status actions for guests already in the shop.');
-      if (appointment.paymentStatus === 'paid' || appointment.paymentStatus === 'refunded') throw new Error('Settled appointments cannot be changed here.');
+      if (appointment.paymentStatus === 'paid' || (appointment.paymentStatus === 'refunded' && action !== 'cancel')) throw new Error('Settled appointments cannot be changed here.');
       if (!appointment.serviceId || !appointment.barberId) throw new Error('This appointment is missing its service or barber.');
       const snapshot = (await transaction.$queryRawUnsafe<SnapshotRow[]>('SELECT "bookingPolicySnapshot", "bookingAuthoritySnapshot" FROM "Appointment" WHERE id = $1 FOR UPDATE', appointmentId))[0];
       const policy = snapshot?.bookingPolicySnapshot;
