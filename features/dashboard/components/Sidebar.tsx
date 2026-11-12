@@ -43,6 +43,7 @@ import { OnboardingCards } from '@/features/platform/onboarding/components/Onboa
 import { dismissOnboarding } from '@/features/platform/onboarding/actions/onboarding'
 import { platformNavGroups, platformStandaloneItems, getPlatformNavItemsWithBasePath } from '@/features/platform/lib/navigation'
 import { useDashboard } from '../context/DashboardProvider'
+import { canSeeOnboarding, canUsePlatformPage } from '@/features/platform/lib/pageAccess'
 import { visiblePlatformItems, visibleSidebarLists } from '../lib/sidebarAccess'
 
 interface User {
@@ -50,10 +51,9 @@ interface User {
   email: string;
   name?: string;
   onboardingStatus?: string;
-  role?: {
-    canAccessDashboard?: boolean;
-    canManageOnboarding?: boolean;
-  };
+  role?: Record<string, boolean | null | undefined>;
+  activeShop?: { id: string; status?: string | null } | null;
+  shopMemberships?: Array<{ membershipRole?: string | null; shop?: { id: string; status?: string | null } | null }> | null;
 }
 
 interface SidebarProps {
@@ -101,7 +101,7 @@ export function Sidebar({ adminMeta, user, onOpenDialog }: SidebarProps) {
     getPlatformNavItemsWithBasePath(basePath),
     listsArray as any[],
     user
-  )
+  ).filter((item) => canUsePlatformPage(user, item.href.split('/platform/')[1]?.split(/[/?#]/)[0] ?? ''))
   const platformItems = platformNavGroups.map((group) => ({
     title: group.title,
     items: platformItemsWithBasePath.filter(item => item.group === group.id).map(item => ({
@@ -368,7 +368,7 @@ export function Sidebar({ adminMeta, user, onOpenDialog }: SidebarProps) {
               description: 'Set up your shop: services, barbers, chairs and hours.',
             }]}
             onboardingStatus={user?.onboardingStatus}
-            userRole={user?.role}
+            userRole={canSeeOnboarding(user) ? user?.role : undefined}
             onDismiss={async () => {
               try {
                 await dismissOnboarding();

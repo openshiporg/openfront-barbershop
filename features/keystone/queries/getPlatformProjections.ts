@@ -7,6 +7,7 @@ import { dayKeyForDate } from '../utils/availability';
 import { permissions, type Session } from '../access';
 // Explicitly authorized aggregate projections use the request's canonical client.
 // Cross-governed capabilities are checked below before any related-record read.
+import { netReceiptTotal } from '../../shared/receipt-net';
 import { currentManagedShopIds, currentShopForPermission, hasCurrentOwnerMembership, requireCurrentShopPermission } from '../utils/currentAuthorization';
 import { assertUsdSettlementCurrency } from '../utils/supportedSettlementCurrency';
 import { countProjectedServices, uncategorizedServiceWhere } from '../utils/serviceCatalogProjection';
@@ -196,8 +197,10 @@ async function scope(context: Context, permission: Parameters<typeof requireCurr
     // Separately governed optional sections (memberships, commissions, payments)
     // are authorized inside each projection and returned as restricted/null.
     const dependencies: Partial<Record<typeof permission, Array<typeof permission>>> = {
-      canManageAppointments: ['canManageCustomers', 'canManageStaff', 'canManageServices'],
-      canManageQueue: ['canManageCustomers', 'canManageStaff', 'canManageServices', 'canManageAppointments'],
+      // The board lists barbers and services through the projection itself, so front desk and
+      // barber (who manage appointments and the queue but not the catalog) are not locked out.
+      canManageAppointments: ['canManageCustomers'],
+      canManageQueue: ['canManageCustomers', 'canManageAppointments'],
       canViewReports: ['canManageAppointments', 'canManagePayments', 'canManageQueue', 'canManageSchedules', 'canManageStaff', 'canManageMemberships'],
       canManageSchedules: ['canManageStaff'],
     };
@@ -563,7 +566,7 @@ export async function getReportsProjection(_root: unknown, args: { startDate?: s
   const appointmentTotal = appointments.reduce((sum, item) => sum + item._count, 0);
   const queueClosed = (queueCounts.served || 0) + (queueCounts.left || 0);
   const serviceLines = settledTransactions.flatMap((transaction) => {
-    const refundableServiceTotal = Math.max(0, (transaction.subtotal || 0) - (transaction.discountAmount || 0) - (transaction.paymentSession?.refundedAmount || 0) - Math.max(0, (transaction.cashRefund?.amount || 0) - (transaction.cashRefund?.tipAmount || 0) - (transaction.cashRefund?.taxAmount || 0)));
+    const refundableServiceTotal = transaction.status === 'refunded' ? 0 : Math.max(0, (transaction.subtotal || 0) - (transaction.discountAmount || 0) - (transaction.paymentSession?.refundedAmount || 0) - Math.max(0, (transaction.cashRefund?.amount || 0) - (transaction.cashRefund?.tipAmount || 0) - (transaction.cashRefund?.taxAmount || 0)));
     const lineTotal = transaction.lineItems.reduce((sum, line) => sum + Math.max(0, line.price || 0), 0);
     return transaction.lineItems.map((line) => ({ ...line, netRevenue: lineTotal ? Math.round(refundableServiceTotal * Math.max(0, line.price || 0) / lineTotal) : 0 }));
   });
@@ -600,7 +603,7 @@ export async function getReportsProjection(_root: unknown, args: { startDate?: s
     const packageVisits = balance.servicePackage?.items.reduce((total, item) => total + (item.quantity || 0), 0) || 1;
     return sum + Math.round((balance.servicePackage?.price || 0) * visits / packageVisits);
   }, 0);
-  const netPaidTotal = settledTransactions.reduce((sum, transaction) => { const total = transaction.total || 0; return sum + (total < 0 ? total : Math.max(0, total - (transaction.paymentSession?.refundedAmount || 0) - (transaction.cashRefund?.amount || 0))); }, 0);
+  const netPaidTotal = settledTransactions.reduce((sum, transaction) => sum + netReceiptTotal(transaction), 0);
   const netTips = settledTransactions.reduce((sum, transaction) => sum + (transaction.status === 'refunded' ? 0 : transaction.tipAmount || 0), 0);
   return { range: { start, end, startDate, endDate, days, timeZone, currencyCode: shopRow?.currencyCode || 'USD' }, appointments: { total: appointmentTotal, ...appointmentCounts }, revenue: { paidTotal: netPaidTotal, tips: netTips, transactionCount: settledTransactions.length, productSales: productLines.reduce((sum, line) => sum + (line.total || 0), 0), productSaleCount: productLines.filter((line) => line.lineType === 'sale').length }, queue: queueCounts, payouts: { total: payouts._sum.totalAmount || 0, count: payouts._count }, rates: { completion: appointmentTotal ? Math.min(100, Math.round(((appointmentCounts.completed || 0) / appointmentTotal) * 100)) : 0, queueConversion: queueClosed ? Math.round(((queueCounts.served || 0) / queueClosed) * 100) : 0, utilization: capacityMinutes ? Math.round((completedMinutes / capacityMinutes) * 100) : 0 }, liabilities: { memberships: membershipLiability, activeBalances: membershipBalances.length }, servicePerformance, barberPerformance };
 }

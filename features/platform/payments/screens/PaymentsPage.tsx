@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { PageContainer } from '@/features/dashboard/components/PageContainer';
 import { basePath } from '@/features/dashboard/lib/config';
+import { netReceiptTotal } from '@/features/shared/receipt-net';
 import { formatShopDateTime } from '@/features/shared/shop-time';
 import { DataTable, Empty, Notice, PageHeader, PillLink, Readouts, Section, StatusCell, StatusDot, Td, Track, type Tone } from '@/features/platform/lib/ui';
 import { ReconciliationControls } from '@/features/platform/barbershop/screens/OperationsControls';
@@ -56,7 +57,7 @@ export default async function PaymentsPage() {
   for (const receipt of settled) {
     const entry = byTender.get(receipt.paymentMethod) || { count: 0, total: 0 };
     entry.count += 1;
-    entry.total += receipt.total || 0;
+    entry.total += netReceiptTotal(receipt);
     byTender.set(receipt.paymentMethod, entry);
   }
 
@@ -69,9 +70,9 @@ export default async function PaymentsPage() {
     <PageContainer title="Payments" header={header} breadcrumbs={breadcrumbs}>
       <div className="flex min-w-0 flex-col gap-8 px-4 pb-24 md:px-6">
         <Readouts items={[
-          { label: 'Taken, 30 days', value: money(settled.reduce((sum, receipt) => sum + (receipt.total || 0), 0)) },
+          { label: 'Taken, 30 days (after refunds)', value: money(settled.reduce((sum, receipt) => sum + netReceiptTotal(receipt), 0)) },
           { label: 'Receipts', value: settled.length },
-          { label: 'Tips', value: money(settled.reduce((sum, receipt) => sum + (receipt.tipAmount || 0), 0)) },
+          { label: 'Tips', value: money(settled.reduce((sum, receipt) => sum + (receipt.status === 'refunded' ? 0 : receipt.tipAmount || 0), 0)) },
           { label: 'Open card payments', value: data.sessions.length, tone: data.sessions.length ? 'wait' : undefined },
         ]} />
 

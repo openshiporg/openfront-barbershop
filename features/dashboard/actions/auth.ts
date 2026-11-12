@@ -154,7 +154,13 @@ export async function getAuthenticatedUser() {
       authenticatedItem {
         ... on User {
           id email name onboardingStatus
-          role { canAccessDashboard canManageOnboarding }
+          role {
+            canAccessDashboard canManageOnboarding canManageServices canManageStaff canManageSchedules
+            canManageAppointments canManageQueue canManageCustomers canManageCustomerNotes canManageMemberships
+            canManagePayments canViewReports
+          }
+          activeShop { id status }
+          shopMemberships(where: { status: { equals: active } }) { membershipRole shop { id status } }
         }
       }
     }

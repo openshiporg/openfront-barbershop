@@ -6,7 +6,7 @@ import { platformRequest } from '@/features/platform/lib/platformRequest';
 
 export type ProviderRow = { id: string; name: string; code: string; isInstalled: boolean; paymentSessionsCount: number };
 export type SessionRow = { id: string; status: string; amount: number; currencyCode: string; createdAt: string; paymentProvider: { name: string | null } | null; appointment: { id: string; serviceTitleSnapshot: string | null } | null };
-export type ReceiptRow = { id: string; status: string; paymentMethod: string; total: number | null; tipAmount: number | null; completedAt: string | null; customer: { firstName: string; lastName: string | null } | null };
+export type ReceiptRow = { id: string; status: string; paymentMethod: string; total: number | null; tipAmount: number | null; completedAt: string | null; paymentSession: { refundedAmount: number | null } | null; cashRefund: { amount: number | null } | null; customer: { firstName: string; lastName: string | null } | null };
 export type ReconciliationRow = { id: string; localStatusBefore: string; remoteStatus: string; localStatusAfter: string; changed: boolean; amount: number; observedAt: string };
 export type GiftCardRow = { id: string; code: string; status: string; initialValue: number; balance: number; purchaserName: string | null; recipientName: string | null; activatedAt: string | null; createdAt: string; paymentSession: { id: string; status: string } | null };
 export type PaymentsData = { shopName: string; timezone: string; providers: ProviderRow[]; sessions: SessionRow[]; receipts: ReceiptRow[]; reconciliations: ReconciliationRow[]; giftCards: GiftCardRow[]; stripeKeyConfigured: boolean };
@@ -22,7 +22,7 @@ export async function getPaymentsAction(): Promise<PaymentsData | null> {
       shop(where: { id: $shop }) { timezone }
       paymentProviders(where: { shop: { id: { equals: $shop } } }, orderBy: [{ name: asc }]) { id name code isInstalled paymentSessionsCount }
       paymentSessions(where: { shop: { id: { equals: $shop } }, status: { in: [pending, authorized] } }, orderBy: [{ createdAt: desc }], take: 50) { id status amount currencyCode createdAt paymentProvider { name } appointment { id serviceTitleSnapshot } }
-      checkoutTransactions(where: { shop: { id: { equals: $shop } }, completedAt: { gte: $since } }, orderBy: [{ completedAt: desc }], take: 500) { id status paymentMethod total tipAmount completedAt customer { firstName lastName } }
+      checkoutTransactions(where: { shop: { id: { equals: $shop } }, completedAt: { gte: $since } }, orderBy: [{ completedAt: desc }], take: 500) { id status paymentMethod total tipAmount completedAt paymentSession { refundedAmount } cashRefund { amount } customer { firstName lastName } }
       paymentReconciliations(where: { shop: { id: { equals: $shop } } }, orderBy: [{ observedAt: desc }], take: 20) { id localStatusBefore remoteStatus localStatusAfter changed amount observedAt }
       giftCards(where: { shop: { id: { equals: $shop } }, status: { not: { equals: pending } } }, orderBy: [{ createdAt: desc }], take: 20) { id code status initialValue balance purchaserName recipientName activatedAt createdAt paymentSession { id status } }
     }`, { shop: shop.id, since });
