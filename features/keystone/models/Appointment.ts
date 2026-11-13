@@ -43,6 +43,7 @@ export const Appointment = list({
     filter: { query: rules.canAccessShopRecords },
   },
   ui: {
+    labelField: "displaySummary",
     listView: {
       initialColumns: ["customer", "service", "barber", "startsAt", "status", "paymentStatus"],
     },
@@ -123,7 +124,6 @@ export const Appointment = list({
     price: integer({ ui: { description: "Final service price in cents." } }),
     depositAmount: integer({ defaultValue: 0 }),
     cancellationReason: text({ ui: { displayMode: "textarea" } }),
-    reminderSentAt: timestamp({ access: { create: () => false, update: () => false }, ui: { createView: { fieldMode: "hidden" }, itemView: { fieldMode: "read" } } }),
     customerNotes: text({ ui: { displayMode: "textarea" } }),
     guestNameSnapshot: text({ access: { create: () => false, update: () => false }, ui: { description: 'Unverified contact name supplied for this occurrence, not proof of customer identity.' } }),
     internalNotes: text({ ui: { displayMode: "textarea" } }),

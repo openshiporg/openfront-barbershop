@@ -7,9 +7,8 @@ import { trackingFields } from './trackingFields';
 const immutable = { update: () => false };
 
 // Idempotency receipts for commands: a replay returns the stored result. Nothing
-// is delivered from here. Raw payloads can hold customer contact details and notes. Report-only
-// roles see the event metadata; only an owner/manager of the event's selected
-// shop can read the payload itself.
+// is delivered from here. Raw payloads can hold customer contact details and notes. The list is an
+// audit trail for owners and managers only (a viewer can read no appointments, customers or payments).
 function canReadPayload({ session, item }: { session?: unknown; item: Record<string, unknown> }) {
   const shopId = typeof item.shopId === 'string' ? item.shopId : '';
   if (!shopId) return false;
@@ -20,7 +19,7 @@ function canReadPayload({ session, item }: { session?: unknown; item: Record<str
 export const CommandReceipt = list({
   access: {
     operation: {
-      query: permissions.canViewReports,
+      query: permissions.canManageStaff,
       create: () => false,
       update: () => false,
       delete: () => false,

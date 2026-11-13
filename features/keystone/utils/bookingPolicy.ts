@@ -105,9 +105,12 @@ export function appointmentChangeConsequences(input: {
     ? (input.action === 'cancel' ? input.policy.lateCancellationFeeAmount : input.policy.rescheduleFeeAmount)
     : 0;
   const hasDeposit = input.paymentStatus === 'deposit_paid' && Number(input.depositAmount || 0) > 0;
+  // Cancelling in time is free under the policy: the deposit goes back. The deposit rule applies to late changes.
   const depositConsequence = !hasDeposit
     ? 'none'
-    : input.policy.depositCancellationRule === 'refund'
+    : input.action === 'cancel' && !isLate
+      ? 'refund_required'
+      : input.policy.depositCancellationRule === 'refund'
       ? 'refund_required'
       : input.policy.depositCancellationRule === 'forfeit'
         ? 'forfeiture_pending'

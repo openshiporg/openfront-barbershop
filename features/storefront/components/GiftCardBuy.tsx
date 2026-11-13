@@ -41,7 +41,7 @@ export function GiftCardBuy({ amounts }: { amounts: number[] }) {
       <div className="sf-actions">
         <button type="submit" className="sf-btn is-primary" disabled={pending}>{pending ? 'Opening checkout…' : `Buy ${usd(amount)} gift card`}</button>
       </div>
-      <p className="sf-small sf-muted">Paid securely with Stripe. The code is emailed {forSomeone ? 'to them' : 'to you'} as soon as payment clears and works at checkout for a year.</p>
+      <p className="sf-small sf-muted">Paid securely with Stripe. The code appears on the next page as soon as payment clears; share it {forSomeone ? 'with them' : 'when you use it'}. It works at checkout for a year.</p>
     </form>
   );
 }

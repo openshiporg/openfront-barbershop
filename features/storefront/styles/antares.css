@@ -1082,3 +1082,15 @@ html:has([data-storefront]) body { overflow-x: clip; background: oklch(93.6% 0.0
   [data-storefront] *, [data-storefront] *::before, [data-storefront] *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
   [data-storefront] .sf-tix[data-torn='true'] .sf-tix-body { animation: none; }
 }
+
+/* Design floor: every tap target is at least 44px at any width, and no pills. */
+[data-storefront] .sf-nav-book,
+[data-storefront] .sf-quick-cta,
+[data-storefront] .sf-quick-slot,
+[data-storefront] .sf-quick-service,
+[data-storefront] .sf-quick-more,
+[data-storefront] .sf-viewall,
+[data-storefront] .sf-quick-day button { min-height: 2.75rem; }
+[data-storefront] .sf-quick-slot { min-width: 2.75rem; border-radius: var(--radius-sm); }
+[data-storefront] .sf-quick-more,
+[data-storefront] .sf-viewall { margin-block: 0; }

@@ -1,5 +1,5 @@
-import { list } from '@keystone-6/core';
-import { integer, json, relationship, select, text, timestamp } from '@keystone-6/core/fields';
+import { graphql, list } from '@keystone-6/core';
+import { integer, json, relationship, select, text, timestamp, virtual } from '@keystone-6/core/fields';
 
 import { permissions, rules } from '../access';
 import { trackingFields } from './trackingFields';
@@ -31,7 +31,7 @@ export const PaymentSession = list({
   },
   ui: {
     listView: {
-      initialColumns: ['appointment', 'status', 'amount', 'currencyCode', 'expiresAt'],
+      initialColumns: ['appointment', 'status', 'amountLabel', 'currencyCode', 'expiresAt'],
     },
   },
   fields: {
@@ -61,6 +61,10 @@ export const PaymentSession = list({
       defaultValue: 'pending',
     }),
     amount: integer({ validation: { isRequired: true, min: 0 } }),
+    amountLabel: virtual({
+      field: graphql.field({ type: graphql.String, resolve: (item) => `$${(Number(item.amount || 0) / 100).toFixed(2)}` }),
+      ui: { listView: { fieldMode: 'read' } },
+    }),
     currencyCode: text({ defaultValue: 'USD', validation: { isRequired: true } }),
     providerPaymentId: text(),
     expiresAt: timestamp(),

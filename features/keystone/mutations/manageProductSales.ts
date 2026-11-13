@@ -32,6 +32,71 @@ export function allocatedReturnTax(originalTax: number, originalQuantity: number
   return cumulative(returnedBefore + quantity) - cumulative(returnedBefore);
 }
 
+/** Records one paid retail sale (receipt, sale line, stock allocation, command receipt) inside the caller's transaction. */
+export async function createProductSaleInTransaction(transaction: Prisma.TransactionClient, input: { shopId: string; productId: string; quantity: number; taxRateBps?: number | null; paymentMethod: string; lineNumber: string; paymentSessionId?: string | null; actorId?: string | null; online?: boolean }) {
+  const { shopId, lineNumber, actorId } = input;
+  const product = await transaction.product.findFirst({ where: { id: input.productId, shopId } });
+  if (!product || product.status !== 'active') throw new Error('Product is not available.');
+  const shop = await transaction.shop.findUnique({ where: { id: shopId }, select: { currencyCode: true } });
+  assertUsdSettlementCurrency(shop?.currencyCode);
+  const totals = calculateProductSale({ unitPrice: product.price || 0, quantity: input.quantity, taxRateBps: input.taxRateBps || 0 });
+  const occurredAt = new Date();
+
+  // Tracked goods are allocated across eligible lots (earliest expiry first);
+  // untracked goods sell without inventing a stock receipt.
+  const allocations: Array<{ lotId: string; quantity: number; quantityAfter: number; becomesConsumed: boolean }> = [];
+  if (product.inventoryTracked !== false) {
+    const candidates = await transaction.inventoryLot.findMany({
+      where: sellableLotWhere(shopId, product.id, occurredAt),
+      orderBy: [{ expiresAt: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }, { id: 'asc' }],
+      take: MAX_ALLOCATION_LOTS,
+      select: { id: true },
+    });
+    for (const lotId of candidates.map((lot) => lot.id).sort()) await lockLot(transaction, lotId);
+    const lots = await transaction.inventoryLot.findMany({
+      where: { ...sellableLotWhere(shopId, product.id, occurredAt), id: { in: candidates.map((lot) => lot.id) } },
+      orderBy: [{ expiresAt: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }, { id: 'asc' }],
+    });
+    let remaining = totals.quantity;
+    for (const lot of lots) {
+      if (remaining <= 0) break;
+      const take = Math.min(remaining, lot.quantityRemaining || 0);
+      if (take <= 0) continue;
+      const quantityAfter = (lot.quantityRemaining || 0) - take;
+      allocations.push({ lotId: lot.id, quantity: take, quantityAfter, becomesConsumed: quantityAfter === 0 });
+      remaining -= take;
+    }
+    // An online order is already paid: record the sale and let the shop sort out missing stock (refund from Payments).
+    if (remaining > 0 && !input.online) throw new Error('Insufficient sellable inventory for this product sale.');
+  }
+
+  const checkout = await transaction.checkoutTransaction.create({ data: {
+    shopId, status: 'paid', subtotal: totals.subtotal, taxAmount: totals.taxAmount, total: totals.total, currencyCode: 'USD',
+    paymentMethod: input.paymentMethod as Prisma.CheckoutTransactionCreateInput['paymentMethod'], paymentSessionId: input.paymentSessionId ?? undefined, completedAt: occurredAt,
+    notes: `Retail sale · ${product.name} (${product.sku}) × ${totals.quantity}`,
+  } });
+  const created = await transaction.productSaleLine.create({ data: {
+    shopId, lineNumber, transactionId: checkout.id, productId: product.id, lineType: 'sale',
+    productNameSnapshot: product.name, skuSnapshot: product.sku ?? '', quantity: totals.quantity, unitPrice: totals.unitPrice,
+    subtotal: totals.subtotal, taxAmount: totals.taxAmount, total: totals.total, occurredAt,
+  }, include: { transaction: true } });
+  for (const [index, allocation] of allocations.entries()) {
+    await transaction.inventoryMovement.create({ data: {
+      shopId, productId: product.id, inventoryLotId: allocation.lotId,
+      // The first lot links 1:1 to the sale line; further lots share its reference prefix.
+      ...(index === 0 ? { productSaleLineId: created.id } : {}),
+      movementType: 'sale', quantityDelta: -allocation.quantity, quantityAfter: allocation.quantityAfter, reason: 'Product POS sale',
+      referenceKey: index === 0 ? `product-sale:${created.id}` : `product-sale:${created.id}:lot:${allocation.lotId}`, occurredAt,
+    } });
+    await transaction.inventoryLot.update({ where: { id: allocation.lotId }, data: { quantityRemaining: allocation.quantityAfter, ...(allocation.becomesConsumed ? { status: 'consumed' } : {}) } });
+  }
+  await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: actorId ?? undefined,
+    eventKey: `product-sale:${created.id}:paid:v1`, eventType: 'product_sale.paid', aggregateType: 'product_sale_line', aggregateId: created.id,
+    shopId, occurredAt, data: { sale: { lineId: created.id, transactionId: checkout.id, productId: product.id, productName: product.name, sku: product.sku, ...totals, paymentMethod: input.paymentMethod, lots: allocations.map(({ lotId, quantity }) => ({ lotId, quantity })), actorId: actorId ?? null } },
+  }));
+  return created;
+}
+
 export async function recordProductSale(_root: unknown, args: { productId: string; quantity: number; paymentMethod: string; taxRateBps?: number | null; idempotencyKey: string }, context: Context) {
   if (!permissions.canManagePayments({ session: context.session })) return { success: false, error: 'Not authorized to record product sales.', sale: null };
   if (!args.productId || !args.idempotencyKey?.trim() || !METHODS.has(args.paymentMethod)) return { success: false, error: 'Choose a product and cash or card.', sale: null };
@@ -55,65 +120,7 @@ export async function recordProductSale(_root: unknown, args: { productId: strin
         ) throw new Error('Product sale idempotency key was reused with different input.');
         return replay;
       }
-      const product = await transaction.product.findFirst({ where: { id: args.productId, shopId } });
-      if (!product || product.status !== 'active') throw new Error('Product is not available.');
-      const shop = await transaction.shop.findUnique({ where: { id: shopId }, select: { currencyCode: true } });
-      assertUsdSettlementCurrency(shop?.currencyCode);
-      const totals = calculateProductSale({ unitPrice: product.price || 0, quantity: args.quantity, taxRateBps: args.taxRateBps || 0 });
-      const occurredAt = new Date();
-
-      // Tracked goods are allocated across eligible lots (earliest expiry first);
-      // untracked goods sell without inventing a stock receipt.
-      const allocations: Array<{ lotId: string; quantity: number; quantityAfter: number; becomesConsumed: boolean }> = [];
-      if (product.inventoryTracked !== false) {
-        const candidates = await transaction.inventoryLot.findMany({
-          where: sellableLotWhere(shopId, product.id, occurredAt),
-          orderBy: [{ expiresAt: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }, { id: 'asc' }],
-          take: MAX_ALLOCATION_LOTS,
-          select: { id: true },
-        });
-        for (const lotId of candidates.map((lot) => lot.id).sort()) await lockLot(transaction, lotId);
-        const lots = await transaction.inventoryLot.findMany({
-          where: { ...sellableLotWhere(shopId, product.id, occurredAt), id: { in: candidates.map((lot) => lot.id) } },
-          orderBy: [{ expiresAt: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }, { id: 'asc' }],
-        });
-        let remaining = totals.quantity;
-        for (const lot of lots) {
-          if (remaining <= 0) break;
-          const take = Math.min(remaining, lot.quantityRemaining || 0);
-          if (take <= 0) continue;
-          const quantityAfter = (lot.quantityRemaining || 0) - take;
-          allocations.push({ lotId: lot.id, quantity: take, quantityAfter, becomesConsumed: quantityAfter === 0 });
-          remaining -= take;
-        }
-        if (remaining > 0) throw new Error('Insufficient sellable inventory for this product sale.');
-      }
-
-      const checkout = await transaction.checkoutTransaction.create({ data: {
-        shopId, status: 'paid', subtotal: totals.subtotal, taxAmount: totals.taxAmount, total: totals.total, currencyCode: 'USD',
-        paymentMethod: args.paymentMethod as Prisma.CheckoutTransactionCreateInput['paymentMethod'], completedAt: occurredAt,
-        notes: `Retail sale · ${product.name} (${product.sku}) × ${totals.quantity}`,
-      } });
-      const created = await transaction.productSaleLine.create({ data: {
-        shopId, lineNumber, transactionId: checkout.id, productId: product.id, lineType: 'sale',
-        productNameSnapshot: product.name, skuSnapshot: product.sku, quantity: totals.quantity, unitPrice: totals.unitPrice,
-        subtotal: totals.subtotal, taxAmount: totals.taxAmount, total: totals.total, occurredAt,
-      }, include: { transaction: true } });
-      for (const [index, allocation] of allocations.entries()) {
-        await transaction.inventoryMovement.create({ data: {
-          shopId, productId: product.id, inventoryLotId: allocation.lotId,
-          // The first lot links 1:1 to the sale line; further lots share its reference prefix.
-          ...(index === 0 ? { productSaleLineId: created.id } : {}),
-          movementType: 'sale', quantityDelta: -allocation.quantity, quantityAfter: allocation.quantityAfter, reason: 'Product POS sale',
-          referenceKey: index === 0 ? `product-sale:${created.id}` : `product-sale:${created.id}:lot:${allocation.lotId}`, occurredAt,
-        } });
-        await transaction.inventoryLot.update({ where: { id: allocation.lotId }, data: { quantityRemaining: allocation.quantityAfter, ...(allocation.becomesConsumed ? { status: 'consumed' } : {}) } });
-      }
-      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId,
-        eventKey: `product-sale:${created.id}:paid:v1`, eventType: 'product_sale.paid', aggregateType: 'product_sale_line', aggregateId: created.id,
-        shopId, occurredAt, data: { sale: { lineId: created.id, transactionId: checkout.id, productId: product.id, productName: product.name, sku: product.sku, ...totals, paymentMethod: args.paymentMethod, lots: allocations.map(({ lotId, quantity }) => ({ lotId, quantity })), actorId: context.session?.itemId ?? null } },
-      }));
-      return created;
+      return createProductSaleInTransaction(transaction, { shopId, productId: args.productId, quantity: args.quantity, taxRateBps: args.taxRateBps, paymentMethod: args.paymentMethod, lineNumber, actorId: context.session?.itemId });
     });
     return { success: true, error: null, sale: { id: line.id, transactionId: line.transactionId, productName: line.productNameSnapshot, quantity: line.quantity, subtotal: line.subtotal, taxAmount: line.taxAmount, total: line.total } };
   } catch (error) {

@@ -109,7 +109,6 @@ export default async function PaymentsPage() {
                     <tr key={provider.id}>
                       <Td>
                         <p className="font-medium">{provider.name}</p>
-                        <p className="text-xs text-muted-foreground"><code>{provider.code}</code></p>
                       </Td>
                       <Td className="text-muted-foreground max-sm:hidden">{PROVIDER_ROLE[provider.code] || 'Other payments'}</Td>
                       <Td><StatusCell tone={provider.isInstalled ? 'live' : 'off'}>{provider.isInstalled ? 'On' : 'Off'}</StatusCell></Td>

@@ -3723,7 +3723,6 @@ type Appointment {
   price: Int
   depositAmount: Int
   cancellationReason: String
-  reminderSentAt: DateTime
   customerNotes: String
   guestNameSnapshot: String
   internalNotes: String
@@ -3802,7 +3801,6 @@ input AppointmentWhereInput {
   price: IntNullableFilter
   depositAmount: IntNullableFilter
   cancellationReason: StringFilter
-  reminderSentAt: DateTimeNullableFilter
   customerNotes: StringFilter
   guestNameSnapshot: StringFilter
   internalNotes: StringFilter
@@ -3863,7 +3861,6 @@ input AppointmentOrderByInput {
   price: OrderDirection
   depositAmount: OrderDirection
   cancellationReason: OrderDirection
-  reminderSentAt: OrderDirection
   customerNotes: OrderDirection
   guestNameSnapshot: OrderDirection
   internalNotes: OrderDirection
@@ -3900,7 +3897,6 @@ input AppointmentUpdateInput {
   price: Int
   depositAmount: Int
   cancellationReason: String
-  reminderSentAt: DateTime
   customerNotes: String
   guestNameSnapshot: String
   internalNotes: String
@@ -3962,7 +3958,6 @@ input AppointmentCreateInput {
   price: Int
   depositAmount: Int
   cancellationReason: String
-  reminderSentAt: DateTime
   customerNotes: String
   guestNameSnapshot: String
   internalNotes: String
@@ -5348,6 +5343,7 @@ type PaymentSession {
   idempotencyKeyHash: String
   status: PaymentSessionStatusType
   amount: Int
+  amountLabel: String
   currencyCode: String
   providerPaymentId: String
   expiresAt: DateTime
@@ -7242,6 +7238,8 @@ type Mutation {
   startGiftCardCheckout(amount: Int!, purchaserName: String!, purchaserEmail: String!, recipientName: String, recipientEmail: String, message: String): DomainCommandResult!
   returnGiftCardCheckout(transactionId: ID!, reason: String!, idempotencyKey: String!): DomainCommandResult!
   confirmGiftCardOrder(giftCardId: ID!, token: String!): DomainCommandResult!
+  startProductCheckout(productId: ID!, buyerName: String!, buyerEmail: String!): DomainCommandResult!
+  confirmProductOrder(orderId: ID!, token: String!): DomainCommandResult!
   confirmDepositCheckout(appointmentId: ID!, accessToken: String): DomainCommandResult!
   markAppointmentNoShow(appointmentId: ID!, policyId: ID, reason: String!, idempotencyKey: String!): DomainCommandResult!
   transitionCommission(commissionId: ID!, toStatus: String!, reason: String, idempotencyKey: String!): DomainCommandResult!

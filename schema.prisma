@@ -611,7 +611,6 @@ model Appointment {
   price                                Int?
   depositAmount                        Int?                          @default(0)
   cancellationReason                   String                        @default("")
-  reminderSentAt                       DateTime?
   customerNotes                        String                        @default("")
   guestNameSnapshot                    String                        @default("")
   internalNotes                        String                        @default("")

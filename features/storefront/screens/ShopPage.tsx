@@ -47,7 +47,7 @@ function ProductRail({ items, showType }: { items: StorefrontProduct[]; showType
   );
 }
 
-/** Retail for sale at the counter; there is no online checkout. */
+/** Retail: bought online (Stripe) or at the counter. */
 export default async function ShopPage() {
   const [settings, products] = await Promise.all([getPublicStorefrontSettings(), getRetailProducts().catch(() => null as StorefrontProduct[] | null)]);
   if (!settings) return <StorefrontShell><></></StorefrontShell>;
@@ -76,9 +76,9 @@ export default async function ShopPage() {
         <section className="sf-container sf-page-head">
           <div className="sf-page-head-row">
             <h1 className="sf-display">Shop</h1>
-            {telephone && settings.phone ? <div className="sf-actions"><a href={`tel:${telephone}`} className="sf-btn">Call to hold one</a></div> : null}
+            {telephone && settings.phone ? <div className="sf-actions"><a href={`tel:${telephone}`} className="sf-btn">Call to ask</a></div> : null}
           </div>
-          <p className="sf-lead">Sold at the counter. There’s no online checkout; pick it up on your visit.</p>
+          <p className="sf-lead">Buy online and pick it up on your visit, or get it at the counter.</p>
         </section>
         <section className="sf-container sf-section is-tight">
           {products === null ? <p role="alert" className="sf-notice is-error">Products couldn’t load. Try again in a moment.</p>

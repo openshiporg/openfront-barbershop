@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { phoneHref } from '@/features/shared/storefront-settings';
+import { ProductBuy } from '../components/ProductBuy';
+import { getGiftCardOptions } from '../lib/data/giftCards';
 import { StorefrontImage } from '../components/StorefrontImage';
 import { productArt } from '../components/productArt';
 import { getRetailProducts } from '../lib/data/services';
@@ -17,15 +19,18 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function ShopProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [products, settings] = await Promise.all([getRetailProducts(), getPublicStorefrontSettings()]);
+  const [products, settings, options] = await Promise.all([getRetailProducts(), getPublicStorefrontSettings(), getGiftCardOptions()]);
   const product = products.find((item) => item.id === id);
   if (!product || !settings) notFound();
   const telephone = phoneHref(settings.phone);
   const art = productArt(product);
   const actions = (
-    <div className="sf-actions">
-      {telephone && settings.phone ? <a href={`tel:${telephone}`} className="sf-btn is-primary">Call to hold one</a> : null}
+    <div className="grid gap-4">
+      {options.online && (product.price ?? 0) > 0 ? <ProductBuy productId={product.id} price={formatMoney(product.price)} /> : null}
+      <div className="sf-actions">
+      {telephone && settings.phone ? <a href={`tel:${telephone}`} className="sf-btn is-primary">Call to ask</a> : null}
       <Link href="/book" className="sf-btn">Book a time</Link>
+      </div>
     </div>
   );
   return (
@@ -43,7 +48,7 @@ export default async function ShopProductPage({ params }: { params: Promise<{ id
               <dl className="sf-ledger">
                 <div><dt>Price</dt><dd className="sf-mono">{formatMoney(product.price)}</dd></div>
                 {product.sku ? <div><dt>SKU</dt><dd className="sf-mono">{product.sku}</dd></div> : null}
-                <div><dt>Buy</dt><dd>At the counter</dd></div>
+                <div><dt>Buy</dt><dd>{options.online ? 'Online or at the counter' : 'At the counter'}</dd></div>
               </dl>
               {actions}
             </div>
@@ -58,7 +63,7 @@ export default async function ShopProductPage({ params }: { params: Promise<{ id
             </div>
             <dl className="sf-ledger">
               {product.sku ? <div><dt>SKU</dt><dd className="sf-mono">{product.sku}</dd></div> : null}
-              <div><dt>Buy</dt><dd>At the counter</dd></div>
+              <div><dt>Buy</dt><dd>{options.online ? 'Online or at the counter' : 'At the counter'}</dd></div>
             </dl>
             {actions}
           </div>

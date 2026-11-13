@@ -52,9 +52,9 @@ function managedShopIds(session) {
     ).map((membership) => membership.shop?.id).filter((shopId) => Boolean(shopId))
   )).sort();
 }
-function shopRelationshipFilter(session, relationship46 = "shop") {
+function shopRelationshipFilter(session, relationship47 = "shop") {
   const shopIds = activeShopIds(session);
-  return shopIds.length > 0 ? { [relationship46]: { id: { in: shopIds } } } : false;
+  return shopIds.length > 0 ? { [relationship47]: { id: { in: shopIds } } } : false;
 }
 function requireSingleActiveShop(session) {
   const shopIds = activeShopIds(session);
@@ -190,16 +190,16 @@ var init_access = __esm({
 // features/keystone/utils/shopRelationshipHooks.ts
 function connectedRelationshipId(value) {
   if (!value || typeof value !== "object") return void 0;
-  const relationship46 = value;
-  if (relationship46.disconnect) return void 0;
-  return typeof relationship46.connect?.id === "string" ? relationship46.connect.id : void 0;
+  const relationship47 = value;
+  if (relationship47.disconnect) return void 0;
+  return typeof relationship47.connect?.id === "string" ? relationship47.connect.id : void 0;
 }
 function connectedRelationshipIds(value) {
   if (!value || typeof value !== "object") return [];
-  const relationship46 = value;
+  const relationship47 = value;
   const candidates = [
-    ...Array.isArray(relationship46.connect) ? relationship46.connect : relationship46.connect ? [relationship46.connect] : [],
-    ...Array.isArray(relationship46.set) ? relationship46.set : []
+    ...Array.isArray(relationship47.connect) ? relationship47.connect : relationship47.connect ? [relationship47.connect] : [],
+    ...Array.isArray(relationship47.set) ? relationship47.set : []
   ];
   return candidates.map((item) => item.id).filter((id) => typeof id === "string");
 }
@@ -212,28 +212,28 @@ async function validateShopRelationships(args, relationships) {
   if (args.context.session && !activeShopIds(args.context.session).includes(shopId)) {
     args.addValidationError("Not authorized to create or change records for this shop.");
   }
-  for (const relationship46 of relationships) {
+  for (const relationship47 of relationships) {
     const prisma = args.context.prisma;
-    if (relationship46.many) {
-      const relationIds = connectedRelationshipIds(args.resolvedData[relationship46.field]);
+    if (relationship47.many) {
+      const relationIds = connectedRelationshipIds(args.resolvedData[relationship47.field]);
       if (relationIds.length === 0) continue;
-      const relatedItems = await prisma[relationship46.delegate].findMany({
+      const relatedItems = await prisma[relationship47.delegate].findMany({
         where: { id: { in: relationIds } },
         select: { id: true, shopId: true }
       });
       if (relatedItems.length !== new Set(relationIds).size || relatedItems.some((related2) => related2.shopId !== shopId)) {
-        args.addValidationError(`${relationship46.field} must belong to the same shop.`);
+        args.addValidationError(`${relationship47.field} must belong to the same shop.`);
       }
       continue;
     }
-    const relationId = args.resolvedData[relationship46.field] === void 0 ? String(args.item?.[`${relationship46.field}Id`] || "") : connectedRelationshipId(args.resolvedData[relationship46.field]);
+    const relationId = args.resolvedData[relationship47.field] === void 0 ? String(args.item?.[`${relationship47.field}Id`] || "") : connectedRelationshipId(args.resolvedData[relationship47.field]);
     if (!relationId) continue;
-    const related = await prisma[relationship46.delegate].findUnique({
+    const related = await prisma[relationship47.delegate].findUnique({
       where: { id: relationId },
       select: { id: true, shopId: true }
     });
     if (!related || related.shopId !== shopId) {
-      args.addValidationError(`${relationship46.field} must belong to the same shop.`);
+      args.addValidationError(`${relationship47.field} must belong to the same shop.`);
     }
   }
 }
@@ -408,6 +408,52 @@ var init_WaitlistEntry = __esm({
   }
 });
 
+// features/keystone/utils/deleteHistoryGuard.ts
+async function deleteHistoryProblem(prisma, listKey, id) {
+  const rule = DELETE_HISTORY[listKey];
+  if (!rule) return null;
+  const counts = await Promise.all(rule.references.map((r) => prisma[r.model].count({ where: { [r.field]: id } })));
+  const found = rule.references.map((r, i) => counts[i] ? `${counts[i]} ${counts[i] === 1 ? r.one : r.many}` : "").filter(Boolean);
+  if (!found.length) return null;
+  return listKey === "Role" ? `${found.join(", ")} this role. ${rule.instead}` : `This has ${found.join(", ")}. ${rule.instead}`;
+}
+function historyDeleteGuard(listKey) {
+  return async ({ item, context, addValidationError }) => {
+    if (listKey === "User" && String(item.id) === String(context.session?.itemId || "")) {
+      addValidationError("You can\u2019t delete your own account.");
+      return;
+    }
+    const problem = await deleteHistoryProblem(context.prisma, listKey, String(item.id));
+    if (problem) addValidationError(problem);
+  };
+}
+var ref, DELETE_HISTORY;
+var init_deleteHistoryGuard = __esm({
+  "features/keystone/utils/deleteHistoryGuard.ts"() {
+    "use strict";
+    ref = (model, field, one, many = `${one}s`) => ({ model, field, one, many });
+    DELETE_HISTORY = {
+      NoShowPolicy: {
+        instead: "Archive the policy instead; charged no-shows keep the policy they were charged under.",
+        references: [ref("noShowEvent", "policyId", "no-show charge")]
+      },
+      Role: {
+        instead: "Give them another role first.",
+        references: [ref("user", "roleId", "person still has", "people still have")]
+      },
+      User: {
+        instead: "Remove their shop access instead of deleting the account.",
+        references: [
+          ref("barber", "userId", "barber profile"),
+          ref("customer", "userId", "customer profile"),
+          ref("appointment", "accountId", "booked appointment"),
+          ref("shopMembership", "userId", "shop membership")
+        ]
+      }
+    };
+  }
+});
+
 // features/keystone/models/NoShowPolicy.ts
 var import_core4, import_fields5, NoShowPolicy;
 var init_NoShowPolicy = __esm({
@@ -418,8 +464,10 @@ var init_NoShowPolicy = __esm({
     init_access();
     init_shopRelationshipHooks();
     init_trackingFields();
+    init_deleteHistoryGuard();
     NoShowPolicy = (0, import_core4.list)({
       hooks: { validate: {
+        delete: historyDeleteGuard("NoShowPolicy"),
         create: (args) => validateShopRelationships(args, []),
         update: (args) => validateShopRelationships(args, [])
       } },
@@ -656,151 +704,6 @@ var init_InventoryLot = __esm({
   }
 });
 
-// features/keystone/utils/lifecycleOutbox.ts
-function canonicalize(value) {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).sort(([left], [right]) => left.localeCompare(right)).map(([key, child]) => [key, canonicalize(child)])
-    );
-  }
-  return value;
-}
-function canonicalJson(value) {
-  return JSON.stringify(canonicalize(value));
-}
-function buildLifecycleEnvelope(input) {
-  return {
-    ...input,
-    schemaVersion: 1,
-    occurredAt: input.occurredAt.toISOString()
-  };
-}
-function lifecyclePayloadHash(envelope) {
-  return (0, import_node_crypto.createHash)("sha256").update(JSON.stringify(canonicalize(envelope))).digest("hex");
-}
-async function enqueueLifecycleEvent(transaction, envelope) {
-  const serialized = JSON.stringify(canonicalize(envelope));
-  if (Buffer.byteLength(serialized) > 1e6) {
-    throw new Error("Lifecycle event snapshot exceeds the supported size.");
-  }
-  await transaction.$executeRawUnsafe(
-    "SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))",
-    "barbershop-outbox",
-    envelope.eventKey
-  );
-  const payloadHash = lifecyclePayloadHash(envelope);
-  const existing = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey: envelope.eventKey } });
-  if (existing) {
-    if (existing.eventType !== envelope.eventType || existing.shopId !== envelope.shopId || existing.payloadHash !== payloadHash) {
-      throw new Error("Lifecycle event idempotency key was reused with a different snapshot.");
-    }
-    return { id: existing.id, created: false };
-  }
-  const event = await transaction.lifecycleOutboxEvent.create({
-    data: {
-      eventKey: envelope.eventKey,
-      eventType: envelope.eventType,
-      schemaVersion: envelope.schemaVersion,
-      aggregateType: envelope.aggregateType,
-      aggregateId: envelope.aggregateId,
-      shopId: envelope.shopId,
-      ...envelope.actorId ? { actorId: envelope.actorId } : {},
-      payload: envelope,
-      payloadHash,
-      occurredAt: new Date(envelope.occurredAt),
-      status: "pending",
-      attempts: 0,
-      maxAttempts: 8,
-      availableAt: new Date(envelope.occurredAt)
-    }
-  });
-  return { id: event.id, created: true };
-}
-var import_node_crypto;
-var init_lifecycleOutbox = __esm({
-  "features/keystone/utils/lifecycleOutbox.ts"() {
-    "use strict";
-    import_node_crypto = require("node:crypto");
-  }
-});
-
-// features/keystone/utils/serializableTransaction.ts
-function isSerializableWriteConflict(error) {
-  return Boolean(error && typeof error === "object" && "code" in error && error.code === "P2034");
-}
-async function runSerializableTransaction(prisma, operation, maxAttempts = 8) {
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      return await prisma.$transaction(operation, {
-        maxWait: 5e3,
-        timeout: 1e4,
-        isolationLevel: "Serializable"
-      });
-    } catch (error) {
-      if (!isSerializableWriteConflict(error) || attempt === maxAttempts) throw error;
-      const backoffMs = Math.min(100, 5 * 2 ** (attempt - 1)) + Math.floor(Math.random() * 10);
-      await new Promise((resolve2) => setTimeout(resolve2, backoffMs));
-    }
-  }
-  throw new Error("Unable to serialize transaction.");
-}
-var init_serializableTransaction = __esm({
-  "features/keystone/utils/serializableTransaction.ts"() {
-    "use strict";
-  }
-});
-
-// features/keystone/utils/crudLifecycleHooks.ts
-function dateValue(value) {
-  if (value instanceof Date) return value;
-  if (typeof value === "string" || typeof value === "number") {
-    const parsed = new Date(value);
-    if (!Number.isNaN(parsed.getTime())) return parsed;
-  }
-  return /* @__PURE__ */ new Date();
-}
-function createCrudLifecycleAfterOperation(aggregateType) {
-  return async ({ operation, item, originalItem, resolvedData, context }) => {
-    const record = (operation === "delete" ? originalItem : item) || item || originalItem;
-    const id = typeof record?.id === "string" ? record.id : "";
-    const shopId = typeof record?.shopId === "string" ? record.shopId : "";
-    if (!id || !shopId) throw new Error(`${aggregateType} lifecycle hook requires shop ownership.`);
-    const occurredAt = dateValue(record?.updatedAt || record?.createdAt);
-    const changedFields = Object.keys(resolvedData || {}).filter((field) => !["credentials", "metadata", "password"].includes(field)).sort();
-    const version = `${occurredAt.getTime()}:${(0, import_node_crypto2.createHash)("sha256").update(changedFields.join(",")).digest("hex").slice(0, 16)}`;
-    try {
-      await runSerializableTransaction(context.prisma, async (client) => {
-        const transaction = client;
-        await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
-          actorId: context.session?.itemId || void 0,
-          eventKey: `crud:${aggregateType}:${id}:${operation}:${version}:v2`,
-          eventType: `${aggregateType}.${operation}d`,
-          aggregateType,
-          aggregateId: id,
-          shopId,
-          occurredAt,
-          data: {
-            lifecycle: { operation, changedFields },
-            record: { id, shopId }
-          }
-        }));
-      });
-    } catch {
-      throw new Error(`The ${aggregateType} change was saved, but its activity record could not be written. Refresh before retrying.`);
-    }
-  };
-}
-var import_node_crypto2;
-var init_crudLifecycleHooks = __esm({
-  "features/keystone/utils/crudLifecycleHooks.ts"() {
-    "use strict";
-    import_node_crypto2 = require("node:crypto");
-    init_lifecycleOutbox();
-    init_serializableTransaction();
-  }
-});
-
 // features/keystone/models/Product.ts
 var import_core9, import_fields10, Product;
 var init_Product = __esm({
@@ -811,7 +714,6 @@ var init_Product = __esm({
     init_access();
     init_trackingFields();
     init_shopRelationshipHooks();
-    init_crudLifecycleHooks();
     Product = (0, import_core9.list)({
       db: {
         extendPrismaSchema: (schema) => schema.replace(
@@ -823,8 +725,7 @@ var init_Product = __esm({
         validate: {
           create: (args) => validateShopRelationships(args, []),
           update: (args) => validateShopRelationships(args, [])
-        },
-        afterOperation: createCrudLifecycleAfterOperation("product")
+        }
       },
       access: {
         operation: { query: permissions.canAccessDashboard, create: permissions.canManageServices, update: permissions.canManageServices, delete: permissions.canManageServices },
@@ -841,6 +742,7 @@ var init_Product = __esm({
         cost: (0, import_fields10.integer)({ defaultValue: 0, validation: { min: 0 } }),
         description: (0, import_fields10.text)({ ui: { displayMode: "textarea" } }),
         imagePath: (0, import_fields10.text)({ ui: { description: "Relative public retail product path, e.g. /images/barbershop/product-matte-clay.svg." } }),
+        image: (0, import_fields10.image)({ storage: "my_images" }),
         inventoryTracked: (0, import_fields10.checkbox)({ defaultValue: true }),
         metadata: (0, import_fields10.json)(),
         inventoryLots: (0, import_fields10.relationship)({ ref: "InventoryLot.product", many: true }),
@@ -1174,7 +1076,8 @@ var init_User = __esm({
     init_access();
     init_currentAuthorization();
     init_peopleAccess();
-    PUBLIC_USER_CREATE_FIELDS = /* @__PURE__ */ new Set(["name", "email", "password", "role"]);
+    init_deleteHistoryGuard();
+    PUBLIC_USER_CREATE_FIELDS = /* @__PURE__ */ new Set(["name", "email", "phone", "password", "role"]);
     User = (0, import_core11.list)({
       access: {
         operation: {
@@ -1191,6 +1094,7 @@ var init_User = __esm({
         }
       },
       hooks: {
+        validate: { delete: historyDeleteGuard("User") },
         resolveInput: async ({ operation, inputData, resolvedData, context }) => {
           if (operation !== "create") return resolvedData;
           if (await hasCurrentRolePermission(context.session, "canManageRoles", context.prisma)) return resolvedData;
@@ -1228,6 +1132,7 @@ var init_User = __esm({
             isRequired: true
           }
         }),
+        phone: (0, import_fields12.text)({ isFilterable: false, isOrderable: false, ui: { description: "Used to fill in bookings." } }),
         password: (0, import_fields12.password)({
           access: {
             read: import_access14.denyAll,
@@ -1325,6 +1230,9 @@ var init_ShopSettings = __esm({
       },
       ui: {
         isHidden: true,
+        // The dashboard derives GraphQL names from this label; "Shop Settings"
+        // would collapse to the list key and fail the whole admin meta load.
+        plural: "Shop Settings Items",
         listView: { initialColumns: ["name", "tagline", "phone", "timezone"] }
       },
       fields: {
@@ -1365,7 +1273,9 @@ var init_Role = __esm({
     init_trackingFields();
     init_access();
     init_currentAuthorization();
+    init_deleteHistoryGuard();
     Role = (0, import_core13.list)({
+      hooks: { validate: { delete: historyDeleteGuard("Role") } },
       access: {
         operation: {
           query: async ({ session, context }) => Boolean(await currentRoleScope(session, context.prisma)),
@@ -1484,30 +1394,30 @@ var init_ServiceCategory = __esm({
 
 // features/keystone/utils/publicAccessToken.ts
 function hashPublicAccessToken(token) {
-  return (0, import_node_crypto3.createHash)("sha256").update(token, "utf8").digest("hex");
+  return (0, import_node_crypto.createHash)("sha256").update(token, "utf8").digest("hex");
 }
 function createPublicAccessToken() {
-  const token = (0, import_node_crypto3.randomBytes)(TOKEN_BYTES).toString("base64url");
+  const token = (0, import_node_crypto.randomBytes)(TOKEN_BYTES).toString("base64url");
   return { token, hash: hashPublicAccessToken(token) };
 }
 function publicAccessTokenMatches(token, expectedHash) {
   if (!token || !expectedHash) return false;
   const supplied = Buffer.from(hashPublicAccessToken(token), "hex");
   const expected = Buffer.from(expectedHash, "hex");
-  return supplied.length === expected.length && (0, import_node_crypto3.timingSafeEqual)(supplied, expected);
+  return supplied.length === expected.length && (0, import_node_crypto.timingSafeEqual)(supplied, expected);
 }
-var import_node_crypto3, TOKEN_BYTES;
+var import_node_crypto, TOKEN_BYTES;
 var init_publicAccessToken = __esm({
   "features/keystone/utils/publicAccessToken.ts"() {
     "use strict";
-    import_node_crypto3 = require("node:crypto");
+    import_node_crypto = require("node:crypto");
     TOKEN_BYTES = 32;
   }
 });
 
 // features/keystone/utils/waiverEvidence.ts
-function hashWaiverText(text47) {
-  return (0, import_node_crypto4.createHash)("sha256").update(text47).digest("hex");
+function hashWaiverText(text48) {
+  return (0, import_node_crypto2.createHash)("sha256").update(text48).digest("hex");
 }
 async function getWaiverRequirement(client, serviceId) {
   const rows = await client.$queryRawUnsafe(`
@@ -1558,11 +1468,11 @@ function canAccessAppointment(input) {
 function assertAppointmentAccess(input) {
   if (!canAccessAppointment(input)) throw new Error(input.accountId ? "Sign in to the account that made this booking to manage it." : "Appointment access proof is invalid.");
 }
-var import_node_crypto4;
+var import_node_crypto2;
 var init_waiverEvidence = __esm({
   "features/keystone/utils/waiverEvidence.ts"() {
     "use strict";
-    import_node_crypto4 = require("node:crypto");
+    import_node_crypto2 = require("node:crypto");
     init_publicAccessToken();
   }
 });
@@ -1573,15 +1483,15 @@ function validateWaiverTemplate(args) {
   if (!required) return;
   const key = String(args.resolvedData.waiverTemplateKey ?? args.item?.waiverTemplateKey ?? "").trim();
   const version = String(args.resolvedData.waiverTemplateVersion ?? args.item?.waiverTemplateVersion ?? "").trim();
-  const text47 = String(args.resolvedData.waiverTemplateText ?? args.item?.waiverTemplateText ?? "");
+  const text48 = String(args.resolvedData.waiverTemplateText ?? args.item?.waiverTemplateText ?? "");
   const digest4 = String(args.resolvedData.waiverTemplateHash ?? args.item?.waiverTemplateHash ?? "").trim();
-  if (!key || !version || !text47 || !digest4 || hashWaiverText(text47) !== digest4) {
+  if (!key || !version || !text48 || !digest4 || hashWaiverText(text48) !== digest4) {
     args.addValidationError("Waiver-required services need a key, version, exact text, and matching SHA-256 hash.");
   }
   const previousText = String(args.item?.waiverTemplateText ?? "");
   const previousHash = String(args.item?.waiverTemplateHash ?? "");
   const previousVersion = String(args.item?.waiverTemplateVersion ?? "");
-  if (args.item && (text47 !== previousText || digest4 !== previousHash) && version === previousVersion) {
+  if (args.item && (text48 !== previousText || digest4 !== previousHash) && version === previousVersion) {
     args.addValidationError("Changing waiver text or hash requires a new template version.");
   }
 }
@@ -1601,9 +1511,8 @@ var init_Service = __esm({
     init_access();
     init_trackingFields();
     init_shopRelationshipHooks();
-    init_crudLifecycleHooks();
     init_waiverEvidence();
-    formatCurrency = (cents) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((cents || 0) / 100);
+    formatCurrency = (cents2) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((cents2 || 0) / 100);
     Service = (0, import_core15.list)({
       hooks: {
         validate: {
@@ -1623,8 +1532,7 @@ var init_Service = __esm({
               { field: "specialists", delegate: "barber", many: true }
             ]);
           }
-        },
-        afterOperation: createCrudLifecycleAfterOperation("service")
+        }
       },
       access: {
         operation: {
@@ -1649,10 +1557,12 @@ var init_Service = __esm({
         name: (0, import_fields16.text)({ validation: { isRequired: true } }),
         description: (0, import_fields16.text)({ ui: { displayMode: "textarea" } }),
         imagePath: (0, import_fields16.text)({ ui: { description: "Relative public image path, e.g. /images/barbershop/service-classic-cut.svg." } }),
+        image: (0, import_fields16.image)({ storage: "my_images" }),
         durationMinutes: (0, import_fields16.integer)({ validation: { isRequired: true, min: 5 }, defaultValue: 30 }),
         price: (0, import_fields16.integer)({ validation: { isRequired: true, min: 0 }, ui: { description: "Base price in cents." } }),
         depositRequired: (0, import_fields16.checkbox)({ defaultValue: false }),
         depositAmount: (0, import_fields16.integer)({ defaultValue: 0, validation: { min: 0 }, ui: { description: "Deposit amount in cents." } }),
+        credentialRequired: (0, import_fields16.checkbox)({ defaultValue: false, ui: { description: "Only book, seat and complete this service with a barber who holds an active practitioner credential for it." } }),
         waiverRequired: (0, import_fields16.checkbox)({ defaultValue: false, ui: { description: "Fail-closed: public booking/start requires a complete immutable waiver template and signer evidence." } }),
         waiverTemplateKey: (0, import_fields16.text)({ ui: { description: "Stable merchant-controlled waiver template key." } }),
         waiverTemplateVersion: (0, import_fields16.text)({ ui: { description: "Immutable displayed template version." } }),
@@ -1812,7 +1722,6 @@ var init_Barber = __esm({
     init_access();
     init_trackingFields();
     init_shopRelationshipHooks();
-    init_crudLifecycleHooks();
     init_shopRelationshipHooks();
     init_childRecordValidation();
     Barber = (0, import_core16.list)({
@@ -1834,8 +1743,7 @@ var init_Barber = __esm({
               if (appointments.length) args.addValidationError(`${appointments.length} upcoming appointment(s) are booked with this barber. Reassign, reschedule or cancel them before changing chair, status or buffer.`);
             }
           }
-        },
-        afterOperation: createCrudLifecycleAfterOperation("barber")
+        }
       },
       access: {
         operation: {
@@ -1862,6 +1770,7 @@ var init_Barber = __esm({
         legalName: (0, import_fields17.text)(),
         bio: (0, import_fields17.text)({ ui: { displayMode: "textarea" } }),
         imagePath: (0, import_fields17.text)({ ui: { description: "Relative public portrait path, e.g. /images/barbershop/barber-maya-brooks.svg." } }),
+        photo: (0, import_fields17.image)({ storage: "my_images" }),
         phone: (0, import_fields17.text)(),
         email: (0, import_fields17.text)(),
         chairNumber: (0, import_fields17.text)({ ui: { description: "Chair or station shown on the shop floor." } }),
@@ -1994,7 +1903,6 @@ var init_Customer = __esm({
     init_currentAuthorization();
     init_trackingFields();
     init_shopRelationshipHooks();
-    init_crudLifecycleHooks();
     currentCustomerAccess = async ({ session }) => Boolean(await currentShopForPermission(session, "canManageCustomers"));
     currentCustomerFilter = async (session) => {
       const shopId = await currentShopForPermission(session, "canManageCustomers");
@@ -2005,8 +1913,7 @@ var init_Customer = __esm({
         validate: {
           create: (args) => validateShopRelationships(args, [{ field: "preferredBarber", delegate: "barber" }]),
           update: (args) => validateShopRelationships(args, [{ field: "preferredBarber", delegate: "barber" }])
-        },
-        afterOperation: createCrudLifecycleAfterOperation("customer")
+        }
       },
       access: {
         operation: {
@@ -2022,6 +1929,7 @@ var init_Customer = __esm({
         }
       },
       ui: {
+        labelField: "fullName",
         listView: {
           initialColumns: ["fullName", "phone", "email", "status", "appointments"]
         }
@@ -2193,6 +2101,7 @@ var init_Appointment = __esm({
         filter: { query: rules.canAccessShopRecords }
       },
       ui: {
+        labelField: "displaySummary",
         listView: {
           initialColumns: ["customer", "service", "barber", "startsAt", "status", "paymentStatus"]
         }
@@ -2773,7 +2682,7 @@ var init_CheckoutTransaction = __esm({
     init_access();
     init_trackingFields();
     init_shopRelationshipHooks();
-    formatCurrency2 = (cents) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((cents || 0) / 100);
+    formatCurrency2 = (cents2) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((cents2 || 0) / 100);
     CheckoutTransaction = (0, import_core28.list)({
       hooks: {
         validate: {
@@ -3029,7 +2938,7 @@ var init_PaymentSession = __esm({
       },
       ui: {
         listView: {
-          initialColumns: ["appointment", "status", "amount", "currencyCode", "expiresAt"]
+          initialColumns: ["appointment", "status", "amountLabel", "currencyCode", "expiresAt"]
         }
       },
       fields: {
@@ -3059,6 +2968,10 @@ var init_PaymentSession = __esm({
           defaultValue: "pending"
         }),
         amount: (0, import_fields31.integer)({ validation: { isRequired: true, min: 0 } }),
+        amountLabel: (0, import_fields31.virtual)({
+          field: import_core30.graphql.field({ type: import_core30.graphql.String, resolve: (item) => `$${(Number(item.amount || 0) / 100).toFixed(2)}` }),
+          ui: { listView: { fieldMode: "read" } }
+        }),
         currencyCode: (0, import_fields31.text)({ defaultValue: "USD", validation: { isRequired: true } }),
         providerPaymentId: (0, import_fields31.text)(),
         expiresAt: (0, import_fields31.timestamp)(),
@@ -3237,11 +3150,15 @@ var init_supportedSettlementCurrency = __esm({
   }
 });
 
-// features/shared/sanitize-store-logo.ts
+// features/keystone/utils/storeLogo.ts
 function sanitizeStoreLogoSvg(svg) {
   const source = svg.trim();
-  if (!source.startsWith("<svg") || !source.endsWith("</svg>") || source.length > 1e5) return "";
-  if (/<!|<\?|\b(?:javascript|data|vbscript):|\bon[a-z]+\s*=|\b(?:href|src|style)\s*=/i.test(source)) return "";
+  if (!source.startsWith("<svg") || !source.endsWith("</svg>") || source.length > 1e5) {
+    return "";
+  }
+  if (/<!|<\?|\b(?:javascript|data|vbscript):|\bon[a-z]+\s*=|\b(?:href|src|style)\s*=/i.test(source)) {
+    return "";
+  }
   let tagCount = 0;
   let match;
   TAG_PATTERN.lastIndex = 0;
@@ -3270,8 +3187,8 @@ function sanitizeStoreLogoSvg(svg) {
   return source;
 }
 var ALLOWED_ELEMENTS, ALLOWED_ATTRIBUTES, ATTRIBUTE_PATTERN, TAG_PATTERN;
-var init_sanitize_store_logo = __esm({
-  "features/shared/sanitize-store-logo.ts"() {
+var init_storeLogo = __esm({
+  "features/keystone/utils/storeLogo.ts"() {
     "use strict";
     ALLOWED_ELEMENTS = /* @__PURE__ */ new Set([
       "svg",
@@ -3335,6 +3252,14 @@ var init_sanitize_store_logo = __esm({
   }
 });
 
+// features/shared/sanitize-store-logo.ts
+var init_sanitize_store_logo = __esm({
+  "features/shared/sanitize-store-logo.ts"() {
+    "use strict";
+    init_storeLogo();
+  }
+});
+
 // features/platform/store-settings/lib/store-logo.ts
 function normalizeStoreLogoColor(value) {
   const numeric = Number.parseFloat(String(value ?? DEFAULT_STORE_LOGO_COLOR));
@@ -3345,7 +3270,7 @@ var DEFAULT_STORE_LOGO_ICON, DEFAULT_STORE_LOGO_COLOR;
 var init_store_logo = __esm({
   "features/platform/store-settings/lib/store-logo.ts"() {
     "use strict";
-    DEFAULT_STORE_LOGO_ICON = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" height="100%" width="100%" viewBox="0 0 42 48"><path fill="#155eef" fill-rule="evenodd" d="m22.102 20.86 9.9-9.9L29.88 8.84l-7.339 7.339V3h-3v13.178l-7.339-7.34-2.121 2.122 9.9 9.9 1.06 1.06zm2.12 2.121 9.9-9.9 2.121 2.122-7.339 7.339H42v3H28.904l7.34 7.339L34.121 35l-9.9-9.899-1.06-1.06zM7.96 35.001l9.9-9.899 1.06-1.06-1.06-1.061-9.9-9.9-2.121 2.122 7.339 7.339H.002v3h13.176l-7.34 7.339zm12.02-7.777-9.9 9.9 2.122 2.12 7.339-7.338V45h3V31.906l7.339 7.338L32 37.124l-9.9-9.9-1.06-1.061z" clip-rule="evenodd"/></svg>';
+    DEFAULT_STORE_LOGO_ICON = '<svg fill="none" height="100%" viewBox="0 0 24 48" width="100%" xmlns="http://www.w3.org/2000/svg"><path d="m0 15.8981h17.3455l-17.061314 17.0613 2.756374 2.7564 17.06134-17.0613v17.3455h.1104l3.7877-3.7877v-15.9638l-4.2485-4.2485h-15.96596l-3.78553995 3.7855z" fill="#155eef"/></svg>';
     DEFAULT_STORE_LOGO_COLOR = "0";
   }
 });
@@ -3505,7 +3430,7 @@ var init_Shop = __esm({
         inventoryMovements: (0, import_fields35.relationship)({ ref: "InventoryMovement.shop", many: true, access: { create: () => false, update: () => false } }),
         productSaleLines: (0, import_fields35.relationship)({ ref: "ProductSaleLine.shop", many: true, access: { create: () => false, update: () => false } }),
         paymentReconciliations: (0, import_fields35.relationship)({ ref: "PaymentReconciliation.shop", many: true, access: { create: () => false, update: () => false } }),
-        lifecycleEvents: (0, import_fields35.relationship)({ ref: "LifecycleOutboxEvent.shop", many: true, access: { create: () => false, update: () => false } }),
+        commandReceipts: (0, import_fields35.relationship)({ ref: "CommandReceipt.shop", many: true, access: { create: () => false, update: () => false } }),
         ...trackingFields
       }
     });
@@ -3653,26 +3578,26 @@ var init_ShopMembership = __esm({
   }
 });
 
-// features/keystone/models/LifecycleOutboxEvent.ts
+// features/keystone/models/CommandReceipt.ts
 function canReadPayload({ session, item }) {
   const shopId = typeof item.shopId === "string" ? item.shopId : "";
   if (!shopId) return false;
   const current = session;
   return managedShopIds(current).includes(shopId) && activeShopIds(current).includes(shopId);
 }
-var import_core36, import_fields37, immutable, LifecycleOutboxEvent;
-var init_LifecycleOutboxEvent = __esm({
-  "features/keystone/models/LifecycleOutboxEvent.ts"() {
+var import_core36, import_fields37, immutable, CommandReceipt;
+var init_CommandReceipt = __esm({
+  "features/keystone/models/CommandReceipt.ts"() {
     "use strict";
     import_core36 = require("@keystone-6/core");
     import_fields37 = require("@keystone-6/core/fields");
     init_access();
     init_trackingFields();
     immutable = { update: () => false };
-    LifecycleOutboxEvent = (0, import_core36.list)({
+    CommandReceipt = (0, import_core36.list)({
       access: {
         operation: {
-          query: permissions.canViewReports,
+          query: permissions.canManageStaff,
           create: () => false,
           update: () => false,
           delete: () => false
@@ -3682,7 +3607,7 @@ var init_LifecycleOutboxEvent = __esm({
       ui: {
         hideCreate: true,
         hideDelete: true,
-        listView: { initialColumns: ["eventKey", "eventType", "aggregateType", "status", "occurredAt"] }
+        listView: { initialColumns: ["eventKey", "eventType", "aggregateType", "occurredAt"] }
       },
       fields: {
         eventKey: (0, import_fields37.text)({ validation: { isRequired: true }, isIndexed: "unique", access: immutable }),
@@ -3690,30 +3615,11 @@ var init_LifecycleOutboxEvent = __esm({
         schemaVersion: (0, import_fields37.integer)({ validation: { isRequired: true }, defaultValue: 1, access: immutable }),
         aggregateType: (0, import_fields37.text)({ validation: { isRequired: true }, access: immutable }),
         aggregateId: (0, import_fields37.text)({ validation: { isRequired: true }, access: immutable }),
-        shop: (0, import_fields37.relationship)({ ref: "Shop.lifecycleEvents", db: { foreignKey: true, extendPrismaSchema: (schema) => schema.replaceAll("?", "") }, access: immutable }),
+        shop: (0, import_fields37.relationship)({ ref: "Shop.commandReceipts", db: { foreignKey: true, extendPrismaSchema: (schema) => schema.replaceAll("?", "") }, access: immutable }),
         payload: (0, import_fields37.json)({ access: { ...immutable, read: canReadPayload } }),
         actorId: (0, import_fields37.text)({ access: immutable, ui: { description: "User who performed the change, when recorded." } }),
         payloadHash: (0, import_fields37.text)({ validation: { isRequired: true }, access: immutable }),
         occurredAt: (0, import_fields37.timestamp)({ validation: { isRequired: true }, access: immutable }),
-        status: (0, import_fields37.select)({
-          ui: { description: "Lifecycle events are kept as an activity record. Outbound delivery is not set up, so events stay pending and nothing is sent to customers or external systems." },
-          type: "enum",
-          options: [
-            { label: "Pending", value: "pending" },
-            { label: "Processing", value: "processing" },
-            { label: "Delivered", value: "delivered" },
-            { label: "Dead letter", value: "dead_letter" }
-          ],
-          defaultValue: "pending"
-        }),
-        attempts: (0, import_fields37.integer)({ defaultValue: 0, validation: { min: 0 } }),
-        maxAttempts: (0, import_fields37.integer)({ defaultValue: 8, validation: { min: 1, max: 100 } }),
-        availableAt: (0, import_fields37.timestamp)({ validation: { isRequired: true } }),
-        lockedAt: (0, import_fields37.timestamp)(),
-        lastAttemptAt: (0, import_fields37.timestamp)(),
-        deliveredAt: (0, import_fields37.timestamp)(),
-        lastError: (0, import_fields37.text)({ ui: { displayMode: "textarea" } }),
-        replayCount: (0, import_fields37.integer)({ defaultValue: 0, validation: { min: 0 } }),
         ...trackingFields
       }
     });
@@ -4343,6 +4249,52 @@ var init_CashRefund = __esm({
   }
 });
 
+// features/keystone/models/GiftCard.ts
+var import_core48, import_fields49, GiftCard;
+var init_GiftCard = __esm({
+  "features/keystone/models/GiftCard.ts"() {
+    "use strict";
+    import_core48 = require("@keystone-6/core");
+    import_fields49 = require("@keystone-6/core/fields");
+    init_access();
+    init_trackingFields();
+    GiftCard = (0, import_core48.list)({
+      access: {
+        operation: { query: permissions.canReadPayments, create: () => false, update: () => false, delete: () => false },
+        filter: { query: rules.canAccessShopRecords }
+      },
+      ui: { hideCreate: true, hideDelete: true, listView: { initialColumns: ["code", "status", "initialValue", "balance", "recipientName", "expiresAt"] } },
+      fields: {
+        shop: (0, import_fields49.relationship)({ ref: "Shop", db: { foreignKey: true, extendPrismaSchema: (s) => s.replaceAll("?", "") } }),
+        code: (0, import_fields49.text)({ isIndexed: "unique", validation: { isRequired: true } }),
+        status: (0, import_fields49.select)({
+          type: "enum",
+          options: [
+            { label: "Awaiting payment", value: "pending" },
+            { label: "Active", value: "active" },
+            { label: "Used up", value: "redeemed" },
+            { label: "Cancelled", value: "cancelled" }
+          ],
+          defaultValue: "pending"
+        }),
+        initialValue: (0, import_fields49.integer)({ validation: { isRequired: true, min: 0 } }),
+        balance: (0, import_fields49.integer)({ validation: { isRequired: true, min: 0 } }),
+        purchaserName: (0, import_fields49.text)(),
+        purchaserEmail: (0, import_fields49.text)(),
+        recipientName: (0, import_fields49.text)(),
+        recipientEmail: (0, import_fields49.text)(),
+        message: (0, import_fields49.text)({ ui: { displayMode: "textarea" } }),
+        paymentSession: (0, import_fields49.relationship)({ ref: "PaymentSession" }),
+        expiresAt: (0, import_fields49.timestamp)(),
+        activatedAt: (0, import_fields49.timestamp)(),
+        emailedAt: (0, import_fields49.timestamp)(),
+        ledger: (0, import_fields49.json)({ defaultValue: [] }),
+        ...trackingFields
+      }
+    });
+  }
+});
+
 // features/keystone/utils/relationshipBoundaries.ts
 function enforceRelationshipBoundaries(lists) {
   for (const [listKey, config2] of Object.entries(lists)) {
@@ -4394,7 +4346,7 @@ var init_relationshipBoundaries = __esm({
 });
 
 // features/keystone/models/index.ts
-var models;
+var allModels, narrowed, models;
 var init_models = __esm({
   "features/keystone/models/index.ts"() {
     "use strict";
@@ -4433,7 +4385,7 @@ var init_models = __esm({
     init_PackageUsage();
     init_Shop();
     init_ShopMembership();
-    init_LifecycleOutboxEvent();
+    init_CommandReceipt();
     init_NoShowEvent();
     init_CommissionPayout();
     init_ProductSaleLine();
@@ -4445,13 +4397,14 @@ var init_models = __esm({
     init_BookingPolicy();
     init_AppointmentChangeEvent();
     init_CashRefund();
+    init_GiftCard();
     init_relationshipBoundaries();
-    models = enforceRelationshipBoundaries({
+    allModels = enforceRelationshipBoundaries({
       User,
       Role,
       Shop,
       ShopMembership,
-      LifecycleOutboxEvent,
+      CommandReceipt,
       NoShowEvent,
       CommissionPayout,
       ProductSaleLine,
@@ -4479,6 +4432,7 @@ var init_models = __esm({
       MembershipEvent,
       CheckoutTransaction,
       CashRefund,
+      GiftCard,
       PaymentProvider,
       PaymentSession,
       PaymentWebhookEvent,
@@ -4495,6 +4449,20 @@ var init_models = __esm({
       Product,
       BarberChair
     });
+    narrowed = (config2) => {
+      const operation = config2.access?.operation ?? {};
+      const ui = config2.ui ?? {};
+      const allowed = (gate, args) => typeof gate !== "function" || Boolean(gate(args));
+      return {
+        ...config2,
+        ui: {
+          ...ui,
+          isHidden: ui.isHidden ?? ((args) => !allowed(operation.query, args)),
+          hideCreate: ui.hideCreate ?? ((args) => !allowed(operation.create, args))
+        }
+      };
+    };
+    models = Object.fromEntries(Object.entries(allModels).map(([key, config2]) => [key, narrowed(config2)]));
   }
 });
 
@@ -4517,20 +4485,20 @@ function shopDateParts(value, timeZone) {
   return Object.fromEntries(parts.map((part) => [part.type, part.value]));
 }
 function shopDateKey(value, timeZone) {
-  const p = shopDateParts(value, timeZone);
-  return `${p.year}-${p.month}-${p.day}`;
+  const p2 = shopDateParts(value, timeZone);
+  return `${p2.year}-${p2.month}-${p2.day}`;
 }
 function shopMinute(value, timeZone) {
-  const p = shopDateParts(value, timeZone);
-  return Number(p.hour) * 60 + Number(p.minute);
+  const p2 = shopDateParts(value, timeZone);
+  return Number(p2.hour) * 60 + Number(p2.minute);
 }
 function shopWallTime(date2, minute, timeZone) {
   const [year, month, day] = date2.split("-").map(Number);
   const target = Date.UTC(year, month - 1, day, 0, minute);
   let instant = target;
   for (let i = 0; i < 4; i++) {
-    const p = shopDateParts(new Date(instant), timeZone);
-    const represented = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour), Number(p.minute), Number(p.second));
+    const p2 = shopDateParts(new Date(instant), timeZone);
+    const represented = Date.UTC(Number(p2.year), Number(p2.month) - 1, Number(p2.day), Number(p2.hour), Number(p2.minute), Number(p2.second));
     const delta = target - represented;
     if (!delta) return new Date(instant);
     instant += delta;
@@ -4701,6 +4669,32 @@ var init_availability = __esm({
   }
 });
 
+// features/keystone/utils/serializableTransaction.ts
+function isSerializableWriteConflict(error) {
+  return Boolean(error && typeof error === "object" && "code" in error && error.code === "P2034");
+}
+async function runSerializableTransaction(prisma, operation, maxAttempts = 8) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await prisma.$transaction(operation, {
+        maxWait: 5e3,
+        timeout: 1e4,
+        isolationLevel: "Serializable"
+      });
+    } catch (error) {
+      if (!isSerializableWriteConflict(error) || attempt === maxAttempts) throw error;
+      const backoffMs = Math.min(100, 5 * 2 ** (attempt - 1)) + Math.floor(Math.random() * 10);
+      await new Promise((resolve2) => setTimeout(resolve2, backoffMs));
+    }
+  }
+  throw new Error("Unable to serialize transaction.");
+}
+var init_serializableTransaction = __esm({
+  "features/keystone/utils/serializableTransaction.ts"() {
+    "use strict";
+  }
+});
+
 // features/keystone/utils/bookingCapacity.ts
 function shopDayAppointmentCandidateFilter(start, end, occupiedBufferMinutes2) {
   const bufferMinutes = Number.isFinite(occupiedBufferMinutes2) ? Math.max(0, occupiedBufferMinutes2) : 0;
@@ -4751,7 +4745,7 @@ var init_bookingCapacity = __esm({
 
 // features/keystone/utils/practitionerAuthority.ts
 function hash(value) {
-  return (0, import_node_crypto5.createHash)("sha256").update(value).digest("hex");
+  return (0, import_node_crypto3.createHash)("sha256").update(value).digest("hex");
 }
 function authoritySnapshot(row) {
   const fixture = isSyntheticAuthority(row);
@@ -4785,7 +4779,34 @@ function authoritySnapshot(row) {
     ...usesLocalFixture ? { isLocalFixture: true } : {}
   };
 }
+function notRequiredSnapshot(input) {
+  return {
+    credentialId: "",
+    barberId: input.barberId,
+    serviceId: input.serviceId,
+    shopId: input.shopId,
+    credentialType: "not_required",
+    credentialNumberHash: "",
+    issuingAuthority: "",
+    jurisdictionCode: "",
+    scopeDescription: "No practitioner credential required for this service",
+    evidenceHash: "",
+    effectiveFrom: (/* @__PURE__ */ new Date(0)).toISOString(),
+    expiresAt: new Date(Date.UTC(9999, 11, 31)).toISOString(),
+    verifiedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    supervisionRequired: false,
+    supervisorId: null,
+    notRequired: true
+  };
+}
 async function requireEffectivePractitionerAuthority(client, input) {
+  const [service] = await client.$queryRawUnsafe(
+    'SELECT "credentialRequired" FROM "Service" WHERE id = $1 AND "shop" = $2',
+    input.serviceId,
+    input.shopId
+  );
+  if (!service) throw new Error("The selected service is not offered by this shop.");
+  if (!service.credentialRequired) return notRequiredSnapshot(input);
   const supervisorEvidence = `FROM "PractitionerCredential" supervisor
     WHERE supervisor."shop" = pc."shop" AND supervisor."barber" = pc."supervisor" AND supervisor."service" = pc."service"
       AND supervisor.id <> pc.id AND supervisor."barber" <> pc."barber"
@@ -4824,11 +4845,11 @@ function assertAuthorityMatches(snapshot, input) {
     throw new Error("Practitioner authority evidence is not effective for this service time.");
   }
 }
-var import_node_crypto5;
+var import_node_crypto3;
 var init_practitionerAuthority = __esm({
   "features/keystone/utils/practitionerAuthority.ts"() {
     "use strict";
-    import_node_crypto5 = require("node:crypto");
+    import_node_crypto3 = require("node:crypto");
     init_localFixtureAuthority();
   }
 });
@@ -4850,6 +4871,504 @@ var init_publicShop = __esm({
   }
 });
 
+// features/shared/shop-hours.ts
+function toMinute(hour, minute, meridiem) {
+  return (Number(hour) % 12 + (meridiem.toUpperCase() === "PM" ? 12 : 0)) * 60 + Number(minute || 0);
+}
+function parseHoursRange(text48) {
+  if (/^\s*closed\s*$/i.test(text48)) return "closed";
+  const match = RANGE.exec(text48);
+  if (!match) return null;
+  const startMinute = toMinute(match[1], match[2], match[3]);
+  const close = toMinute(match[4], match[5], match[6]);
+  const endMinute = close === 0 ? 1440 : close;
+  return endMinute > startMinute ? { startMinute, endMinute } : null;
+}
+function postedDayWindow(hours, dayKey) {
+  if (!hours || typeof hours !== "object") return null;
+  const record = hours;
+  const posted = SHOP_HOURS_DAYS.filter((day) => typeof record[day] === "string" && String(record[day]).trim());
+  if (!posted.length) return null;
+  const value = record[dayKey];
+  if (typeof value !== "string" || !value.trim()) return "closed";
+  return parseHoursRange(value);
+}
+function clipToPostedHours(schedule, hours, dayKey) {
+  if (!schedule) return null;
+  const window = postedDayWindow(hours, dayKey);
+  if (window === null) return schedule;
+  if (window === "closed") return null;
+  const startMinute = Math.max(schedule.startMinute ?? 0, window.startMinute);
+  const endMinute = Math.min(schedule.endMinute ?? 1440, window.endMinute);
+  return endMinute > startMinute ? { ...schedule, startMinute, endMinute } : null;
+}
+function normalizeShopHours(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { error: "Enter hours for each day." };
+  const record = input;
+  const hours = {};
+  for (const day of SHOP_HOURS_DAYS) {
+    const text48 = typeof record[day] === "string" ? String(record[day]).trim() : "";
+    const parsed = parseHoursRange(text48 || "Closed");
+    if (!parsed) return { error: `Hours for ${day[0].toUpperCase()}${day.slice(1)} must look like 9:00 AM - 7:00 PM, or Closed.` };
+    hours[day] = parsed === "closed" ? "Closed" : text48;
+  }
+  return { hours };
+}
+function nextPostedOpening(hours, todayKey, nowMinute) {
+  const order = SHOP_HOURS_DAYS;
+  const start = order.indexOf(todayKey);
+  if (start < 0) return null;
+  for (let offset = 0; offset < 8; offset += 1) {
+    const day = order[(start + offset) % 7];
+    const window = postedDayWindow(hours, day);
+    if (window === null) return null;
+    if (window === "closed" || offset === 0 && window.startMinute <= nowMinute) continue;
+    const hour = Math.floor(window.startMinute / 60);
+    const clock = `${hour % 12 || 12}:${pad(window.startMinute % 60)} ${hour >= 12 ? "PM" : "AM"}`;
+    return offset === 0 ? `Opens ${clock}` : `Opens ${HOURS_DAY_LABELS[day]} ${clock}`;
+  }
+  return null;
+}
+var SHOP_HOURS_DAYS, RANGE, pad, HOURS_DAY_LABELS;
+var init_shop_hours = __esm({
+  "features/shared/shop-hours.ts"() {
+    "use strict";
+    SHOP_HOURS_DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+    RANGE = /^\s*(\d{1,2})(?::(\d{2}))?\s*([AP]M)\s*[-–—]\s*(\d{1,2})(?::(\d{2}))?\s*([AP]M)\s*$/i;
+    pad = (value) => String(value).padStart(2, "0");
+    HOURS_DAY_LABELS = { monday: "Mon", tuesday: "Tue", wednesday: "Wed", thursday: "Thu", friday: "Fri", saturday: "Sat", sunday: "Sun" };
+  }
+});
+
+// features/integrations/payment/stripe.ts
+var stripe_exports = {};
+__export(stripe_exports, {
+  capturePaymentFunction: () => capturePaymentFunction,
+  createPaymentFunction: () => createPaymentFunction,
+  generatePaymentLinkFunction: () => generatePaymentLinkFunction,
+  getPaymentStatusFunction: () => getPaymentStatusFunction,
+  handleWebhookFunction: () => handleWebhookFunction,
+  refundPaymentFunction: () => refundPaymentFunction,
+  stripeConfigured: () => stripeConfigured
+});
+function stripeConfigured() {
+  return Boolean(process.env.STRIPE_SECRET_KEY);
+}
+function secretKey() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error("Online card payments are not set up.");
+  return key;
+}
+function form(values) {
+  const body = new URLSearchParams();
+  for (const [key, value] of Object.entries(values)) if (value !== void 0 && value !== "") body.append(key, String(value));
+  return body;
+}
+async function stripe(path2, init = {}) {
+  const response = await fetch(`${API}${path2}`, {
+    method: init.method || "GET",
+    headers: {
+      Authorization: `Bearer ${secretKey()}`,
+      ...init.body ? { "Content-Type": "application/x-www-form-urlencoded" } : {},
+      ...init.idempotencyKey ? { "Idempotency-Key": init.idempotencyKey } : {}
+    },
+    body: init.body,
+    redirect: "error"
+  });
+  const json22 = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(json22.error?.message || `Stripe request failed (${response.status}).`);
+  return json22;
+}
+function sessionStatus(session) {
+  if (session.payment_status === "paid" || session.payment_status === "no_payment_required") return "captured";
+  if (session.status === "expired") return "expired";
+  return "pending";
+}
+function asString(value) {
+  return typeof value === "string" ? value : "";
+}
+async function createPaymentFunction({ amount, currency, successUrl, cancelUrl, description, idempotencyKey, metadata, customerEmail }) {
+  const cents2 = Math.round(Number(amount));
+  if (!Number.isSafeInteger(cents2) || cents2 <= 0) throw new Error("Payment amount must be greater than zero.");
+  const meta = metadata && typeof metadata === "object" ? metadata : {};
+  const session = await stripe("/checkout/sessions", {
+    method: "POST",
+    idempotencyKey: asString(idempotencyKey) || void 0,
+    body: form({
+      mode: "payment",
+      success_url: asString(successUrl),
+      cancel_url: asString(cancelUrl),
+      .../^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(asString(customerEmail)) ? { customer_email: asString(customerEmail) } : {},
+      "line_items[0][quantity]": 1,
+      "line_items[0][price_data][currency]": asString(currency || "usd").toLowerCase(),
+      "line_items[0][price_data][unit_amount]": cents2,
+      "line_items[0][price_data][product_data][name]": asString(description) || "Deposit",
+      ...Object.fromEntries(Object.entries(meta).map(([key, value]) => [`metadata[${key}]`, asString(value)]))
+    })
+  });
+  return { status: sessionStatus(session), id: session.id, url: session.url, data: { id: session.id, url: session.url, status: session.status, amount: session.amount_total, provider: "stripe" } };
+}
+async function getPaymentStatusFunction({ paymentId }) {
+  const session = await stripe(`/checkout/sessions/${encodeURIComponent(asString(paymentId))}`);
+  return { status: sessionStatus(session), amount: session.amount_total, data: { id: session.id, status: session.status, paymentStatus: session.payment_status, paymentIntent: session.payment_intent, amount: session.amount_total } };
+}
+async function capturePaymentFunction(args) {
+  return getPaymentStatusFunction(args);
+}
+async function refundPaymentFunction({ paymentId, amount, idempotencyKey }) {
+  const session = await stripe(`/checkout/sessions/${encodeURIComponent(asString(paymentId))}`);
+  if (!session.payment_intent) throw new Error("This payment has nothing to refund.");
+  const refund = await stripe("/refunds", {
+    method: "POST",
+    idempotencyKey: asString(idempotencyKey) || void 0,
+    body: form({ payment_intent: session.payment_intent, amount: amount == null ? void 0 : Math.round(Number(amount)) })
+  });
+  return { status: refund.status === "succeeded" ? "refunded" : refund.status, amount: refund.amount, data: refund };
+}
+async function handleWebhookFunction() {
+  throw new Error("Stripe payments are confirmed from the Checkout Session, not by webhook.");
+}
+var API, generatePaymentLinkFunction;
+var init_stripe = __esm({
+  "features/integrations/payment/stripe.ts"() {
+    "use strict";
+    API = "https://api.stripe.com/v1";
+    generatePaymentLinkFunction = createPaymentFunction;
+  }
+});
+
+// features/shared/trusted-origin.ts
+function trustedOrigin(env = process.env) {
+  const configured = env.APP_ORIGIN || env.NEXT_PUBLIC_APP_URL || (env.RAILWAY_PUBLIC_DOMAIN ? `https://${env.RAILWAY_PUBLIC_DOMAIN}` : "");
+  if (configured) {
+    const url = new URL(configured);
+    if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname !== "/") throw new Error("APP_ORIGIN must be an HTTP(S) origin without credentials or path.");
+    if (env.NODE_ENV === "production" && url.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(url.hostname)) throw new Error("APP_ORIGIN must use HTTPS in production.");
+    return url.origin;
+  }
+  if (env.NODE_ENV === "production") throw new Error("Set APP_ORIGIN (or RAILWAY_PUBLIC_DOMAIN) before starting production.");
+  const port = env.PORT || "3000";
+  if (!/^\d{1,5}$/.test(port)) throw new Error("Invalid local application port.");
+  return `http://127.0.0.1:${port}`;
+}
+var init_trusted_origin = __esm({
+  "features/shared/trusted-origin.ts"() {
+    "use strict";
+  }
+});
+
+// features/keystone/utils/commandReceipt.ts
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).sort(([left], [right]) => left.localeCompare(right)).map(([key, child]) => [key, canonicalize(child)])
+    );
+  }
+  return value;
+}
+function canonicalJson(value) {
+  return JSON.stringify(canonicalize(value));
+}
+function buildCommandReceipt(input) {
+  return {
+    ...input,
+    schemaVersion: 1,
+    occurredAt: input.occurredAt.toISOString()
+  };
+}
+function commandReceiptHash(envelope) {
+  return (0, import_node_crypto4.createHash)("sha256").update(JSON.stringify(canonicalize(envelope))).digest("hex");
+}
+async function recordCommandReceipt(transaction, envelope) {
+  const serialized = JSON.stringify(canonicalize(envelope));
+  if (Buffer.byteLength(serialized) > 1e6) {
+    throw new Error("Command receipt snapshot exceeds the supported size.");
+  }
+  await transaction.$executeRawUnsafe(
+    "SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))",
+    "barbershop-command-receipt",
+    envelope.eventKey
+  );
+  const payloadHash = commandReceiptHash(envelope);
+  const existing = await transaction.commandReceipt.findUnique({ where: { eventKey: envelope.eventKey } });
+  if (existing) {
+    if (existing.eventType !== envelope.eventType || existing.shopId !== envelope.shopId || existing.payloadHash !== payloadHash) {
+      throw new Error("Command receipt idempotency key was reused with a different snapshot.");
+    }
+    return { id: existing.id, created: false };
+  }
+  const event = await transaction.commandReceipt.create({
+    data: {
+      eventKey: envelope.eventKey,
+      eventType: envelope.eventType,
+      schemaVersion: envelope.schemaVersion,
+      aggregateType: envelope.aggregateType,
+      aggregateId: envelope.aggregateId,
+      shopId: envelope.shopId,
+      ...envelope.actorId ? { actorId: envelope.actorId } : {},
+      payload: envelope,
+      payloadHash,
+      occurredAt: new Date(envelope.occurredAt)
+    }
+  });
+  return { id: event.id, created: true };
+}
+var import_node_crypto4;
+var init_commandReceipt = __esm({
+  "features/keystone/utils/commandReceipt.ts"() {
+    "use strict";
+    import_node_crypto4 = require("node:crypto");
+  }
+});
+
+// features/integrations/payment/manual.ts
+var manual_exports = {};
+__export(manual_exports, {
+  capturePaymentFunction: () => capturePaymentFunction2,
+  createPaymentFunction: () => createPaymentFunction2,
+  generatePaymentLinkFunction: () => generatePaymentLinkFunction2,
+  getPaymentStatusFunction: () => getPaymentStatusFunction2,
+  handleWebhookFunction: () => handleWebhookFunction2,
+  refundPaymentFunction: () => refundPaymentFunction2
+});
+function asNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+function asString2(value, fallback = "") {
+  return typeof value === "string" && value.length > 0 ? value : fallback;
+}
+async function handleWebhookFunction2() {
+  throw new Error("Pay-in-person payments do not accept webhooks.");
+}
+async function createPaymentFunction2({ amount, currency }) {
+  return {
+    status: "pending",
+    data: {
+      status: "pending",
+      amount: asNumber(amount),
+      currency: asString2(currency, "usd").toLowerCase(),
+      provider: "manual",
+      settlement: "offline"
+    }
+  };
+}
+async function capturePaymentFunction2() {
+  throw new Error("Pay-in-person payments are not captured by a processor. Record the payment at checkout.");
+}
+async function refundPaymentFunction2() {
+  throw new Error("Pay-in-person payments are not refunded by a processor. Record a cash refund from the checkout receipt.");
+}
+async function getPaymentStatusFunction2() {
+  throw new Error("Pay-in-person payments have no processor status to check.");
+}
+async function generatePaymentLinkFunction2() {
+  return null;
+}
+var init_manual = __esm({
+  "features/integrations/payment/manual.ts"() {
+    "use strict";
+  }
+});
+
+// features/integrations/payment/index.ts
+function isPaymentProviderAdapterCode(value) {
+  return Object.prototype.hasOwnProperty.call(paymentProviderAdapters, value);
+}
+function getPaymentProviderRegistration(code) {
+  return isPaymentProviderAdapterCode(code) ? paymentProviderAdapters[code] : null;
+}
+var paymentProviderAdapters;
+var init_payment = __esm({
+  "features/integrations/payment/index.ts"() {
+    "use strict";
+    paymentProviderAdapters = {
+      manual: {
+        load: () => Promise.resolve().then(() => (init_manual(), manual_exports)),
+        settlement: "offline",
+        allowsPublicSettlement: false,
+        webhook: null
+      },
+      // Online deposits through Stripe Checkout; needs STRIPE_SECRET_KEY (as in E-commerce).
+      stripe: {
+        load: () => Promise.resolve().then(() => (init_stripe(), stripe_exports)),
+        settlement: "processor",
+        allowsPublicSettlement: true,
+        webhook: null
+      }
+    };
+  }
+});
+
+// features/keystone/utils/paymentProviderAdapter.ts
+function adapterCodeForProvider(provider) {
+  const code = provider.code.replace(/^pp_/, "");
+  const registration = getPaymentProviderRegistration(code);
+  if (!registration) {
+    throw new Error(`Payment adapter ${code || provider.code} is not registered.`);
+  }
+  return code;
+}
+function paymentProviderSettlement(provider) {
+  const registration = getPaymentProviderRegistration(provider.code.replace(/^pp_/, ""));
+  return registration?.settlement === "processor" ? "processor" : "offline";
+}
+function isOfflinePaymentProvider(provider) {
+  return paymentProviderSettlement(provider) === "offline";
+}
+async function executeAdapterFunction({ provider, functionName, args }) {
+  const adapterCode = adapterCodeForProvider(provider);
+  const configuredSelector = provider[functionName];
+  if (typeof configuredSelector === "string" && configuredSelector !== adapterCode) {
+    throw new Error(`Payment adapter selector for ${functionName} is not registered for ${adapterCode}.`);
+  }
+  const registration = getPaymentProviderRegistration(adapterCode);
+  if (!registration) throw new Error(`Payment adapter ${adapterCode} is not registered.`);
+  const adapter = await registration.load();
+  const fn = adapter[functionName];
+  if (!fn) {
+    throw new Error(`Function ${functionName} is not available in payment adapter ${adapterCode}.`);
+  }
+  try {
+    return await fn({ provider: { code: provider.code }, ...args });
+  } catch (error) {
+    throw new Error(
+      `Error executing ${functionName} for payment adapter ${adapterCode}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+async function createPayment({ provider, ...args }) {
+  return executeAdapterFunction({ provider, functionName: "createPaymentFunction", args });
+}
+async function capturePayment({ provider, ...args }) {
+  return executeAdapterFunction({ provider, functionName: "capturePaymentFunction", args });
+}
+async function refundPayment({ provider, ...args }) {
+  return executeAdapterFunction({ provider, functionName: "refundPaymentFunction", args });
+}
+async function getPaymentStatus({ provider, ...args }) {
+  return executeAdapterFunction({ provider, functionName: "getPaymentStatusFunction", args });
+}
+var init_paymentProviderAdapter = __esm({
+  "features/keystone/utils/paymentProviderAdapter.ts"() {
+    "use strict";
+    init_payment();
+  }
+});
+
+// features/keystone/mutations/publicDeposits.ts
+async function onlineDepositProvider(prisma, shopId) {
+  if (!stripeConfigured()) return null;
+  return prisma.paymentProvider.findFirst({ where: { shopId, code: STRIPE_CODE, isInstalled: true }, select: { id: true, code: true } });
+}
+async function getPublicPaymentOptions(_root, _args, context) {
+  const prisma = context.sudo().prisma;
+  const shop = await resolvePublishedShop(prisma, { id: true });
+  return { onlineDeposits: Boolean(shop && await onlineDepositProvider(prisma, shop.id)) };
+}
+async function loadAppointment(context, args) {
+  const prisma = context.sudo().prisma;
+  const appointment = await prisma.appointment.findUnique({
+    where: { id: String(args.appointmentId || "") },
+    select: { id: true, shopId: true, status: true, paymentStatus: true, depositAmount: true, serviceTitleSnapshot: true, publicAccessTokenHash: true, accountId: true, customer: { select: { email: true } } }
+  });
+  if (!appointment) throw new Error("Appointment not found.");
+  assertAppointmentAccess({ token: args.accessToken?.trim() || "", storedHash: appointment.publicAccessTokenHash, accountId: appointment.accountId, sessionItemId: context.session?.itemId || null });
+  return { prisma, appointment };
+}
+async function startDepositCheckout(_root, args, context) {
+  try {
+    const { prisma, appointment } = await loadAppointment(context, args);
+    if (!["requested", "confirmed"].includes(String(appointment.status)) || appointment.paymentStatus !== "deposit_due") throw new Error("This visit has no deposit to pay.");
+    const amount = appointment.depositAmount || 0;
+    if (amount <= 0) throw new Error("This visit has no deposit to pay.");
+    const provider = await onlineDepositProvider(prisma, appointment.shopId);
+    if (!provider) throw new Error("Online deposits are not available. Pay the deposit in the shop.");
+    const open = (await prisma.paymentSession.findMany({ where: { appointmentId: appointment.id, paymentProviderId: provider.id, status: "pending", amount }, orderBy: { createdAt: "desc" }, take: 5 })).find((row) => row.metadata?.purpose !== "desk_card");
+    const openUrl = open && typeof open.metadata?.checkoutUrl === "string" ? String(open.metadata.checkoutUrl) : "";
+    if (open && openUrl && (!open.expiresAt || open.expiresAt > /* @__PURE__ */ new Date())) return { success: true, error: null, data: { url: openUrl } };
+    const origin = trustedOrigin();
+    const returnTo = `${origin}/appointment?id=${encodeURIComponent(appointment.id)}`;
+    const key = (0, import_node_crypto5.randomUUID)();
+    const result = await createPayment({
+      provider: { code: provider.code },
+      amount,
+      currency: "usd",
+      description: `Deposit \xB7 ${appointment.serviceTitleSnapshot || "Appointment"}`,
+      successUrl: `${returnTo}&deposit=return`,
+      cancelUrl: `${returnTo}&deposit=cancelled`,
+      idempotencyKey: key,
+      metadata: { appointmentId: appointment.id },
+      customerEmail: appointment.customer?.email || ""
+    });
+    if (!result.id || !result.url) throw new Error("Stripe did not open a checkout.");
+    await prisma.paymentSession.create({ data: {
+      shopId: appointment.shopId,
+      appointmentId: appointment.id,
+      paymentProviderId: provider.id,
+      idempotencyKeyHash: hashPublicAccessToken(`deposit:${key}`),
+      status: "pending",
+      amount,
+      currencyCode: "USD",
+      providerPaymentId: result.id,
+      expiresAt: new Date(Date.now() + 23 * 36e5),
+      metadata: { checkoutUrl: result.url, purpose: "deposit" }
+    } });
+    return { success: true, error: null, data: { url: result.url } };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Unable to open the deposit checkout.", data: null };
+  }
+}
+async function confirmDepositCheckout(_root, args, context) {
+  try {
+    const { prisma, appointment } = await loadAppointment(context, args);
+    if (appointment.paymentStatus === "deposit_paid") return { success: true, error: null, data: { paid: true } };
+    const session = (await prisma.paymentSession.findMany({ where: { appointmentId: appointment.id, status: "pending", paymentProvider: { code: STRIPE_CODE } }, orderBy: { createdAt: "desc" }, take: 5, include: { paymentProvider: { select: { code: true } } } })).find((row) => row.metadata?.purpose !== "desk_card");
+    if (!session || !session.paymentProvider) return { success: true, error: null, data: { paid: false } };
+    const status = await getPaymentStatus({ provider: { code: session.paymentProvider.code }, paymentId: session.providerPaymentId });
+    if (status.status === "expired") {
+      await prisma.paymentSession.update({ where: { id: session.id }, data: { status: "expired" } });
+      return { success: true, error: null, data: { paid: false } };
+    }
+    if (status.status !== "captured") return { success: true, error: null, data: { paid: false } };
+    if (Number(status.amount) !== session.amount) throw new Error("The amount paid does not match the deposit. Contact the shop.");
+    const capturedAt = /* @__PURE__ */ new Date();
+    await prisma.$transaction(async (transaction) => {
+      const claimed = await transaction.paymentSession.updateMany({ where: { id: session.id, status: "pending" }, data: { status: "captured", capturedAt } });
+      if (!claimed.count) return;
+      await transaction.appointment.update({ where: { id: appointment.id }, data: { paymentStatus: "deposit_paid" } });
+      await recordCommandReceipt(transaction, buildCommandReceipt({
+        eventKey: `payment-session:${session.id}:captured:v1`,
+        eventType: "payment_session.captured",
+        aggregateType: "payment_session",
+        aggregateId: session.id,
+        shopId: appointment.shopId,
+        occurredAt: capturedAt,
+        data: { paymentSession: { id: session.id, appointmentId: appointment.id, amount: session.amount, purpose: "deposit" } }
+      }));
+    });
+    return { success: true, error: null, data: { paid: true } };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Unable to check the deposit.", data: null };
+  }
+}
+var import_node_crypto5, STRIPE_CODE;
+var init_publicDeposits = __esm({
+  "features/keystone/mutations/publicDeposits.ts"() {
+    "use strict";
+    import_node_crypto5 = require("node:crypto");
+    init_stripe();
+    init_trusted_origin();
+    init_commandReceipt();
+    init_paymentProviderAdapter();
+    init_publicShop();
+    init_publicAccessToken();
+    init_waiverEvidence();
+    STRIPE_CODE = "pp_stripe";
+  }
+});
+
 // features/keystone/queries/checkBarberAvailability.ts
 async function checkBarberAvailability(_root, args, context) {
   const barberId = args.barberId?.trim();
@@ -4857,17 +5376,18 @@ async function checkBarberAvailability(_root, args, context) {
   if (!barberId || !args.serviceId || !/^\d{4}-\d{2}-\d{2}$/.test(args.date || "")) return [];
   const sudo = context.sudo();
   const [barber, publishedShop] = await Promise.all([
-    sudo.prisma.barber.findUnique({ where: { id: barberId }, select: { id: true, status: true, bookingEnabled: true, bufferMinutes: true, chairId: true, chair: { select: { id: true, status: true } }, shop: { select: { id: true, status: true, isPublic: true, timezone: true } } } }),
+    sudo.prisma.barber.findUnique({ where: { id: barberId }, select: { id: true, status: true, bookingEnabled: true, bufferMinutes: true, chairId: true, chair: { select: { id: true, status: true } }, shop: { select: { id: true, status: true, isPublic: true, timezone: true, hours: true } } } }),
     resolvePublishedShop(sudo.prisma, { id: true })
   ]);
   const shop = barber?.shop;
   if (!barber || !publishedShop || barber.status !== "active" || !barber.bookingEnabled || !barber.chair || barber.chair.status !== "active" || shop?.id !== publishedShop.id || shop.status !== "active" || !shop.isPublic) return [];
   const service = await sudo.prisma.service.findFirst({ where: { id: args.serviceId, shopId: shop.id, status: "active" }, select: { id: true, durationMinutes: true, depositRequired: true, bookingBufferMinutes: true, specialists: { select: { id: true } } } });
-  if (!service || service.depositRequired || service.durationMinutes !== serviceDuration || service.specialists.length && !service.specialists.some((item) => item.id === barberId)) return [];
+  if (service?.depositRequired && !await onlineDepositProvider(sudo.prisma, shop.id)) return [];
+  if (!service || service.durationMinutes !== serviceDuration || service.specialists.length && !service.specialists.some((item) => item.id === barberId)) return [];
   const timeZone = shop.timezone || "UTC";
   const dayOfWeek = dayKeyForDate(args.date, timeZone);
   const { start, end } = dayRange(args.date, timeZone);
-  if (Number.isNaN(start.getTime()) || end <= /* @__PURE__ */ new Date()) return [];
+  if (Number.isNaN(start.getTime()) || end <= /* @__PURE__ */ new Date() || start.getTime() > Date.now() + BOOKING_HORIZON_MS) return [];
   const minute = (value) => value <= start ? 0 : value >= end ? 1440 : shopMinute(value, timeZone);
   const bufferMinutes = occupiedBufferMinutes(barber.bufferMinutes, service.bookingBufferMinutes);
   const [schedules, exceptions, appointments, shifts] = await Promise.all([
@@ -4879,7 +5399,7 @@ async function checkBarberAvailability(_root, args, context) {
   assertAppointmentCandidateSetComplete(appointments);
   const weekly = schedules.find((candidate) => candidate.dayOfWeek === dayOfWeek);
   const override = exceptions.find((item) => item.exceptionType === "working_override");
-  const schedule = override ? { id: `override-${barberId}`, dayOfWeek, isWorking: true, startMinute: minute(override.startsAt), endMinute: minute(override.endsAt), barber: { id: barberId, displayName: "" } } : weekly;
+  const schedule = clipToPostedHours(override ? { id: `override-${barberId}`, dayOfWeek, isWorking: true, startMinute: minute(override.startsAt), endMinute: minute(override.endsAt), barber: { id: barberId, displayName: "" } } : weekly, shop.hours, dayOfWeek);
   if (!schedule) return [];
   const orderedShifts = [...shifts].sort((left, right) => left.scheduledStart.getTime() - right.scheduledStart.getTime());
   const effectiveSchedule = orderedShifts.length ? { ...schedule, startMinute: Math.max(schedule.startMinute ?? 0, minute(orderedShifts[0].scheduledStart)), endMinute: Math.min(schedule.endMinute ?? 1440, minute(orderedShifts[orderedShifts.length - 1].scheduledEnd)) } : schedule;
@@ -4905,6 +5425,7 @@ async function checkBarberAvailability(_root, args, context) {
   }));
   return checked.filter((slot) => slot.available || args.includeUnavailable);
 }
+var BOOKING_HORIZON_MS;
 var init_checkBarberAvailability = __esm({
   "features/keystone/queries/checkBarberAvailability.ts"() {
     "use strict";
@@ -4914,6 +5435,9 @@ var init_checkBarberAvailability = __esm({
     init_availability();
     init_shop_time();
     init_publicShop();
+    init_shop_hours();
+    init_publicDeposits();
+    BOOKING_HORIZON_MS = 90 * 864e5;
   }
 });
 
@@ -5054,7 +5578,7 @@ function publicBookingEligibilityView(policy) {
     policyId: policy.policyId,
     version: policy.version,
     publicServiceEligibility,
-    description: publicServiceEligibility === "active_catalog" ? "Online requests require an active service in an active category belonging to this shop." : "The menu shows active categories only. Direct online requests may use other active shop services; staff, chair, and authority checks still apply."
+    description: publicServiceEligibility === "active_catalog" ? "Open for services in an active category" : "Open for all active services"
   };
 }
 var init_public_booking_eligibility = __esm({
@@ -5115,7 +5639,7 @@ function appointmentChangeConsequences(input) {
   }
   const feeAmount = isLate ? input.action === "cancel" ? input.policy.lateCancellationFeeAmount : input.policy.rescheduleFeeAmount : 0;
   const hasDeposit = input.paymentStatus === "deposit_paid" && Number(input.depositAmount || 0) > 0;
-  const depositConsequence = !hasDeposit ? "none" : input.policy.depositCancellationRule === "refund" ? "refund_required" : input.policy.depositCancellationRule === "forfeit" ? "forfeiture_pending" : "manual_review";
+  const depositConsequence = !hasDeposit ? "none" : input.action === "cancel" && !isLate ? "refund_required" : input.policy.depositCancellationRule === "refund" ? "refund_required" : input.policy.depositCancellationRule === "forfeit" ? "forfeiture_pending" : "manual_review";
   return { isLate, feeAmount, depositConsequence, minutesUntilStart };
 }
 var init_bookingPolicy = __esm({
@@ -5141,6 +5665,46 @@ var init_publicServiceEligibility = __esm({
   "features/keystone/utils/publicServiceEligibility.ts"() {
     "use strict";
     init_public_booking_eligibility();
+  }
+});
+
+// features/keystone/utils/accountCustomer.ts
+async function resolveBookingCustomer(client, contact, accountId) {
+  if (accountId) {
+    const linked = await client.customer.findFirst({ where: { shopId: contact.shopId, userId: accountId }, select: { id: true, userId: true } });
+    if (linked) return { id: linked.id, reused: true };
+    const previous = await client.appointment.findFirst({
+      where: { shopId: contact.shopId, accountId, customerId: { not: null } },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: { customerId: true }
+    });
+    if (previous?.customerId) {
+      const owned = await client.customer.findFirst({ where: { id: previous.customerId, shopId: contact.shopId }, select: { id: true, userId: true } });
+      if (owned) {
+        if (!owned.userId && !await client.customer.findUnique({ where: { userId: accountId }, select: { id: true } })) {
+          await client.customer.update({ where: { id: owned.id }, data: { userId: accountId } });
+        }
+        return { id: owned.id, reused: true };
+      }
+    }
+  }
+  const linkAccount = accountId && !await client.customer.findUnique({ where: { userId: accountId }, select: { id: true } });
+  const created = await client.customer.create({
+    data: {
+      shopId: contact.shopId,
+      firstName: contact.firstName,
+      lastName: contact.lastName,
+      phone: contact.phone,
+      email: contact.email,
+      status: "active",
+      ...linkAccount ? { userId: accountId } : {}
+    }
+  });
+  return { id: created.id, reused: false };
+}
+var init_accountCustomer = __esm({
+  "features/keystone/utils/accountCustomer.ts"() {
+    "use strict";
   }
 });
 
@@ -5189,7 +5753,7 @@ async function createLockedAppointment({
     transaction.service.findUnique({
       where: { id: serviceId },
       include: {
-        shop: { select: { id: true, status: true, isPublic: true, timezone: true } },
+        shop: { select: { id: true, status: true, isPublic: true, timezone: true, hours: true } },
         category: { select: { id: true, shopId: true, status: true } },
         specialists: { select: { id: true } }
       }
@@ -5198,7 +5762,7 @@ async function createLockedAppointment({
     resolvePublishedShop(transaction, { id: true })
   ]);
   if (!service || service.status !== "active" || !service.shopId || !publishedShop || service.shopId !== publishedShop.id || expectedShopId !== void 0 && service.shopId !== expectedShopId || service.shop.status !== "active" || !service.shop.isPublic) throw new BookingRejected("Selected service is no longer available.");
-  if (service.depositRequired) {
+  if (service.depositRequired && !await onlineDepositProvider(transaction, publishedShop.id)) {
     throw new BookingRejected("Online booking for deposit-required services is unavailable until a customer payment provider is connected.");
   }
   if (!barber || barber.status !== "active" || !barber.bookingEnabled) {
@@ -5278,7 +5842,7 @@ async function createLockedAppointment({
     updatedAt: override.updatedAt
   } : weeklySchedule;
   if (shifts.length && !shifts.some((shift) => startsAt >= shift.scheduledStart && occupiedEndsAt <= shift.scheduledEnd)) throw new BookingRejected("That time is outside the barber\u2019s scheduled shift.");
-  const schedule = baseSchedule;
+  const schedule = clipToPostedHours(baseSchedule, service.shop.hours, dayKeyForDate(startsAt, timeZone));
   const appointments = await transaction.appointment.findMany({
     where: {
       shopId: service.shopId,
@@ -5320,16 +5884,13 @@ async function createLockedAppointment({
     getWaiverRequirement(transaction, service.id)
   ]);
   const [firstName, ...rest] = customerName.split(/\s+/);
-  const customer = await transaction.customer.create({
-    data: {
-      shopId: service.shopId,
-      firstName: firstName || customerName,
-      lastName: rest.join(" "),
-      phone: customerPhone,
-      email: customerEmail,
-      status: "active"
-    }
-  });
+  const customer = await resolveBookingCustomer(transaction, {
+    shopId: service.shopId,
+    firstName: firstName || customerName,
+    lastName: rest.join(" "),
+    phone: customerPhone,
+    email: customerEmail
+  }, accountId);
   const appointment = await transaction.appointment.create({
     data: {
       shopId: service.shopId,
@@ -5368,7 +5929,7 @@ async function createLockedAppointment({
         "waiverRequirementSnapshot" = $4::jsonb
     WHERE id = $1
   `, appointment.id, JSON.stringify(bookingAuthority), JSON.stringify(bookingPolicy), JSON.stringify(waiverRequirement));
-  await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+  await recordCommandReceipt(transaction, buildCommandReceipt({
     eventKey: `appointment:${appointment.id}:created:v1`,
     eventType: "appointment.created",
     aggregateType: "appointment",
@@ -5406,11 +5967,12 @@ async function createBookingForActor(args, context, accountId) {
   const actor = accountId ? `account:${accountId}` : "guest";
   try {
     const body = validateGuestBookingCommand(args);
-    return await runGuestCommand(async (transaction) => {
+    const result = await runGuestCommand(async (transaction) => {
       await lockGuestCommand(transaction, args.requestKey);
       if (accountId && !await transaction.user.findUnique({ where: { id: accountId }, select: { id: true } })) throw new Error("Account unavailable.");
       const original = await readGuestCommand(transaction, args, actor);
       if (original) return original;
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(body.customerEmail || "")) throw new BookingRejected("Enter an email so we can send your confirmation.");
       const startsAt = new Date(body.startsAt);
       if (startsAt.getTime() < Date.now() + 5 * 6e4 || startsAt.getTime() > Date.now() + 90 * 864e5) throw new BookingRejected("Choose an appointment at least 5 minutes and no more than 90 days from now.");
       const sudo = context.sudo();
@@ -5419,10 +5981,10 @@ async function createBookingForActor(args, context, accountId) {
           where: { id: body.serviceId },
           query: "id name imagePath durationMinutes price depositRequired depositAmount status shop { id status isPublic } category { id status shop { id } } specialists(where: { status: { equals: active }, bookingEnabled: { equals: true } }) { id displayName }"
         }),
-        resolvePublishedShop(transaction, { id: true })
+        resolvePublishedShop(transaction, { id: true, name: true })
       ]);
       if (!service || !publishedShop || publishedShop.id !== body.shopId || service.status !== "active" || service.shop?.id !== publishedShop.id || service.shop?.status !== "active" || !service.shop?.isPublic) throw new BookingRejected("This service is no longer available online.");
-      if (service.depositRequired) throw new BookingRejected("This service needs a deposit and can\u2019t be booked online yet. Contact the shop.");
+      if (service.depositRequired && !await onlineDepositProvider(transaction, publishedShop.id)) throw new BookingRejected("This service needs a deposit and can\u2019t be booked online. Contact the shop.");
       try {
         const policy = await requireEffectiveBookingPolicy(transaction, { shopId: publishedShop.id, at: /* @__PURE__ */ new Date() });
         assertPublicServiceEligibility({
@@ -5487,6 +6049,7 @@ async function createBookingForActor(args, context, accountId) {
       await persistGuestCommand(transaction, args, { version: 1, disposition: "accepted", appointment: receipt }, actor);
       return { success: true, disposition: "accepted", error: null, appointment: receipt, accessToken: args.guestProof };
     });
+    return result;
   } catch (error) {
     if (error instanceof BookingRejected) return { success: false, disposition: "rejected", error: error.message, appointment: null, accessToken: null };
     return unresolvedGuestCommand();
@@ -5498,16 +6061,19 @@ var init_createOnlineBooking = __esm({
     "use strict";
     init_shop_time();
     init_availability();
+    init_shop_hours();
+    init_publicDeposits();
     init_bookingCapacity();
     init_publicAccessToken();
     init_guest_booking_command();
     init_guestBookingCommand();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_practitionerAuthority();
     init_bookingPolicy();
     init_publicShop();
     init_waiverEvidence();
     init_publicServiceEligibility();
+    init_accountCustomer();
     init_public_booking_eligibility();
     ACTIVE_APPOINTMENT_STATUSES = ["requested", "confirmed", "checked_in", "in_chair"];
     BookingRejected = class extends Error {
@@ -5602,6 +6168,32 @@ async function recoverAccountBooking(_root, args, context) {
     return unresolvedGuestCommand();
   }
 }
+async function getAccountBalances(_root, _args, context) {
+  const accountId = await currentAccountId(context);
+  if (!accountId) return { success: false, error: "Sign in to view balances.", data: null };
+  const booked = await context.prisma.appointment.findMany({ where: { accountId, customerId: { not: null } }, select: { customerId: true }, distinct: ["customerId"], take: 200 });
+  const customerIds = booked.map((row) => row.customerId).filter((id) => Boolean(id));
+  const balances = await context.prisma.customerPackage.findMany({
+    where: { status: { in: ["active", "paused"] }, customer: { OR: [{ userId: accountId }, ...customerIds.length ? [{ id: { in: customerIds } }] : []] } },
+    orderBy: [{ createdAt: "desc" }],
+    take: 50,
+    select: { id: true, status: true, remainingVisits: true, expiresAt: true, nextBillingAt: true, servicePackage: { select: { name: true } }, membershipPlan: { select: { name: true, billingInterval: true } } }
+  });
+  return {
+    success: true,
+    error: null,
+    data: balances.map((item) => ({
+      id: item.id,
+      status: item.status,
+      remainingVisits: item.remainingVisits,
+      name: item.membershipPlan?.name || item.servicePackage?.name || "Balance",
+      kind: item.membershipPlan ? "membership" : "package",
+      billingInterval: item.membershipPlan?.billingInterval || null,
+      expiresAt: item.expiresAt?.toISOString() || null,
+      nextBillingAt: item.nextBillingAt?.toISOString() || null
+    }))
+  };
+}
 var ACCOUNT_BOOKING_PAGE_SIZE, EXPORT_LIMIT;
 var init_getAccountBookings = __esm({
   "features/keystone/queries/getAccountBookings.ts"() {
@@ -5613,22 +6205,59 @@ var init_getAccountBookings = __esm({
   }
 });
 
+// features/keystone/queries/getPublicOffers.ts
+async function getPublicMembershipOffers(_root, _args, context) {
+  const prisma = context.sudo().prisma;
+  const shop = await resolvePublishedShop(prisma, { id: true });
+  if (!shop) return { packages: [], plans: [] };
+  const [packages, plans] = await Promise.all([
+    prisma.servicePackage.findMany({
+      where: { shopId: shop.id, status: "active" },
+      orderBy: [{ price: "asc" }],
+      select: { id: true, name: true, description: true, price: true, items: { where: { service: { status: "active" } }, select: { quantity: true, service: { select: { id: true, name: true } } } } }
+    }),
+    prisma.membershipPlan.findMany({
+      where: { shopId: shop.id, status: "active" },
+      orderBy: [{ price: "asc" }],
+      select: { id: true, name: true, description: true, price: true, billingInterval: true, includedVisits: true, discountPercent: true }
+    })
+  ]);
+  return {
+    packages: packages.map((item) => ({ ...item, price: item.price ?? 0, items: item.items.flatMap((line) => line.service ? [{ quantity: line.quantity ?? 1, serviceId: line.service.id, serviceName: line.service.name }] : []) })),
+    plans: plans.map((plan) => ({ ...plan, price: plan.price ?? 0, billingInterval: plan.billingInterval ?? "monthly" }))
+  };
+}
+async function getPublicBarberWeek(_root, args, context) {
+  const prisma = context.sudo().prisma;
+  const shop = await resolvePublishedShop(prisma, { id: true });
+  if (!shop || !args.barberId) return [];
+  const barber = await prisma.barber.findFirst({ where: { id: args.barberId, shopId: shop.id, status: "active", bookingEnabled: true }, select: { id: true } });
+  if (!barber) return [];
+  return prisma.barberSchedule.findMany({ where: { barberId: barber.id, isWorking: true }, select: { dayOfWeek: true, startMinute: true, endMinute: true } });
+}
+var init_getPublicOffers = __esm({
+  "features/keystone/queries/getPublicOffers.ts"() {
+    "use strict";
+    init_publicShop();
+  }
+});
+
 // features/keystone/utils/balanceLedgers.ts
-function integer30(value, label) {
+function integer31(value, label) {
   if (!Number.isSafeInteger(value)) throw new Error(`${label} must be a safe integer.`);
   return value;
 }
 function applyInventoryDelta(current, delta) {
-  const before = integer30(current, "Inventory balance");
-  const normalizedDelta = integer30(delta, "Inventory movement");
+  const before = integer31(current, "Inventory balance");
+  const normalizedDelta = integer31(delta, "Inventory movement");
   if (normalizedDelta === 0) throw new Error("Inventory movement must be non-zero.");
   const after = before + normalizedDelta;
   if (after < 0) throw new Error("Insufficient inventory for this movement.");
   return { before, delta: normalizedDelta, after };
 }
 function applyPackageDelta(current, delta) {
-  const before = integer30(current, "Package balance");
-  const normalizedDelta = integer30(delta, "Package usage");
+  const before = integer31(current, "Package balance");
+  const normalizedDelta = integer31(delta, "Package usage");
   if (normalizedDelta === 0) throw new Error("Package usage must be non-zero.");
   const after = before + normalizedDelta;
   if (after < 0) throw new Error("Package has no visits remaining.");
@@ -5754,6 +6383,270 @@ var init_commissionAccrual = __esm({
   }
 });
 
+// features/keystone/mutations/paymentSessionResult.ts
+function serializePaymentSession(session) {
+  if (!session) return session;
+  const dateFields = ["expiresAt", "capturedAt", "cancelledAt", "createdAt", "updatedAt"];
+  const serialized = { ...session };
+  for (const field of dateFields) {
+    const value = serialized[field];
+    if (value instanceof Date) serialized[field] = value.toISOString();
+  }
+  return serialized;
+}
+async function lockAppointmentMoney(transaction, appointmentId) {
+  if (!appointmentId) return;
+  await transaction.$executeRawUnsafe(
+    "SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))",
+    "barbershop-checkout",
+    appointmentId
+  );
+}
+function recordOf(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+function appointmentSettledElsewhere(paymentStatus) {
+  return ["paid", "refunded"].includes(String(paymentStatus || ""));
+}
+var OPEN_PAYMENT_SESSION_STATUSES;
+var init_paymentSessionResult = __esm({
+  "features/keystone/mutations/paymentSessionResult.ts"() {
+    "use strict";
+    OPEN_PAYMENT_SESSION_STATUSES = ["pending", "authorized", "captured", "partially_refunded"];
+  }
+});
+
+// features/keystone/mutations/giftCards.ts
+function codeFor(key) {
+  return (0, import_node_crypto7.createHash)("sha256").update(key).digest("hex").slice(0, 12).toUpperCase().match(/.{1,4}/g).join("-");
+}
+function normalizeGiftCode(code) {
+  const raw = code.toUpperCase().replace(/[^0-9A-F]/g, "");
+  return raw.length === 12 ? raw.match(/.{1,4}/g).join("-") : "";
+}
+function orderToken(giftCardId) {
+  const secret = process.env.SESSION_SECRET || "";
+  if (secret.length < 32) throw new Error("SESSION_SECRET must be at least 32 characters long");
+  return (0, import_node_crypto7.createHmac)("sha256", secret).update(`barbershop-gift:${giftCardId}`).digest("hex");
+}
+function tokenOk(giftCardId, token) {
+  if (!token || token.length !== 64) return false;
+  const a = Buffer.from(orderToken(giftCardId));
+  const b = Buffer.from(token);
+  return a.length === b.length && (0, import_node_crypto7.timingSafeEqual)(a, b);
+}
+async function giftCardOptions(prisma) {
+  const shop = await resolvePublishedShop(prisma, { id: true });
+  return { online: Boolean(shop && await onlineDepositProvider(prisma, shop.id)), amounts: GIFT_CARD_AMOUNTS };
+}
+async function startGiftCardCheckout(_root, args, context) {
+  const fail6 = (error) => ({ success: false, error, data: null });
+  try {
+    if (!GIFT_CARD_AMOUNTS.includes(args.amount)) return fail6("Choose one of the gift card amounts.");
+    const purchaserName = (args.purchaserName || "").trim();
+    const purchaserEmail = (args.purchaserEmail || "").trim().toLowerCase();
+    const recipientEmail = (args.recipientEmail || "").trim().toLowerCase() || purchaserEmail;
+    const recipientName = (args.recipientName || "").trim() || purchaserName;
+    const message = (args.message || "").trim();
+    if (!purchaserName || purchaserName.length > 120 || recipientName.length > 120) return fail6("Enter your name.");
+    if (!EMAIL.test(purchaserEmail) || !EMAIL.test(recipientEmail)) return fail6("Enter a valid email address.");
+    if (message.length > 500) return fail6("Keep the message under 500 characters.");
+    const prisma = context.sudo().prisma;
+    const shop = await resolvePublishedShop(prisma, { id: true, name: true });
+    if (!shop) return fail6("Gift cards are unavailable right now.");
+    const provider = await onlineDepositProvider(prisma, shop.id);
+    if (!provider) return fail6("Online gift cards are unavailable right now. Buy one in the shop.");
+    const key = (0, import_node_crypto7.randomUUID)();
+    const expiresAt = /* @__PURE__ */ new Date();
+    expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+    const card = await prisma.giftCard.create({ data: {
+      shopId: shop.id,
+      code: codeFor(`gift:${key}`),
+      status: "pending",
+      initialValue: args.amount,
+      balance: args.amount,
+      purchaserName,
+      purchaserEmail,
+      recipientName,
+      recipientEmail,
+      message,
+      expiresAt
+    } });
+    const back = `${trustedOrigin()}/gift-cards/order?id=${encodeURIComponent(card.id)}&token=${orderToken(card.id)}`;
+    try {
+      const result = recordOf(await createPayment({
+        provider: { code: provider.code },
+        amount: args.amount,
+        currency: "usd",
+        description: `${shop.name} gift card \xB7 ${usd(args.amount)}`,
+        successUrl: back,
+        cancelUrl: `${back}&result=cancelled`,
+        idempotencyKey: key,
+        customerEmail: purchaserEmail,
+        metadata: { purpose: "gift_card", giftCardId: card.id }
+      }));
+      if (!result.id || typeof result.url !== "string") throw new Error("Stripe did not open a checkout.");
+      const session = await prisma.paymentSession.create({ data: {
+        shopId: shop.id,
+        paymentProviderId: provider.id,
+        idempotencyKeyHash: hashPublicAccessToken(`gift-card:${key}`),
+        status: "pending",
+        amount: args.amount,
+        currencyCode: "USD",
+        providerPaymentId: String(result.id),
+        expiresAt: new Date(Date.now() + 23 * 36e5),
+        metadata: { purpose: "gift_card", giftCardId: card.id, checkoutUrl: result.url }
+      } });
+      await prisma.giftCard.update({ where: { id: card.id }, data: { paymentSessionId: session.id } });
+      return { success: true, error: null, data: { url: result.url } };
+    } catch (error) {
+      console.error("Gift card checkout could not be opened:", error);
+      await prisma.giftCard.update({ where: { id: card.id }, data: { status: "cancelled" } });
+      return fail6("Online gift cards are unavailable right now. Buy one in the shop.");
+    }
+  } catch (error) {
+    return fail6(error instanceof Error ? error.message : "Unable to start the gift card order.");
+  }
+}
+async function settleGiftCard(prisma, giftCardId) {
+  const card = await prisma.giftCard.findUnique({ where: { id: giftCardId }, include: { paymentSession: { include: { paymentProvider: { select: { code: true } } } } } });
+  if (!card) throw new Error("Gift card order not found.");
+  const session = card.paymentSession;
+  if (card.status === "pending" && session?.paymentProvider && session.status === "pending") {
+    const remote = recordOf(await getPaymentStatus({ provider: { code: session.paymentProvider.code }, paymentId: session.providerPaymentId }));
+    if (remote.status === "expired") {
+      await prisma.$transaction([
+        prisma.paymentSession.update({ where: { id: session.id }, data: { status: "expired", cancelledAt: /* @__PURE__ */ new Date() } }),
+        prisma.giftCard.update({ where: { id: card.id }, data: { status: "cancelled" } })
+      ]);
+      return { ...card, status: "cancelled" };
+    }
+    if (remote.status === "captured") {
+      if (Number(remote.amount) !== session.amount) throw new Error("The amount paid does not match the gift card. Contact the shop.");
+      const now = /* @__PURE__ */ new Date();
+      await prisma.$transaction(async (tx) => {
+        const claimed = await tx.paymentSession.updateMany({ where: { id: session.id, status: "pending" }, data: { status: "captured", capturedAt: now } });
+        if (!claimed.count) return;
+        const ledger = [{ at: now.toISOString(), type: "purchase", amount: card.initialValue, balance: card.initialValue, ref: session.id }];
+        await tx.giftCard.update({ where: { id: card.id }, data: { status: "active", activatedAt: now, ledger } });
+        await recordCommandReceipt(tx, buildCommandReceipt({
+          eventKey: `gift-card:${card.id}:sold:v1`,
+          eventType: "gift_card.sold",
+          aggregateType: "gift_card",
+          aggregateId: card.id,
+          shopId: card.shopId,
+          occurredAt: now,
+          data: { giftCard: { id: card.id, amount: card.initialValue, paymentSessionId: session.id } }
+        }));
+      });
+    }
+  }
+  const fresh = await prisma.giftCard.findUniqueOrThrow({ where: { id: card.id } });
+  return fresh;
+}
+async function confirmGiftCardOrder(_root, args, context) {
+  if (!tokenOk(args.giftCardId, args.token)) return { success: false, error: "We could not find that gift card order.", data: null };
+  try {
+    const card = await settleGiftCard(context.sudo().prisma, args.giftCardId);
+    return { success: true, error: null, data: {
+      status: card.status,
+      amount: card.initialValue,
+      recipientEmail: card.recipientEmail,
+      recipientName: card.recipientName,
+      code: card.status === "active" || card.status === "redeemed" ? card.code : null,
+      expiresAt: card.expiresAt?.toISOString() || null
+    } };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "We could not check the payment yet.", data: null };
+  }
+}
+async function settleOpenGiftCards(prisma, shopId) {
+  const open = await prisma.giftCard.findMany({ where: { shopId, status: "pending", paymentSession: { status: "pending" } }, select: { id: true }, take: 20 });
+  for (const card of open) await settleGiftCard(prisma, card.id).catch(() => void 0);
+}
+async function lookupGiftCard(_root, args, context) {
+  if (!permissions.canManagePayments({ session: context.session })) return { success: false, error: "Not authorized.", data: null };
+  try {
+    const shopId = await requireCurrentShopPermission(context.session, "canManagePayments");
+    const code = normalizeGiftCode(args.code || "");
+    if (!code) return { success: false, error: "Enter the 12-character gift card code.", data: null };
+    let card = await context.prisma.giftCard.findFirst({ where: { shopId, code } });
+    if (card?.status === "pending") card = await settleGiftCard(context.prisma, card.id);
+    if (!card) return { success: false, error: "No gift card with that code.", data: null };
+    return { success: true, error: null, data: { id: card.id, code: card.code, status: card.status, balance: card.balance, expiresAt: card.expiresAt?.toISOString() || null, recipientName: card.recipientName } };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Unable to look up the gift card.", data: null };
+  }
+}
+async function redeemGiftCardInTransaction(transaction, input) {
+  const code = normalizeGiftCode(input.code);
+  await transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", "barbershop-gift-card", code);
+  const card = await transaction.giftCard.findFirst({ where: { shopId: input.shopId, code } });
+  if (!card || card.status !== "active") throw new Error("That gift card is not active.");
+  if (card.expiresAt && card.expiresAt < input.now) throw new Error("That gift card has expired.");
+  if (card.balance < input.amount) throw new Error(`That gift card has ${usd(card.balance)} left. Take the rest by card or cash first.`);
+  const balance = card.balance - input.amount;
+  const ledger = [...Array.isArray(card.ledger) ? card.ledger : [], { at: input.now.toISOString(), type: "redeem", amount: input.amount, balance, ref: input.transactionId }];
+  await transaction.giftCard.update({ where: { id: card.id }, data: { balance, status: balance === 0 ? "redeemed" : "active", ledger } });
+  return card;
+}
+async function returnGiftCardCheckout(_root, args, context) {
+  if (!permissions.canManagePayments({ session: context.session })) return { success: false, error: "Not authorized.", data: null };
+  try {
+    const shopId = await requireCurrentShopPermission(context.session, "canManagePayments");
+    const reason = (args.reason || "").trim();
+    if (reason.length < 3 || reason.length > 1e3) throw new Error("Give a reason for the return.");
+    if (!args.idempotencyKey?.trim()) throw new Error("Request key is missing. Reload and try again.");
+    const data = await context.prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))", "barbershop-cash-refund", args.transactionId);
+      const receipt = await tx.checkoutTransaction.findFirst({ where: { id: args.transactionId, shopId } });
+      if (!receipt || String(receipt.paymentMethod) !== "gift_card") throw new Error("Only a gift card receipt can be returned to the card.");
+      if (receipt.status === "refunded") {
+        const card2 = await tx.giftCard.findFirst({ where: { shopId, ledger: { array_contains: [{ ref: `return:${receipt.id}` }] } } });
+        return { giftCardId: card2?.id || null, amount: 0, balance: card2?.balance ?? null, replayed: true };
+      }
+      if (receipt.status !== "paid") throw new Error(`A ${receipt.status} receipt can't be returned.`);
+      const paidCommission = await tx.commission.count({ where: { transactionId: receipt.id, status: "paid" } });
+      if (paidCommission) throw new Error("A commission on this visit was already paid. Owner reconciliation is required first.");
+      const card = await tx.giftCard.findFirst({ where: { shopId, ledger: { array_contains: [{ ref: receipt.id }] } } });
+      if (!card) throw new Error("The gift card used on this receipt was not found.");
+      const ledger = Array.isArray(card.ledger) ? card.ledger : [];
+      const debit = ledger.filter((entry) => entry.type === "redeem" && entry.ref === receipt.id).reduce((sum, entry) => sum + entry.amount, 0);
+      if (debit <= 0) throw new Error("Nothing was taken from a gift card on this receipt.");
+      const now = /* @__PURE__ */ new Date();
+      const balance = card.balance + debit;
+      await tx.giftCard.update({ where: { id: card.id }, data: { balance, status: card.status === "redeemed" ? "active" : card.status, ledger: [...ledger, { at: now.toISOString(), type: "return", amount: debit, balance, ref: `return:${receipt.id}` }] } });
+      await tx.checkoutTransaction.update({ where: { id: receipt.id }, data: { status: "refunded" } });
+      await tx.appointment.updateMany({ where: { transactionId: receipt.id, shopId }, data: { paymentStatus: "refunded" } });
+      await tx.commission.updateMany({ where: { transactionId: receipt.id, status: { in: ["projected", "approved"] } }, data: { status: "voided" } });
+      await recordCommandReceipt(tx, buildCommandReceipt({ actorId: context.session?.itemId, eventKey: `gift-card-return:${receipt.id}`, eventType: "checkout.gift_card_returned", aggregateType: "checkout_transaction", aggregateId: receipt.id, shopId, occurredAt: now, data: { giftCardId: card.id, amount: debit, balance, reason } }));
+      return { giftCardId: card.id, amount: debit, balance, replayed: false };
+    });
+    return { success: true, error: null, data };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Unable to return the gift card payment.", data: null };
+  }
+}
+var import_node_crypto7, GIFT_CARD_AMOUNTS, EMAIL, usd;
+var init_giftCards = __esm({
+  "features/keystone/mutations/giftCards.ts"() {
+    "use strict";
+    import_node_crypto7 = require("node:crypto");
+    init_access();
+    init_trusted_origin();
+    init_currentAuthorization();
+    init_commandReceipt();
+    init_paymentProviderAdapter();
+    init_publicAccessToken();
+    init_publicShop();
+    init_publicDeposits();
+    init_paymentSessionResult();
+    GIFT_CARD_AMOUNTS = [2500, 5e3, 7500, 1e4, 15e3, 2e4];
+    EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    usd = (cents2) => `$${(cents2 / 100).toFixed(cents2 % 100 ? 2 : 0)}`;
+  }
+});
+
 // features/keystone/mutations/checkoutAppointment.ts
 function money(value) {
   const amount = Number(value ?? 0);
@@ -5764,7 +6657,7 @@ function clean2(value) {
   return value?.trim() || "";
 }
 function assertCheckoutReplay(transaction, expected) {
-  if (String(transaction.paymentMethod) !== expected.paymentMethod || (transaction.tipAmount || 0) !== expected.tipAmount || (transaction.discountAmount || 0) !== expected.discountAmount || (transaction.taxAmount || 0) !== expected.taxAmount || (transaction.total || 0) !== expected.total || (transaction.packageBalanceId || "") !== expected.packageBalanceId || (transaction.paymentSessionId || "") !== expected.paymentSessionId || (transaction.notes || "") !== expected.notes) throw new Error("This appointment was already checked out with different tender or totals.");
+  if (String(transaction.paymentMethod) !== expected.paymentMethod || (transaction.tipAmount || 0) !== expected.tipAmount || (transaction.discountAmount || 0) !== expected.discountAmount || (transaction.taxAmount || 0) !== expected.taxAmount || (transaction.total || 0) !== expected.total || (transaction.packageBalanceId || "") !== expected.packageBalanceId || expected.paymentSessionId && (transaction.paymentSessionId || "") !== expected.paymentSessionId || (transaction.notes || "") !== expected.notes && !["Deposit ", "Gift card "].some((suffix) => (transaction.notes || "").startsWith(expected.notes ? `${expected.notes} \xB7 ${suffix}` : suffix))) throw new Error("This appointment was already checked out with different tender or totals.");
 }
 async function checkoutAppointment(_root, args, context) {
   if (!permissions.canManagePayments({ session: context.session })) {
@@ -5785,7 +6678,9 @@ async function checkoutAppointment(_root, args, context) {
     }
     const paymentMethod = clean2(args.paymentMethod) || "cash";
     const packageBalanceId = clean2(args.packageBalanceId);
-    if (!["cash", "package"].includes(paymentMethod)) throw new Error("This release supports cash and prepaid visits only; online/card settlement is not connected.");
+    if (!["cash", "card", "package", "gift_card"].includes(paymentMethod)) throw new Error("Choose cash, card, gift card or a prepaid visit.");
+    const giftCardCode = paymentMethod === "gift_card" ? normalizeGiftCode(clean2(args.giftCardCode)) : "";
+    if (paymentMethod === "gift_card" && !giftCardCode) throw new Error("Enter the 12-character gift card code.");
     if (preview.shop.currencyCode !== "USD") throw new Error("This release supports USD settlement only.");
     if (preview.price == null) throw new Error("This legacy appointment has no agreed price. Resolve its commercial evidence before checkout.");
     const subtotal = paymentMethod === "package" ? 0 : money(preview.price);
@@ -5795,7 +6690,7 @@ async function checkoutAppointment(_root, args, context) {
     const total = Math.max(0, subtotal + tipAmount + taxAmount - discountAmount);
     if (!Number.isSafeInteger(total) || total > 2e9) throw new Error("Checkout total exceeds the supported limit.");
     if (paymentMethod === "package" && total > 0) throw new Error("Package tender covers a visit only. Collect tips/tax separately; mixed tender is not supported.");
-    if (clean2(args.paymentSessionId)) throw new Error("Processor settlement is not enabled for this cash-only release.");
+    if (clean2(args.paymentSessionId) && paymentMethod !== "card") throw new Error("A card payment session can only settle card tender.");
     const idempotencyKey = clean2(args.idempotencyKey);
     if (idempotencyKey.length > 200) throw new Error("Checkout request key is too long.");
     const commandKeyHash = idempotencyKey ? hashPublicAccessToken(idempotencyKey) : null;
@@ -5822,7 +6717,7 @@ async function checkoutAppointment(_root, args, context) {
         const replayTransaction = await transaction.checkoutTransaction.findUniqueOrThrow({ where: { id: appointment.transactionId }, include: { lineItems: true } });
         assertCheckoutReplay(replayTransaction, replayInput);
         if (commandKeyHash) {
-          const event = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey: `checkout:${replayTransaction.id}:paid:v1` } });
+          const event = await transaction.commandReceipt.findUnique({ where: { eventKey: `checkout:${replayTransaction.id}:paid:v1` } });
           const saved = event?.payload?.data?.command?.keyHash;
           if (saved && saved !== commandKeyHash) throw new Error("This appointment was already checked out by another request.");
         }
@@ -5859,11 +6754,14 @@ async function checkoutAppointment(_root, args, context) {
         if (!paymentSession || paymentSession.shopId !== appointment.shopId || paymentSession.appointmentId !== appointment.id) {
           throw new Error("Selected payment session does not belong to this appointment and shop.");
         }
-        if (paymentSession.status !== "captured" || Number(paymentSession.amount) !== total) {
+        const paidDeposit = appointment.paymentStatus === "deposit_paid" ? Math.min(appointment.depositAmount || 0, total) : 0;
+        if (paymentSession.status !== "captured" || Number(paymentSession.amount) !== total - paidDeposit) {
           throw new Error("Payment session must be captured for the exact checkout total.");
         }
       }
       const completedAt = /* @__PURE__ */ new Date();
+      const depositSession = appointment.paymentStatus === "deposit_paid" ? (await transaction.paymentSession.findMany({ where: { appointmentId: appointment.id, status: "captured", transaction: null, ...paymentSession ? { id: { not: paymentSession.id } } : {} }, orderBy: { capturedAt: "desc" }, take: 5 })).find((row) => row.metadata?.purpose !== "desk_card") || null : null;
+      const depositNote = depositSession ? `Deposit ${(depositSession.amount / 100).toFixed(2)} paid online` : "";
       const checkout = await transaction.checkoutTransaction.create({
         data: {
           shopId: appointment.shopId,
@@ -5877,16 +6775,20 @@ async function checkoutAppointment(_root, args, context) {
           discountAmount,
           total,
           paymentMethod,
-          providerPaymentId: paymentSession?.providerPaymentId || "",
+          providerPaymentId: paymentSession?.providerPaymentId || depositSession?.providerPaymentId || "",
           packageBalanceId: packageBalance?.id,
-          paymentSessionId: paymentSession?.id,
+          paymentSessionId: paymentSession?.id || depositSession?.id,
           completedAt,
           currencyCode: "USD",
           merchantSnapshot: { name: appointment.shop.name, legalName: appointment.shop.legalName, address: appointment.shop.address, phone: appointment.shop.phone, timezone: appointment.shop.timezone },
           taxRuleSnapshot: { mode: "operator_entered", amount: taxAmount },
-          notes: clean2(args.notes)
+          notes: [clean2(args.notes), depositNote, giftCardCode ? `Gift card ${giftCardCode.slice(-4)}` : ""].filter(Boolean).join(" \xB7 ")
         }
       });
+      if (giftCardCode) {
+        const owed = total - (depositSession ? Math.min(depositSession.amount, total) : 0);
+        if (owed > 0) await redeemGiftCardInTransaction(transaction, { shopId: appointment.shopId, code: giftCardCode, amount: owed, transactionId: checkout.id, now: completedAt });
+      }
       const snapshot = buildAppointmentLineItemSnapshot(appointment, packageBalance);
       const lineItem = await transaction.appointmentLineItem.create({
         data: {
@@ -5957,7 +6859,7 @@ async function checkoutAppointment(_root, args, context) {
       if (appointment.customerId) {
         await transaction.customer.update({ where: { id: appointment.customerId }, data: { lastVisitAt: completedAt } });
       }
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
         eventKey: `checkout:${checkout.id}:paid:v1`,
         eventType: "checkout.paid",
@@ -5999,10 +6901,11 @@ var init_checkoutAppointment = __esm({
     init_packageUsageLedger();
     init_appointmentLineItemSnapshot();
     init_commissionAccrual();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_packageUsageLedger();
     init_serializableTransaction();
     init_practitionerAuthority();
+    init_giftCards();
     init_waiverEvidence();
     checkoutInclude = {
       shop: true,
@@ -6098,8 +7001,8 @@ function toIsoString(value) {
   if (!value) return null;
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
-function formatCurrency3(cents) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(cents || 0) / 100);
+function formatCurrency3(cents2) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(cents2 || 0) / 100);
 }
 async function getPublicAppointment(_root, args, context) {
   const appointmentId = args.appointmentId?.trim();
@@ -6285,7 +7188,266 @@ var init_getPublicBookingEligibility = __esm({
   }
 });
 
+// features/keystone/mutations/reconcilePaymentSession.ts
+function reconciliationResult(row) {
+  return {
+    id: row.id,
+    paymentSessionId: row.paymentSessionId,
+    localStatusBefore: row.localStatusBefore,
+    remoteStatus: row.remoteStatus,
+    localStatusAfter: row.localStatusAfter,
+    changed: row.changed,
+    observedAt: row.observedAt.toISOString()
+  };
+}
+async function reconcileSessionInTransaction(transaction, input) {
+  const { shopId, paymentSessionId, eventKey, actorId } = input;
+  await transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", "barbershop-payment-session", paymentSessionId);
+  const replay = await transaction.paymentReconciliation.findUnique({ where: { eventKey } });
+  if (replay) {
+    if (replay.shopId !== shopId || replay.paymentSessionId !== paymentSessionId) throw new Error("Reconciliation idempotency key was already used.");
+    return replay;
+  }
+  const paymentSession = await transaction.paymentSession.findFirst({
+    where: { id: paymentSessionId, shopId },
+    include: { paymentProvider: true, transaction: true }
+  });
+  if (!paymentSession || !paymentSession.paymentProvider) throw new Error("Payment session or provider was not found.");
+  if (isOfflinePaymentProvider(paymentSession.paymentProvider)) {
+    throw new Error("Pay-in-person sessions have no processor status to reconcile. Record payment at checkout.");
+  }
+  if (!paymentSession.providerPaymentId) throw new Error("This session has no processor payment reference to reconcile.");
+  const providerResult = recordOf(await getPaymentStatus({
+    provider: paymentSession.paymentProvider,
+    paymentId: paymentSession.providerPaymentId,
+    amount: paymentSession.amount,
+    currency: paymentSession.currencyCode.toLowerCase(),
+    paymentSessionId: paymentSession.id,
+    appointmentId: paymentSession.appointmentId
+  }));
+  const remoteStatus = String(providerResult.status || "").toLowerCase();
+  const observed = REMOTE_STATUS[remoteStatus];
+  if (!observed) throw new Error("The provider returned a payment status that cannot be reconciled automatically.");
+  if (providerResult.amount != null && Number(providerResult.amount) !== paymentSession.amount) {
+    throw new Error("The provider reported a different amount. Review this payment with the provider.");
+  }
+  if (typeof providerResult.currency === "string" && providerResult.currency.toUpperCase() !== paymentSession.currencyCode.toUpperCase()) {
+    throw new Error("The provider reported a different currency. Review this payment with the provider.");
+  }
+  const before = String(paymentSession.status);
+  const reportedRefund = Number(providerResult.refundedAmount);
+  const refundKnown = Number.isSafeInteger(reportedRefund) && reportedRefund >= 0 && reportedRefund <= paymentSession.amount;
+  let next = before;
+  let refundedAmount = paymentSession.refundedAmount ?? 0;
+  if (observed !== before && ALLOWED[before]?.includes(observed)) {
+    if (observed === "refunded" || observed === "partially_refunded") {
+      if (refundKnown && reportedRefund > refundedAmount) {
+        refundedAmount = reportedRefund;
+        next = reportedRefund >= paymentSession.amount ? "refunded" : "partially_refunded";
+      }
+    } else {
+      next = observed;
+    }
+  } else if (before === "partially_refunded" && observed === "partially_refunded" && refundKnown && reportedRefund > refundedAmount) {
+    refundedAmount = reportedRefund;
+  }
+  const changed = next !== before || refundedAmount !== (paymentSession.refundedAmount ?? 0);
+  const observedAt = /* @__PURE__ */ new Date();
+  if (changed) {
+    await lockAppointmentMoney(transaction, paymentSession.appointmentId);
+    await transaction.paymentSession.update({
+      where: { id: paymentSession.id },
+      data: {
+        status: next,
+        refundedAmount,
+        ...next === "captured" && !paymentSession.capturedAt ? { capturedAt: observedAt } : {}
+      }
+    });
+    const appointment = paymentSession.appointmentId ? await transaction.appointment.findFirst({ where: { id: paymentSession.appointmentId, shopId }, select: { id: true, paymentStatus: true, transactionId: true } }) : null;
+    if (appointment && recordOf(paymentSession.metadata).purpose !== "desk_card" && !appointmentSettledElsewhere(appointment.paymentStatus) && next === "captured") {
+      await transaction.appointment.update({ where: { id: appointment.id }, data: { paymentStatus: "deposit_paid" } });
+    }
+    if (appointment && next === "refunded" && appointment.paymentStatus === "deposit_paid" && !appointment.transactionId) {
+      await transaction.appointment.update({ where: { id: appointment.id }, data: { paymentStatus: "refunded" } });
+    }
+    if (paymentSession.transaction?.id && ["partially_refunded", "refunded"].includes(next)) {
+      await transaction.checkoutTransaction.update({ where: { id: paymentSession.transaction.id }, data: { status: next } });
+    }
+  }
+  const providerPayloadHash = (0, import_node_crypto8.createHash)("sha256").update(canonicalJson(providerResult)).digest("hex");
+  const created = await transaction.paymentReconciliation.create({ data: {
+    shopId,
+    eventKey,
+    paymentSessionId: paymentSession.id,
+    localStatusBefore: before,
+    remoteStatus,
+    localStatusAfter: next,
+    changed,
+    amount: paymentSession.amount,
+    providerPayloadHash,
+    observedAt
+  } });
+  await recordCommandReceipt(transaction, buildCommandReceipt({
+    actorId: actorId || void 0,
+    eventKey: `${eventKey}:receipt`,
+    eventType: "payment_session.reconciled",
+    aggregateType: "payment_session",
+    aggregateId: paymentSession.id,
+    shopId,
+    occurredAt: observedAt,
+    data: { reconciliation: { id: created.id, localStatusBefore: before, remoteStatus, localStatusAfter: next, changed, amount: paymentSession.amount, refundedAmount } }
+  }));
+  return created;
+}
+async function reconcilePaymentSession(_root, args, context) {
+  if (!permissions.canManagePayments({ session: context.session })) return { success: false, error: "Not authorized to reconcile payments.", reconciliation: null };
+  const idempotencyKey = args.idempotencyKey?.trim() || "";
+  if (!args.paymentSessionId?.trim() || !idempotencyKey || idempotencyKey.length > 200) return { success: false, error: "Payment session and idempotency key are required.", reconciliation: null };
+  try {
+    const shopId = await requireCurrentShopPermission(context.session, "canManagePayments");
+    const commandHash = hashPublicAccessToken(idempotencyKey);
+    const reconciliation = await runSerializableTransaction(context.prisma, async (client) => {
+      const transaction = client;
+      await requireCurrentShopPermission(context.session, "canManagePayments", transaction);
+      const eventKey = `payment-reconciliation:${commandHash}:v1`;
+      return reconcileSessionInTransaction(transaction, { shopId, paymentSessionId: args.paymentSessionId, eventKey, actorId: context.session?.itemId });
+    });
+    return { success: true, error: null, reconciliation: reconciliationResult(reconciliation) };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Unable to reconcile payment.", reconciliation: null };
+  }
+}
+var import_node_crypto8, REMOTE_STATUS, ALLOWED;
+var init_reconcilePaymentSession = __esm({
+  "features/keystone/mutations/reconcilePaymentSession.ts"() {
+    "use strict";
+    import_node_crypto8 = require("node:crypto");
+    init_access();
+    init_currentAuthorization();
+    init_commandReceipt();
+    init_paymentProviderAdapter();
+    init_publicAccessToken();
+    init_serializableTransaction();
+    init_paymentSessionResult();
+    REMOTE_STATUS = {
+      pending: "pending",
+      authorized: "authorized",
+      captured: "captured",
+      paid: "captured",
+      succeeded: "captured",
+      partially_refunded: "partially_refunded",
+      refunded: "refunded",
+      cancelled: "cancelled",
+      canceled: "cancelled",
+      expired: "expired",
+      failed: "failed"
+    };
+    ALLOWED = {
+      pending: ["authorized", "captured", "failed", "cancelled", "expired"],
+      authorized: ["captured", "failed", "cancelled", "expired"],
+      captured: ["partially_refunded", "refunded"],
+      partially_refunded: ["partially_refunded", "refunded"]
+    };
+  }
+});
+
+// features/keystone/utils/expireStalePaymentSessions.ts
+async function expireAtStripe(checkoutId) {
+  if (!checkoutId || !process.env.STRIPE_SECRET_KEY) return;
+  await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(checkoutId)}/expire`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` },
+    redirect: "error"
+  }).catch(() => void 0);
+}
+async function closeOpenDepositSessions(tx, appointmentId) {
+  const open = await tx.paymentSession.findMany({ where: { appointmentId, status: "pending" }, include: { paymentProvider: true } });
+  const online = open.filter((row) => row.metadata?.purpose !== "desk_card" && row.paymentProvider && !isOfflinePaymentProvider(row.paymentProvider));
+  if (!online.length) return [];
+  await tx.paymentSession.updateMany({ where: { id: { in: online.map((row) => row.id) }, status: "pending" }, data: { status: "expired", cancelledAt: /* @__PURE__ */ new Date() } });
+  return online.map((row) => row.providerPaymentId).filter((id) => Boolean(id));
+}
+function triggerPaymentSweep(prisma, shopId) {
+  if (!shopId || process.env.NODE_ENV === "test") return;
+  const last = lastSweep.get(shopId) || 0;
+  if (Date.now() - last < SWEEP_EVERY_MS || running.has(shopId)) return;
+  void expireStalePaymentSessions(prisma, shopId).catch((error) => console.error("Payment sweep failed:", error));
+}
+async function expireStalePaymentSessions(prisma, shopId, now = /* @__PURE__ */ new Date(), options = {}) {
+  return (await sweepStalePaymentSessions(prisma, shopId, now, options)).expired;
+}
+async function sweepStalePaymentSessions(prisma, shopId, now = /* @__PURE__ */ new Date(), options = {}) {
+  const result = { expired: 0, reconciled: 0, checked: 0 };
+  const last = lastSweep.get(shopId) || 0;
+  if (!options.force && now.getTime() - last < SWEEP_EVERY_MS) return result;
+  if (running.has(shopId)) return result;
+  lastSweep.set(shopId, now.getTime());
+  running.add(shopId);
+  try {
+    const stale = await prisma.paymentSession.findMany({
+      where: { shopId, status: { in: ["pending", "authorized"] }, OR: [{ expiresAt: { lt: now } }, { expiresAt: null, createdAt: { lt: new Date(now.getTime() - DEFAULT_LIFETIME_MS) } }] },
+      include: { paymentProvider: { select: { code: true } } },
+      take: 50,
+      orderBy: { createdAt: "asc" }
+    });
+    for (const session of stale) {
+      if (!session.paymentProvider || isOfflinePaymentProvider(session.paymentProvider)) continue;
+      result.checked += 1;
+      try {
+        if (session.providerPaymentId) {
+          const remote = await getPaymentStatus({ provider: { code: session.paymentProvider.code }, paymentId: session.providerPaymentId });
+          if (remote.status === "captured" || remote.status === "paid" || remote.status === "succeeded") {
+            if ("$transaction" in prisma) {
+              const row = await runSerializableTransaction(prisma, (client) => reconcileSessionInTransaction(client, {
+                shopId,
+                paymentSessionId: session.id,
+                eventKey: `payment-reconciliation:auto:${session.id}:captured:v1`,
+                actorId: null
+              }));
+              if (row.changed) result.reconciled += 1;
+            }
+            continue;
+          }
+          if (remote.status !== "expired") await expireAtStripe(session.providerPaymentId);
+        }
+        const updated = await prisma.paymentSession.updateMany({ where: { id: session.id, status: { in: ["pending", "authorized"] } }, data: { status: "expired", cancelledAt: now } });
+        result.expired += updated.count;
+      } catch {
+      }
+    }
+  } finally {
+    running.delete(shopId);
+  }
+  return result;
+}
+var lastSweep, SWEEP_EVERY_MS, DEFAULT_LIFETIME_MS, running;
+var init_expireStalePaymentSessions = __esm({
+  "features/keystone/utils/expireStalePaymentSessions.ts"() {
+    "use strict";
+    init_reconcilePaymentSession();
+    init_paymentProviderAdapter();
+    init_serializableTransaction();
+    lastSweep = /* @__PURE__ */ new Map();
+    SWEEP_EVERY_MS = 5 * 6e4;
+    DEFAULT_LIFETIME_MS = 24 * 36e5;
+    running = /* @__PURE__ */ new Set();
+  }
+});
+
 // features/keystone/queries/getPublicServices.ts
+async function applyUploadedImages(context, list49, field, rows) {
+  const ids = [...new Set(rows.map((row) => String(row.id || "")).filter(Boolean))];
+  if (!ids.length) return;
+  const found = await context.sudo().query[list49].findMany({ where: { id: { in: ids } }, query: `id ${field} { url }` });
+  const urls = new Map(found.flatMap((item) => {
+    const url = item[field]?.url;
+    return url ? [[item.id, url]] : [];
+  }));
+  for (const row of rows) {
+    const url = urls.get(String(row.id || ""));
+    if (url) row.imagePath = url;
+  }
+}
 async function canonicalPublicShopId(context) {
   const shop = await resolvePublishedShop(context.sudo().prisma, { id: true });
   return shop?.id || "";
@@ -6293,7 +7455,8 @@ async function canonicalPublicShopId(context) {
 async function getPublicServiceCatalog(_root, _args, context) {
   const shopId = await canonicalPublicShopId(context);
   if (!shopId) return [];
-  return context.sudo().prisma.serviceCategory.findMany({
+  triggerPaymentSweep(context.sudo().prisma, shopId);
+  const categories = await context.sudo().prisma.serviceCategory.findMany({
     where: { shopId, status: "active" },
     orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
     select: {
@@ -6322,11 +7485,17 @@ async function getPublicServiceCatalog(_root, _args, context) {
       }
     }
   });
+  const services = categories.flatMap((category) => category.services || []);
+  await Promise.all([
+    applyUploadedImages(context, "Service", "image", services),
+    applyUploadedImages(context, "Barber", "photo", services.flatMap((service) => service.specialists || []))
+  ]);
+  return categories;
 }
 async function getPublicBarbers(_root, _args, context) {
   const shopId = await canonicalPublicShopId(context);
   if (!shopId) return [];
-  return context.sudo().prisma.barber.findMany({
+  const barbers = await context.sudo().prisma.barber.findMany({
     where: { shopId, status: "active", bookingEnabled: true },
     orderBy: { displayName: "asc" },
     select: {
@@ -6353,11 +7522,16 @@ async function getPublicBarbers(_root, _args, context) {
       }
     }
   });
+  await Promise.all([
+    applyUploadedImages(context, "Barber", "photo", barbers),
+    applyUploadedImages(context, "Service", "image", barbers.flatMap((barber) => barber.specialties || []))
+  ]);
+  return barbers;
 }
 async function getPublicProducts(_root, _args, context) {
   const shopId = await canonicalPublicShopId(context);
   if (!shopId) return [];
-  return context.sudo().prisma.product.findMany({
+  const products = await context.sudo().prisma.product.findMany({
     where: { shopId, status: "active" },
     orderBy: { name: "asc" },
     take: 24,
@@ -6371,10 +7545,13 @@ async function getPublicProducts(_root, _args, context) {
       imagePath: true
     }
   });
+  await applyUploadedImages(context, "Product", "image", products);
+  return products;
 }
 var init_getPublicServices = __esm({
   "features/keystone/queries/getPublicServices.ts"() {
     "use strict";
+    init_expireStalePaymentSessions();
     init_publicShop();
   }
 });
@@ -6395,26 +7572,14 @@ var init_storefront_settings = __esm({
     "use strict";
     STOREFRONT_BRAND_PRESETS = {
       amber: {
-        label: "Warm amber",
-        swatch: "#c9822f",
+        label: "Cobalt",
+        swatch: "#155eef",
         variables: {
-          "--color-paper": "oklch(96% 0.014 79)",
-          "--color-paper-2": "oklch(91% 0.021 75)",
-          "--color-paper-3": "oklch(84% 0.031 68)",
-          "--color-ink": "oklch(18% 0.024 52)",
-          "--color-ink-2": "oklch(31% 0.026 54)",
-          "--color-ink-muted": "oklch(44% 0.022 57)",
-          "--color-rule": "oklch(78% 0.021 68)",
-          "--color-rule-strong": "oklch(60% 0.03 62)",
-          "--color-accent": "oklch(69% 0.125 70)",
-          "--color-accent-hover": "oklch(62% 0.135 62)",
-          "--color-accent-ink": "oklch(18% 0.024 52)",
-          "--color-accent-soft": "oklch(90% 0.052 73)",
-          "--color-inverse": "oklch(16% 0.023 50)",
-          "--color-inverse-2": "oklch(22% 0.027 51)",
-          "--color-inverse-ink": "oklch(95% 0.014 79)",
-          "--color-inverse-muted": "oklch(77% 0.022 72)",
-          "--color-focus": "oklch(72% 0.16 82)"
+          "--color-accent": "oklch(50% 0.2 263)",
+          "--color-accent-hover": "oklch(43% 0.19 263)",
+          "--color-accent-ink": "oklch(98% 0.01 263)",
+          "--color-accent-soft": "oklch(92% 0.04 263)",
+          "--color-focus": "oklch(60% 0.2 263)"
         }
       },
       indigo: {
@@ -6512,6 +7677,33 @@ var init_getStorefrontSettings = __esm({
   }
 });
 
+// features/keystone/utils/walkInCapacity.ts
+async function walkInStatus(client, shop, now = /* @__PURE__ */ new Date()) {
+  const prisma = client;
+  const timeZone = shop.timezone || "UTC";
+  const today = dayKeyForDate(shopDateKey(now, timeZone), timeZone);
+  const minute = shopMinute(now, timeZone);
+  const opensAt = nextPostedOpening(shop.hours, today, minute);
+  const window = postedDayWindow(shop.hours, today);
+  if (window === "closed" || window && (minute < window.startMinute || minute >= window.endMinute)) return { open: false, barbersOnNow: 0, opensAt, onNowIds: [] };
+  const [barbers, exceptions] = await Promise.all([
+    prisma.barber.findMany({ where: { shopId: shop.id, status: "active", bookingEnabled: true }, select: { id: true, schedules: { where: { dayOfWeek: today, isWorking: true }, select: { dayOfWeek: true, isWorking: true, startMinute: true, endMinute: true, breakStartMinute: true, breakEndMinute: true } } } }),
+    prisma.scheduleException.findMany({ where: { shopId: shop.id, status: "active", startsAt: { lte: now }, endsAt: { gt: now }, exceptionType: { in: ["shop_closure", "time_off"] } }, select: { exceptionType: true, barberId: true, chairId: true } })
+  ]);
+  if (exceptions.some((item) => item.exceptionType === "shop_closure" && !item.barberId && !item.chairId)) return { open: false, barbersOnNow: 0, opensAt, onNowIds: [] };
+  const away = new Set(exceptions.filter((item) => item.exceptionType === "time_off" && item.barberId).map((item) => item.barberId));
+  const onNowIds = barbers.filter((barber) => !away.has(barber.id) && barber.schedules.some((schedule) => (schedule.startMinute ?? 0) <= minute && minute < (schedule.endMinute ?? 0) && !(schedule.breakStartMinute != null && schedule.breakEndMinute != null && minute >= schedule.breakStartMinute && minute < schedule.breakEndMinute))).map((barber) => barber.id);
+  return { open: onNowIds.length > 0, barbersOnNow: onNowIds.length, opensAt, onNowIds };
+}
+var init_walkInCapacity = __esm({
+  "features/keystone/utils/walkInCapacity.ts"() {
+    "use strict";
+    init_shop_hours();
+    init_shop_time();
+    init_availability();
+  }
+});
+
 // features/keystone/queries/getPublicQueue.ts
 function toIsoString2(value) {
   if (!value) return null;
@@ -6531,10 +7723,11 @@ function publicQueueItem(item) {
 }
 async function getPublicQueue(_root, _args, context) {
   const prisma = context.sudo().prisma;
-  const shop = await resolvePublishedShop(prisma, { id: true });
+  const shop = await resolvePublishedShop(prisma, { id: true, timezone: true });
   if (!shop) return [];
+  const { start } = shopDayRange(/* @__PURE__ */ new Date(), shop.timezone || "UTC");
   const items = await prisma.walkInQueueEntry.findMany({
-    where: { shopId: shop.id, status: { in: ["waiting", "texted", "in_chair"] } },
+    where: { shopId: shop.id, status: { in: ["waiting", "texted", "in_chair"] }, checkedInAt: { gte: start } },
     orderBy: { checkedInAt: "asc" },
     take: 100,
     select: {
@@ -6581,11 +7774,19 @@ async function getPublicQueueEntry(_root, args, context) {
   }
   return publicQueueItem(item);
 }
+async function getPublicWalkInStatus(_root, _args, context) {
+  const prisma = context.sudo().prisma;
+  const shop = await resolvePublishedShop(prisma, { id: true, timezone: true, hours: true });
+  if (!shop) return { open: false, barbersOnNow: 0, opensAt: null, onNowIds: [] };
+  return walkInStatus(prisma, shop);
+}
 var init_getPublicQueue = __esm({
   "features/keystone/queries/getPublicQueue.ts"() {
     "use strict";
     init_publicAccessToken();
     init_publicShop();
+    init_shop_time();
+    init_walkInCapacity();
   }
 });
 
@@ -6599,13 +7800,13 @@ function rejected(error) {
 async function createPublicQueueEntry(_root, args, context) {
   const customerName = clean3(args.customerName);
   const phone = clean3(args.phone);
-  const phoneKey = phone.replace(/\D/g, "");
+  const phoneKey2 = phone.replace(/\D/g, "");
   const requestedServiceId = clean3(args.requestedServiceId);
   const requestedBarberId = clean3(args.requestedBarberId);
   const partySize = args.partySize == null ? 1 : Number(args.partySize);
   const clientToken = clean3(args.accessToken);
   if (customerName.length < 2 || customerName.length > 120) return rejected("Enter a valid name.");
-  if (phoneKey.length < 7 || phone.length > 40) return rejected("Enter a valid phone number.");
+  if (phoneKey2.length < 7 || phone.length > 40) return rejected("Enter a valid phone number.");
   if (!Number.isInteger(partySize) || partySize < 1 || partySize > 8) return rejected("Party size must be between 1 and 8.");
   if (clientToken && !CLIENT_TOKEN_PATTERN.test(clientToken)) return rejected("Unable to join the queue. Reload the page and try again.");
   const prisma = context.prisma;
@@ -6613,10 +7814,10 @@ async function createPublicQueueEntry(_root, args, context) {
   try {
     const queueEntry = await runSerializableTransaction(prisma, async (client) => {
       const transaction = client;
-      const publishedShop = await resolvePublishedShop(transaction, { id: true });
+      const publishedShop = await resolvePublishedShop(transaction, { id: true, timezone: true, hours: true });
       if (!publishedShop) throw new QueueRejected("The walk-in queue is not open online right now. Contact the shop.");
       const shopId = publishedShop.id;
-      await transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", "barbershop-public-queue", `${shopId}:${phoneKey}`);
+      await transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", "barbershop-public-queue", `${shopId}:${phoneKey2}`);
       if (clientToken) {
         const original = await transaction.walkInQueueEntry.findFirst({ where: { shopId, publicAccessTokenHash: access.hash }, select: QUEUE_ENTRY_SELECT });
         if (original) {
@@ -6625,6 +7826,10 @@ async function createPublicQueueEntry(_root, args, context) {
           }
           return original;
         }
+      }
+      if (!clientToken || !await transaction.walkInQueueEntry.findFirst({ where: { shopId, publicAccessTokenHash: access.hash }, select: { id: true } })) {
+        const status = await walkInStatus(transaction, publishedShop);
+        if (!status.open) throw new QueueRejected(`Walk-ins are closed right now.${status.opensAt ? ` ${status.opensAt}.` : ""}`);
       }
       const [service, barber] = await Promise.all([
         requestedServiceId ? transaction.service.findUnique({ where: { id: requestedServiceId }, select: { id: true, status: true, shopId: true, specialists: { select: { id: true } } } }) : null,
@@ -6639,7 +7844,7 @@ async function createPublicQueueEntry(_root, args, context) {
         `SELECT id FROM "WalkInQueueEntry" WHERE "shop" = $1 AND status::text = ANY($2::text[]) AND regexp_replace(phone, '[^0-9]', '', 'g') = $3 LIMIT 1`,
         shopId,
         [...ACTIVE_QUEUE_STATUSES],
-        phoneKey
+        phoneKey2
       );
       if (duplicates.length) throw new QueueRejected("This phone number is already in the queue. Contact the shop if you need help.");
       const created = await transaction.walkInQueueEntry.create({
@@ -6657,7 +7862,7 @@ async function createPublicQueueEntry(_root, args, context) {
         },
         select: QUEUE_ENTRY_SELECT
       });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         eventKey: `queue:${created.id}:checked_in:v1`,
         eventType: "queue.checked_in",
         aggregateType: "walk_in_queue_entry",
@@ -6699,9 +7904,10 @@ var init_createPublicQueueEntry = __esm({
   "features/keystone/mutations/createPublicQueueEntry.ts"() {
     "use strict";
     init_publicAccessToken();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_publicShop();
     init_serializableTransaction();
+    init_walkInCapacity();
     ACTIVE_QUEUE_STATUSES = ["waiting", "texted", "in_chair"];
     CLIENT_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
     QueueRejected = class extends Error {
@@ -6736,9 +7942,7 @@ var init_context = __esm({
     init_keystone();
     PrismaModule = __toESM(require("@prisma/client"));
     keystoneContext = globalThis.keystoneContext ?? (0, import_context.getContext)(keystone_default, PrismaModule);
-    if (process.env.NODE_ENV !== "production") {
-      globalThis.keystoneContext = keystoneContext;
-    }
+    globalThis.keystoneContext = keystoneContext;
   }
 });
 
@@ -6772,14 +7976,14 @@ function loadSeed() {
 function selectSeedMode(seed, mode) {
   if (mode === "full") return seed;
   const categories = (seed.serviceCategories ?? []).slice(0, 2);
-  const categoryNames = new Set(categories.map((item) => text46(item.name)));
-  const services = (seed.services ?? []).filter((item) => categoryNames.has(text46(item.category))).slice(0, 3);
-  const serviceNames = new Set(services.map((item) => text46(item.name)));
+  const categoryNames = new Set(categories.map((item) => text47(item.name)));
+  const services = (seed.services ?? []).filter((item) => categoryNames.has(text47(item.category))).slice(0, 3);
+  const serviceNames = new Set(services.map((item) => text47(item.name)));
   const barbers = (seed.barbers ?? []).slice(0, 1).map((item) => ({
     ...item,
-    specialties: Array.isArray(item.specialties) ? item.specialties.filter((name) => serviceNames.has(text46(name))) : []
+    specialties: Array.isArray(item.specialties) ? item.specialties.filter((name) => serviceNames.has(text47(name))) : []
   }));
-  const barberNames = new Set(barbers.map((item) => text46(item.displayName)));
+  const barberNames = new Set(barbers.map((item) => text47(item.displayName)));
   return {
     shop: seed.shop,
     paymentProviders: (seed.paymentProviders ?? []).slice(0, 1),
@@ -6790,7 +7994,7 @@ function selectSeedMode(seed, mode) {
     barbers,
     products: (seed.products ?? []).slice(0, 1),
     suppliers: (seed.suppliers ?? []).slice(0, 1),
-    schedules: (seed.schedules ?? []).filter((item) => barberNames.has(text46(item.barber))),
+    schedules: (seed.schedules ?? []).filter((item) => barberNames.has(text47(item.barber))),
     servicePackages: [],
     membershipPlans: []
   };
@@ -6799,7 +8003,7 @@ function stat(stats, key, field = "created") {
   stats[key] ??= { created: 0, reused: 0, skipped: 0 };
   stats[key][field] = (stats[key][field] ?? 0) + 1;
 }
-function text46(value, fallback = "") {
+function text47(value, fallback = "") {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 function numberValue(value, fallback = 0) {
@@ -6807,13 +8011,13 @@ function numberValue(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 function buildDemoPractitionerCredentialSeeds(barbers, jurisdictionCode) {
-  const jurisdiction = text46(jurisdictionCode, "US-NY");
+  const jurisdiction = text47(jurisdictionCode, "US-NY");
   return barbers.flatMap((barber) => {
-    const barberName = text46(barber.displayName);
-    const specialties = Array.isArray(barber.specialties) ? barber.specialties.map((service) => text46(service)).filter(Boolean) : [];
+    const barberName = text47(barber.displayName);
+    const specialties = Array.isArray(barber.specialties) ? barber.specialties.map((service) => text47(service)).filter(Boolean) : [];
     return specialties.map((serviceName) => {
       const seedKey = `${jurisdiction}:${barberName}:${serviceName}`;
-      const keyHash = (0, import_node_crypto7.createHash)("sha256").update(seedKey).digest("hex");
+      const keyHash = (0, import_node_crypto9.createHash)("sha256").update(seedKey).digest("hex");
       return {
         barberName,
         serviceName,
@@ -6822,7 +8026,7 @@ function buildDemoPractitionerCredentialSeeds(barbers, jurisdictionCode) {
         issuingAuthority: "DEMO ONLY \u2014 onboarding authority fixture; not a licensing authority",
         jurisdictionCode: jurisdiction,
         scopeDescription: `DEMO ONLY \u2014 seeded authority for ${barberName} to provide ${serviceName}; not legal credential proof`,
-        evidenceHash: (0, import_node_crypto7.createHash)("sha256").update(`demo-practitioner-authority:${seedKey}:v1`).digest("hex"),
+        evidenceHash: (0, import_node_crypto9.createHash)("sha256").update(`demo-practitioner-authority:${seedKey}:v1`).digest("hex"),
         status: "active",
         effectiveFrom: "2020-01-01T00:00:00.000Z",
         expiresAt: "2099-12-31T23:59:59.000Z",
@@ -6877,32 +8081,51 @@ function slugify(value) {
   return value.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "barbershop";
 }
 function seedShopData(shop) {
-  const timezone = text46(shop.timezone, "America/New_York");
+  const timezone = text47(shop.timezone, "America/New_York");
   try {
     new Intl.DateTimeFormat("en", { timeZone: timezone }).format();
   } catch {
     throw new Error("Timezone must be a valid IANA timezone.");
   }
-  const currencyCode = text46(shop.currencyCode, "USD");
+  const currencyCode = text47(shop.currencyCode, "USD");
   assertUsdSettlementCurrency(currencyCode);
-  const logoIcon = typeof shop.logoIcon === "string" && shop.logoIcon.trim() ? sanitizeStoreLogoSvg(shop.logoIcon) : "";
-  if (typeof shop.logoIcon === "string" && shop.logoIcon.trim() && !logoIcon) throw new Error("Invalid SVG format.");
+  const logoIcon = sanitizeStoreLogoSvg(typeof shop.logoIcon === "string" && shop.logoIcon.trim() ? shop.logoIcon : DEFAULT_STORE_LOGO_ICON);
+  if (!logoIcon) throw new Error("Invalid SVG format.");
   return {
-    name: text46(shop.name, "Barbershop"),
-    legalName: text46(shop.legalName, text46(shop.name, "Barbershop")),
+    name: text47(shop.name, "Barbershop"),
+    legalName: text47(shop.legalName, text47(shop.name, "Barbershop")),
     status: "active",
-    tagline: text46(shop.tagline),
-    address: text46(shop.address),
-    phone: text46(shop.phone),
+    tagline: text47(shop.tagline),
+    address: text47(shop.address),
+    phone: text47(shop.phone),
     timezone,
     currencyCode,
-    jurisdictionCode: text46(shop.jurisdictionCode, "US-NY"),
+    jurisdictionCode: text47(shop.jurisdictionCode, "US-NY"),
     hours: shop.hours ?? {},
-    brandColor: text46(shop.brandColor, "amber"),
-    ...logoIcon ? { logoIcon } : {},
-    ...shop.logoColor !== void 0 ? { logoColor: normalizeStoreLogoColor(shop.logoColor) } : {},
-    isDemo: true
+    brandColor: text47(shop.brandColor, "amber"),
+    logoIcon,
+    logoColor: normalizeStoreLogoColor(shop.logoColor ?? DEFAULT_STORE_LOGO_COLOR),
+    isDemo: shop.isDemo !== false
   };
+}
+function applyShopDetails(shop, details) {
+  const name = text47(details?.name).trim();
+  const address = text47(details?.address).trim();
+  const phone = text47(details?.phone).trim();
+  const timezone = text47(details?.timezone).trim();
+  if (name.length > 120 || address.length > 200 || phone.length > 40) throw new Error("Shop details are too long.");
+  if (timezone) {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: timezone });
+    } catch {
+      throw new Error("Choose a valid timezone.");
+    }
+  }
+  if (!name) return { ...shop, ...address ? { address } : {}, ...phone ? { phone } : {}, ...timezone ? { timezone } : {} };
+  const rest = { ...shop };
+  delete rest.slug;
+  delete rest.tagline;
+  return { ...rest, name, legalName: name, address, phone, ...timezone ? { timezone } : {}, isDemo: false };
 }
 async function resolveCallerShop(stats, userId, shopSeed) {
   const client = getPrismaClient();
@@ -6922,10 +8145,10 @@ async function resolveCallerShop(stats, userId, shopSeed) {
       return { id: selected.shop.id, jurisdictionCode: selected.shop.jurisdictionCode, created: false };
     }
     const data = seedShopData(shopSeed);
-    const baseSlug = slugify(text46(shopSeed.slug, data.name));
+    const baseSlug = slugify(text47(shopSeed.slug, data.name));
     let slug = baseSlug;
     for (let attempt = 0; attempt < 5 && await transaction.shop.findUnique({ where: { slug }, select: { id: true } }); attempt += 1) {
-      slug = `${baseSlug}-${(0, import_node_crypto7.randomBytes)(3).toString("hex")}`;
+      slug = `${baseSlug}-${(0, import_node_crypto9.randomBytes)(3).toString("hex")}`;
     }
     const otherPublicShop = await transaction.shop.findFirst({ where: { status: "active", isPublic: true }, select: { id: true } });
     const shop = await transaction.shop.create({
@@ -6945,26 +8168,27 @@ async function resolveCallerShop(stats, userId, shopSeed) {
 }
 async function resolveCliShop(stats, shopSeed) {
   const data = seedShopData(shopSeed);
-  const slug = slugify(text46(shopSeed.slug, data.name));
+  const slug = slugify(text47(shopSeed.slug, data.name));
   const shop = await findOrCreate(stats, "Shop", { slug: { equals: slug } }, { ...data, slug, isPublic: true }, "id jurisdictionCode");
-  return { id: shop.id, jurisdictionCode: text46(shop.jurisdictionCode, data.jurisdictionCode), created: false };
+  return { id: shop.id, jurisdictionCode: text47(shop.jurisdictionCode, data.jurisdictionCode), created: false };
 }
-async function refreshSeedSession(userId) {
+async function refreshedSeedSession(userId) {
   const context = seedContextStorage.getStore();
-  if (!context?.withSession) return;
+  if (!context?.withSession) return void 0;
   const [current] = await getSudoContext().query.User.findMany({
     where: { id: { equals: userId } },
     take: 1,
     query: `id name activeShop { id slug status } shopMemberships { id status membershipRole shop { id slug status } } role { id name canSeeOtherPeople canEditOtherPeople canManagePeople canManageRoles canAccessDashboard canManageOnboarding canManageServices canManageStaff canManageSchedules canManageAppointments canManageQueue canManageCustomers canManageCustomerNotes canManageMemberships canManagePayments canViewReports }`
   });
   if (!current) throw new Error("Onboarding account is unavailable.");
-  seedContextStorage.enterWith(context.withSession({ itemId: userId, listKey: "User", data: current }));
+  return context.withSession({ itemId: userId, listKey: "User", data: current });
 }
 async function runBarbershopSeed({
   mode = "full",
   apply = false,
   context,
-  requireLocalDatabase = false
+  requireLocalDatabase = false,
+  shopDetails = null
 }) {
   return seedContextStorage.run(context, async () => {
     const runtime = requireLocalDatabase ? assertSafeLocalSeedDatabase() : describeSeedDatabase();
@@ -6995,10 +8219,14 @@ async function runBarbershopSeed({
     const barberIds = {};
     const productIdsBySku = {};
     const userId = getSeedSessionUserId();
-    const shop = userId ? await resolveCallerShop(stats, userId, seed.shop) : await resolveCliShop(stats, seed.shop);
+    const shopSeed = applyShopDetails(seed.shop, shopDetails);
+    const shop = userId ? await resolveCallerShop(stats, userId, shopSeed) : await resolveCliShop(stats, shopSeed);
     const shopId = shop.id;
-    const shopJurisdictionCode = text46(shop.jurisdictionCode, text46(seed.shop.jurisdictionCode, "US-NY"));
-    if (userId) await refreshSeedSession(userId);
+    const shopJurisdictionCode = text47(shop.jurisdictionCode, text47(seed.shop.jurisdictionCode, "US-NY"));
+    if (userId) {
+      const refreshed = await refreshedSeedSession(userId);
+      if (refreshed) seedContextStorage.enterWith(refreshed);
+    }
     for (const policy of seed.bookingPolicies ?? []) {
       const existing = await findFirst("BookingPolicy", { shop: { id: { equals: shopId } } }, "id status");
       if (existing) {
@@ -7008,21 +8236,21 @@ async function runBarbershopSeed({
       await findOrCreate(
         stats,
         "BookingPolicy",
-        { shop: { id: { equals: shopId } }, version: { equals: text46(policy.version, "v1") } },
+        { shop: { id: { equals: shopId } }, version: { equals: text47(policy.version, "v1") } },
         {
           shop: optionalConnect(shopId),
-          name: text46(policy.name, "Standard booking policy"),
-          version: text46(policy.version, "v1"),
+          name: text47(policy.name, "Standard booking policy"),
+          version: text47(policy.version, "v1"),
           jurisdictionCode: shopJurisdictionCode,
-          policyTextHash: text46(policy.policyTextHash),
+          policyTextHash: text47(policy.policyTextHash),
           status: "active",
-          effectiveFrom: text46(policy.effectiveFrom, (/* @__PURE__ */ new Date()).toISOString()),
+          effectiveFrom: text47(policy.effectiveFrom, (/* @__PURE__ */ new Date()).toISOString()),
           effectiveUntil: policy.effectiveUntil || null,
           cancellationWindowMinutes: numberValue(policy.cancellationWindowMinutes, 1440),
           rescheduleWindowMinutes: numberValue(policy.rescheduleWindowMinutes, 1440),
           lateCancellationFeeAmount: numberValue(policy.lateCancellationFeeAmount),
           rescheduleFeeAmount: numberValue(policy.rescheduleFeeAmount),
-          depositCancellationRule: text46(policy.depositCancellationRule, "manual_review"),
+          depositCancellationRule: text47(policy.depositCancellationRule, "manual_review"),
           maxCustomerReschedules: numberValue(policy.maxCustomerReschedules, 2)
         },
         "id status"
@@ -7030,7 +8258,7 @@ async function runBarbershopSeed({
     }
     if (hasPrismaDelegate("paymentProvider")) {
       for (const provider of seed.paymentProviders ?? []) {
-        const code = text46(provider.code);
+        const code = text47(provider.code);
         if (!code) continue;
         await findOrCreate(
           stats,
@@ -7038,17 +8266,17 @@ async function runBarbershopSeed({
           { shop: { id: { equals: shopId } }, code: { equals: code } },
           {
             shop: optionalConnect(shopId),
-            name: text46(provider.name, code),
+            name: text47(provider.name, code),
             code,
             isInstalled: provider.isInstalled ?? true,
             credentials: provider.credentials ?? {},
             metadata: provider.metadata ?? {},
-            createPaymentFunction: text46(provider.createPaymentFunction, "manual"),
-            capturePaymentFunction: text46(provider.capturePaymentFunction, "manual"),
-            refundPaymentFunction: text46(provider.refundPaymentFunction, "manual"),
-            getPaymentStatusFunction: text46(provider.getPaymentStatusFunction, "manual"),
-            generatePaymentLinkFunction: text46(provider.generatePaymentLinkFunction, "manual"),
-            handleWebhookFunction: text46(provider.handleWebhookFunction, "manual")
+            createPaymentFunction: text47(provider.createPaymentFunction, "manual"),
+            capturePaymentFunction: text47(provider.capturePaymentFunction, "manual"),
+            refundPaymentFunction: text47(provider.refundPaymentFunction, "manual"),
+            getPaymentStatusFunction: text47(provider.getPaymentStatusFunction, "manual"),
+            generatePaymentLinkFunction: text47(provider.generatePaymentLinkFunction, "manual"),
+            handleWebhookFunction: text47(provider.handleWebhookFunction, "manual")
           },
           "id code"
         );
@@ -7057,7 +8285,7 @@ async function runBarbershopSeed({
       stat(stats, "PaymentProvider", "skipped");
     }
     for (const policy of seed.noShowPolicies ?? []) {
-      const name = text46(policy.name);
+      const name = text47(policy.name);
       if (!name) continue;
       await findOrCreate(
         stats,
@@ -7066,16 +8294,16 @@ async function runBarbershopSeed({
         {
           shop: optionalConnect(shopId),
           name,
-          status: text46(policy.status, "active"),
+          status: text47(policy.status, "active"),
           feeAmount: numberValue(policy.feeAmount),
           graceMinutes: numberValue(policy.graceMinutes, 10),
           appliesToMemberships: Boolean(policy.appliesToMemberships),
-          description: text46(policy.description)
+          description: text47(policy.description)
         }
       );
     }
     for (const category of seed.serviceCategories ?? []) {
-      const name = text46(category.name);
+      const name = text47(category.name);
       if (!name) continue;
       const item = await findOrCreate(
         stats,
@@ -7084,15 +8312,15 @@ async function runBarbershopSeed({
         {
           shop: optionalConnect(shopId),
           name,
-          description: text46(category.description),
+          description: text47(category.description),
           displayOrder: numberValue(category.displayOrder),
-          status: text46(category.status, "active")
+          status: text47(category.status, "active")
         }
       );
       categoryIds[name] = item.id;
     }
     for (const service of seed.services ?? []) {
-      const name = text46(service.name);
+      const name = text47(service.name);
       if (!name) continue;
       const item = await findOrCreate(
         stats,
@@ -7101,25 +8329,25 @@ async function runBarbershopSeed({
         {
           shop: optionalConnect(shopId),
           name,
-          description: text46(service.description),
-          imagePath: text46(service.imagePath),
+          description: text47(service.description),
+          imagePath: text47(service.imagePath),
           durationMinutes: numberValue(service.durationMinutes, 30),
           price: numberValue(service.price),
           depositRequired: Boolean(service.depositRequired),
           depositAmount: numberValue(service.depositAmount),
-          status: text46(service.status, "active"),
+          status: text47(service.status, "active"),
           bookingBufferMinutes: numberValue(service.bookingBufferMinutes, 10),
-          color: text46(service.color, "#111827"),
-          category: optionalConnect(categoryIds[text46(service.category)])
+          color: text47(service.color, "#111827"),
+          category: optionalConnect(categoryIds[text47(service.category)])
         }
       );
       serviceIds[name] = item.id;
     }
     for (const barber of seed.barbers ?? []) {
-      const displayName = text46(barber.displayName);
+      const displayName = text47(barber.displayName);
       if (!displayName) continue;
-      const specialties = Array.isArray(barber.specialties) ? barber.specialties.map((name) => serviceIds[text46(name)]).filter(Boolean).map((id) => ({ id })) : [];
-      const chairNumber = text46(barber.chairNumber);
+      const specialties = Array.isArray(barber.specialties) ? barber.specialties.map((name) => serviceIds[text47(name)]).filter(Boolean).map((id) => ({ id })) : [];
+      const chairNumber = text47(barber.chairNumber);
       const chair = chairNumber ? await findOrCreate(
         stats,
         "BarberChair",
@@ -7134,13 +8362,13 @@ async function runBarbershopSeed({
           shop: optionalConnect(shopId),
           chair: optionalConnect(chair?.id),
           displayName,
-          legalName: text46(barber.legalName),
-          bio: text46(barber.bio),
-          imagePath: text46(barber.imagePath),
-          phone: text46(barber.phone),
-          email: text46(barber.email),
+          legalName: text47(barber.legalName),
+          bio: text47(barber.bio),
+          imagePath: text47(barber.imagePath),
+          phone: text47(barber.phone),
+          email: text47(barber.email),
           chairNumber,
-          status: text46(barber.status, "active"),
+          status: text47(barber.status, "active"),
           bookingEnabled: barber.bookingEnabled ?? true,
           bufferMinutes: numberValue(barber.bufferMinutes, 10),
           serviceCommissionRateBps: numberValue(barber.serviceCommissionRateBps),
@@ -7193,8 +8421,8 @@ async function runBarbershopSeed({
       );
     }
     for (const product of seed.products ?? []) {
-      const sku = text46(product.sku);
-      const name = text46(product.name);
+      const sku = text47(product.sku);
+      const name = text47(product.name);
       if (!sku || !name) continue;
       const item = await findOrCreate(
         stats,
@@ -7204,12 +8432,12 @@ async function runBarbershopSeed({
           shop: optionalConnect(shopId),
           name,
           sku,
-          status: text46(product.status, "active"),
-          productType: text46(product.productType, "other"),
+          status: text47(product.status, "active"),
+          productType: text47(product.productType, "other"),
           price: numberValue(product.price),
           cost: numberValue(product.cost),
-          description: text46(product.description),
-          imagePath: text46(product.imagePath),
+          description: text47(product.description),
+          imagePath: text47(product.imagePath),
           inventoryTracked: product.inventoryTracked ?? true,
           metadata: product.metadata ?? {}
         }
@@ -7217,7 +8445,7 @@ async function runBarbershopSeed({
       productIdsBySku[sku] = item.id;
     }
     for (const supplier of seed.suppliers ?? []) {
-      const name = text46(supplier.name);
+      const name = text47(supplier.name);
       if (!name) continue;
       await findOrCreate(
         stats,
@@ -7226,19 +8454,19 @@ async function runBarbershopSeed({
         {
           shop: optionalConnect(shopId),
           name,
-          status: text46(supplier.status, "active"),
-          contactName: text46(supplier.contactName),
-          email: text46(supplier.email),
-          phone: text46(supplier.phone),
-          website: text46(supplier.website),
-          notes: text46(supplier.notes),
+          status: text47(supplier.status, "active"),
+          contactName: text47(supplier.contactName),
+          email: text47(supplier.email),
+          phone: text47(supplier.phone),
+          website: text47(supplier.website),
+          notes: text47(supplier.notes),
           metadata: supplier.metadata ?? {}
         }
       );
     }
     for (const schedule of seed.schedules ?? []) {
-      const barberId = barberIds[text46(schedule.barber)];
-      const days = Array.isArray(schedule.days) ? schedule.days.map((day) => text46(day)).filter(Boolean) : [];
+      const barberId = barberIds[text47(schedule.barber)];
+      const days = Array.isArray(schedule.days) ? schedule.days.map((day) => text47(day)).filter(Boolean) : [];
       if (!barberId || days.length === 0) continue;
       for (const dayOfWeek of days) {
         await findOrCreate(
@@ -7253,13 +8481,13 @@ async function runBarbershopSeed({
             endMinute: numberValue(schedule.endMinute, 1020),
             breakStartMinute: numberValue(schedule.breakStartMinute, 0),
             breakEndMinute: numberValue(schedule.breakEndMinute, 0),
-            notes: text46(schedule.notes)
+            notes: text47(schedule.notes)
           }
         );
       }
     }
     for (const pack of seed.servicePackages ?? []) {
-      const name = text46(pack.name);
+      const name = text47(pack.name);
       if (!name) continue;
       const item = await findOrCreate(
         stats,
@@ -7268,14 +8496,14 @@ async function runBarbershopSeed({
         {
           shop: optionalConnect(shopId),
           name,
-          description: text46(pack.description),
+          description: text47(pack.description),
           price: numberValue(pack.price),
-          status: text46(pack.status, "active")
+          status: text47(pack.status, "active")
         }
       );
       const items = Array.isArray(pack.items) ? pack.items : [];
       for (const packItem of items) {
-        const serviceId = serviceIds[text46(packItem.service)];
+        const serviceId = serviceIds[text47(packItem.service)];
         if (!serviceId) continue;
         await findOrCreate(
           stats,
@@ -7290,7 +8518,7 @@ async function runBarbershopSeed({
       }
     }
     for (const plan of seed.membershipPlans ?? []) {
-      const name = text46(plan.name);
+      const name = text47(plan.name);
       if (!name) continue;
       await findOrCreate(
         stats,
@@ -7299,24 +8527,24 @@ async function runBarbershopSeed({
         {
           shop: optionalConnect(shopId),
           name,
-          description: text46(plan.description),
+          description: text47(plan.description),
           price: numberValue(plan.price),
-          billingInterval: text46(plan.billingInterval, "monthly"),
+          billingInterval: text47(plan.billingInterval, "monthly"),
           includedVisits: numberValue(plan.includedVisits, 1),
           discountPercent: numberValue(plan.discountPercent),
-          status: text46(plan.status, "active")
+          status: text47(plan.status, "active")
         }
       );
     }
     return { mode, runtime, summary, stats, dryRun: false };
   });
 }
-var import_node_async_hooks, import_node_crypto7, import_node_fs2, import_node_path2, REQUIRED_LOCAL_RUNTIME_DATABASE, SAFE_LOCAL_DB_HOSTS, seedPath, isDirectExecution, seedContextStorage;
+var import_node_async_hooks, import_node_crypto9, import_node_fs2, import_node_path2, REQUIRED_LOCAL_RUNTIME_DATABASE, SAFE_LOCAL_DB_HOSTS, seedPath, isDirectExecution, seedContextStorage;
 var init_seedBarbershopDemo = __esm({
   "features/platform/onboarding/scripts/seedBarbershopDemo.ts"() {
     "use strict";
     import_node_async_hooks = require("node:async_hooks");
-    import_node_crypto7 = require("node:crypto");
+    import_node_crypto9 = require("node:crypto");
     import_node_fs2 = __toESM(require("node:fs"));
     import_node_path2 = __toESM(require("node:path"));
     init_localFixtureAuthority();
@@ -7381,7 +8609,7 @@ async function runBarbershopOnboarding(_root, args, context) {
       where: { id: userId },
       data: { onboardingStatus: "in_progress" }
     });
-    const result = await runBarbershopSeed({ mode, apply: true, context });
+    const result = await runBarbershopSeed({ mode, apply: true, context, shopDetails: { name: args.shopName, address: args.shopAddress, phone: args.shopPhone, timezone: args.shopTimezone } });
     await sudo.db.User.updateOne({
       where: { id: userId },
       data: { onboardingStatus: "completed" }
@@ -7405,167 +8633,6 @@ var init_runBarbershopOnboarding = __esm({
     init_access();
     init_currentAuthorization();
     init_seedBarbershopDemo();
-  }
-});
-
-// features/integrations/payment/manual.ts
-var manual_exports = {};
-__export(manual_exports, {
-  capturePaymentFunction: () => capturePaymentFunction,
-  createPaymentFunction: () => createPaymentFunction,
-  generatePaymentLinkFunction: () => generatePaymentLinkFunction,
-  getPaymentStatusFunction: () => getPaymentStatusFunction,
-  handleWebhookFunction: () => handleWebhookFunction,
-  refundPaymentFunction: () => refundPaymentFunction
-});
-function asNumber(value, fallback = 0) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : fallback;
-}
-function asString(value, fallback = "") {
-  return typeof value === "string" && value.length > 0 ? value : fallback;
-}
-async function handleWebhookFunction() {
-  throw new Error("Pay-in-person payments do not accept webhooks.");
-}
-async function createPaymentFunction({ amount, currency }) {
-  return {
-    status: "pending",
-    data: {
-      status: "pending",
-      amount: asNumber(amount),
-      currency: asString(currency, "usd").toLowerCase(),
-      provider: "manual",
-      settlement: "offline"
-    }
-  };
-}
-async function capturePaymentFunction() {
-  throw new Error("Pay-in-person payments are not captured by a processor. Record the payment at checkout.");
-}
-async function refundPaymentFunction() {
-  throw new Error("Pay-in-person payments are not refunded by a processor. Record a cash refund from the checkout receipt.");
-}
-async function getPaymentStatusFunction() {
-  throw new Error("Pay-in-person payments have no processor status to check.");
-}
-async function generatePaymentLinkFunction() {
-  return null;
-}
-var init_manual = __esm({
-  "features/integrations/payment/manual.ts"() {
-    "use strict";
-  }
-});
-
-// features/integrations/payment/index.ts
-function isPaymentProviderAdapterCode(value) {
-  return Object.prototype.hasOwnProperty.call(paymentProviderAdapters, value);
-}
-function getPaymentProviderRegistration(code) {
-  return isPaymentProviderAdapterCode(code) ? paymentProviderAdapters[code] : null;
-}
-var paymentProviderAdapters;
-var init_payment = __esm({
-  "features/integrations/payment/index.ts"() {
-    "use strict";
-    paymentProviderAdapters = {
-      manual: {
-        load: () => Promise.resolve().then(() => (init_manual(), manual_exports)),
-        settlement: "offline",
-        allowsPublicSettlement: false,
-        webhook: null
-      }
-    };
-  }
-});
-
-// features/keystone/utils/paymentProviderAdapter.ts
-function adapterCodeForProvider(provider) {
-  const code = provider.code.replace(/^pp_/, "");
-  const registration = getPaymentProviderRegistration(code);
-  if (!registration) {
-    throw new Error(`Payment adapter ${code || provider.code} is not registered.`);
-  }
-  return code;
-}
-function paymentProviderSettlement(provider) {
-  const registration = getPaymentProviderRegistration(provider.code.replace(/^pp_/, ""));
-  return registration?.settlement === "processor" ? "processor" : "offline";
-}
-function isOfflinePaymentProvider(provider) {
-  return paymentProviderSettlement(provider) === "offline";
-}
-async function executeAdapterFunction({ provider, functionName, args }) {
-  const adapterCode = adapterCodeForProvider(provider);
-  const configuredSelector = provider[functionName];
-  if (typeof configuredSelector === "string" && configuredSelector !== adapterCode) {
-    throw new Error(`Payment adapter selector for ${functionName} is not registered for ${adapterCode}.`);
-  }
-  const registration = getPaymentProviderRegistration(adapterCode);
-  if (!registration) throw new Error(`Payment adapter ${adapterCode} is not registered.`);
-  const adapter = await registration.load();
-  const fn = adapter[functionName];
-  if (!fn) {
-    throw new Error(`Function ${functionName} is not available in payment adapter ${adapterCode}.`);
-  }
-  try {
-    return await fn({ provider: { code: provider.code }, ...args });
-  } catch (error) {
-    throw new Error(
-      `Error executing ${functionName} for payment adapter ${adapterCode}: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
-}
-async function createPayment({ provider, ...args }) {
-  return executeAdapterFunction({ provider, functionName: "createPaymentFunction", args });
-}
-async function capturePayment({ provider, ...args }) {
-  return executeAdapterFunction({ provider, functionName: "capturePaymentFunction", args });
-}
-async function refundPayment({ provider, ...args }) {
-  return executeAdapterFunction({ provider, functionName: "refundPaymentFunction", args });
-}
-async function getPaymentStatus({ provider, ...args }) {
-  return executeAdapterFunction({ provider, functionName: "getPaymentStatusFunction", args });
-}
-var init_paymentProviderAdapter = __esm({
-  "features/keystone/utils/paymentProviderAdapter.ts"() {
-    "use strict";
-    init_payment();
-  }
-});
-
-// features/keystone/mutations/paymentSessionResult.ts
-function serializePaymentSession(session) {
-  if (!session) return session;
-  const dateFields = ["expiresAt", "capturedAt", "cancelledAt", "createdAt", "updatedAt"];
-  const serialized = { ...session };
-  for (const field of dateFields) {
-    const value = serialized[field];
-    if (value instanceof Date) serialized[field] = value.toISOString();
-  }
-  return serialized;
-}
-async function lockAppointmentMoney(transaction, appointmentId) {
-  if (!appointmentId) return;
-  await transaction.$executeRawUnsafe(
-    "SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))",
-    "barbershop-checkout",
-    appointmentId
-  );
-}
-function recordOf(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-}
-function appointmentSettledElsewhere(paymentStatus) {
-  return ["paid", "refunded"].includes(String(paymentStatus || ""));
-}
-var OPEN_PAYMENT_SESSION_STATUSES;
-var init_paymentSessionResult = __esm({
-  "features/keystone/mutations/paymentSessionResult.ts"() {
-    "use strict";
-    OPEN_PAYMENT_SESSION_STATUSES = ["pending", "authorized", "captured", "partially_refunded"];
   }
 });
 
@@ -7694,7 +8761,7 @@ async function initiateAppointmentPaymentSession(_root, args, context) {
         data: { providerPaymentId: externalId ?? "", status, metadata: { request, providerCode: provider.code, settlement, adapterStatus } },
         include: { appointment: true, paymentProvider: true }
       });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
         eventKey: `payment-session:${created.id}:initiated:v1`,
         eventType: "payment_session.initiated",
@@ -7731,7 +8798,7 @@ var init_initiateAppointmentPaymentSession = __esm({
     "use strict";
     init_access();
     init_currentAuthorization();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_paymentProviderAdapter();
     init_publicAccessToken();
     init_serializableTransaction();
@@ -7816,7 +8883,7 @@ async function captureAppointmentPaymentSession(_root, args, context) {
           data: { paymentStatus: "deposit_paid" }
         });
       }
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
         eventKey: `payment-session:${paymentSession.id}:captured:v1`,
         eventType: "payment_session.captured",
@@ -7851,7 +8918,7 @@ var init_captureAppointmentPaymentSession = __esm({
     init_access();
     init_currentAuthorization();
     init_paymentProviderAdapter();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_serializableTransaction();
     init_paymentSessionResult();
   }
@@ -7891,7 +8958,7 @@ async function refundAppointmentPaymentSession(_root, args, context) {
         throw new Error("Pay-in-person payments are not refunded by a processor. Record a cash refund from the checkout receipt.");
       }
       const eventKey = `payment-refund:${shopId}:${hashPublicAccessToken(idempotencyKey)}:v1`;
-      const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+      const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
       if (replay) {
         const payload = recordOf(replay.payload);
         const refund = recordOf(recordOf(payload.data).refund);
@@ -7908,6 +8975,11 @@ async function refundAppointmentPaymentSession(_root, args, context) {
         throw new Error("The payment provider changed after this session started. Reconcile it before refunding.");
       }
       if (!paymentSession.providerPaymentId) throw new Error("This session has no processor payment reference to refund.");
+      if (metadata.purpose === "gift_card") {
+        const card = await transaction.giftCard.findFirst({ where: { paymentSessionId: paymentSession.id, shopId } });
+        if (card && card.balance < card.initialValue) throw new Error("This gift card has been used. Only an unused gift card can be refunded.");
+        if (requestedAmount != null && requestedAmount < paymentSession.amount) throw new Error("Gift cards are refunded in full.");
+      }
       const capturedAmount = Math.max(0, paymentSession.amount);
       const alreadyRefunded = Math.max(0, paymentSession.refundedAmount || 0);
       const remaining = Math.max(0, capturedAmount - alreadyRefunded);
@@ -7916,6 +8988,10 @@ async function refundAppointmentPaymentSession(_root, args, context) {
         throw new Error("Refund amount must be positive and no greater than the remaining captured amount.");
       }
       await lockAppointmentMoney(transaction, paymentSession.appointmentId);
+      if (paymentSession.transaction?.id) {
+        const paidCommission = await transaction.commission.count({ where: { transactionId: paymentSession.transaction.id, status: "paid" } });
+        if (paidCommission) throw new Error("A commission on this sale was already paid. Owner reconciliation is required before refunding it.");
+      }
       const result = recordOf(await refundPayment({
         provider,
         paymentId: paymentSession.providerPaymentId,
@@ -7943,14 +9019,25 @@ async function refundAppointmentPaymentSession(_root, args, context) {
           where: { id: paymentSession.appointmentId, shopId, paymentStatus: "deposit_paid", transactionId: null },
           data: { paymentStatus: "refunded" }
         });
+        await transaction.appointment.updateMany({
+          where: { id: paymentSession.appointmentId, shopId, paymentStatus: "refunded", transactionId: null, status: { in: ["requested", "confirmed"] } },
+          data: { status: "cancelled", cancellationReason: "Deposit refunded" }
+        });
+      }
+      if (fullyRefunded && recordOf(paymentSession.metadata).purpose === "gift_card") {
+        await transaction.giftCard.updateMany({ where: { paymentSessionId: paymentSession.id, shopId }, data: { status: "cancelled", balance: 0 } });
       }
       if (paymentSession.transaction?.id) {
         await transaction.checkoutTransaction.update({
           where: { id: paymentSession.transaction.id },
           data: { status: fullyRefunded ? "refunded" : "partially_refunded" }
         });
+        if (fullyRefunded) {
+          await transaction.appointment.updateMany({ where: { transactionId: paymentSession.transaction.id, shopId }, data: { paymentStatus: "refunded" } });
+          await transaction.commission.updateMany({ where: { transactionId: paymentSession.transaction.id, status: { in: ["projected", "approved"] } }, data: { status: "voided" } });
+        }
       }
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
         eventKey,
         eventType: fullyRefunded ? "payment_session.refunded" : "payment_session.partially_refunded",
@@ -7988,7 +9075,7 @@ var init_refundAppointmentPaymentSession = __esm({
     "use strict";
     init_access();
     init_currentAuthorization();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_paymentProviderAdapter();
     init_publicAccessToken();
     init_serializableTransaction();
@@ -8032,7 +9119,7 @@ async function cancelAppointmentPaymentSession(_root, args, context) {
         data: { status: "cancelled", cancelledAt },
         include: { appointment: true, paymentProvider: true }
       });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
         eventKey: `payment-session:${paymentSession.id}:cancelled:v1`,
         eventType: "payment_session.cancelled",
@@ -8058,7 +9145,7 @@ var init_cancelAppointmentPaymentSession = __esm({
     "use strict";
     init_access();
     init_currentAuthorization();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_paymentProviderAdapter();
     init_serializableTransaction();
     init_paymentSessionResult();
@@ -8132,7 +9219,7 @@ async function recordInventoryMovement(_root, args, context) {
             status: expired ? "expired" : balance.after === 0 ? "consumed" : "active"
           }
         });
-        await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+        await recordCommandReceipt(transaction, buildCommandReceipt({
           actorId: context.session?.itemId,
           eventKey: `inventory:${created.id}:${referenceKey}:v1`,
           eventType: "inventory.moved",
@@ -8170,7 +9257,7 @@ var init_recordInventoryMovement = __esm({
     init_currentAuthorization();
     init_balanceLedgers();
     init_serializableTransaction();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     MOVEMENT_TYPES = /* @__PURE__ */ new Set(["receive", "sale", "return", "waste", "adjustment"]);
   }
 });
@@ -8206,7 +9293,7 @@ async function receiveInventoryLot(_root, args, context) {
       await transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", "barbershop-inventory-lot", `${product.shopId}:${lotNumber}`);
       const lot = await transaction.inventoryLot.create({ data: { shopId: product.shopId, productId: product.id, supplierId: supplier?.id || null, lotNumber, quantityReceived: quantity, quantityRemaining: quantity, unitCost, receivedAt, expiresAt, status: expiresAt && expiresAt <= /* @__PURE__ */ new Date() ? "expired" : "active", metadata: { source: "operator_receipt" } } });
       const movement = await transaction.inventoryMovement.create({ data: { shopId: product.shopId, productId: product.id, inventoryLotId: lot.id, movementType: "receive", quantityDelta: quantity, quantityAfter: quantity, reason: `Received lot ${lotNumber}`, referenceKey, occurredAt: receivedAt } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId, eventKey: `inventory-receipt:${movement.id}:recorded:v1`, eventType: "inventory.received", aggregateType: "inventory_lot", aggregateId: lot.id, shopId: product.shopId, occurredAt: receivedAt, data: { receipt: { lotId: lot.id, productId: product.id, supplierId: supplier?.id || null, lotNumber, quantity, unitCost, receivedAt: receivedAt.toISOString(), expiresAt: expiresAt?.toISOString() ?? null, actorId: context.session?.itemId ?? null } } }));
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId, eventKey: `inventory-receipt:${movement.id}:recorded:v1`, eventType: "inventory.received", aggregateType: "inventory_lot", aggregateId: lot.id, shopId: product.shopId, occurredAt: receivedAt, data: { receipt: { lotId: lot.id, productId: product.id, supplierId: supplier?.id || null, lotNumber, quantity, unitCost, receivedAt: receivedAt.toISOString(), expiresAt: expiresAt?.toISOString() ?? null, actorId: context.session?.itemId ?? null } } }));
       return lot;
     });
     return { success: true, error: null, received: { id: received.id, lotNumber: received.lotNumber, quantityReceived: received.quantityReceived, quantityRemaining: received.quantityRemaining, status: received.status } };
@@ -8214,16 +9301,16 @@ async function receiveInventoryLot(_root, args, context) {
     return { success: false, error: error instanceof Error ? error.message : "Unable to receive inventory.", received: null };
   }
 }
-var import_node_crypto8, hash3, optionalDate;
+var import_node_crypto10, hash3, optionalDate;
 var init_receiveInventoryLot = __esm({
   "features/keystone/mutations/receiveInventoryLot.ts"() {
     "use strict";
-    import_node_crypto8 = require("node:crypto");
+    import_node_crypto10 = require("node:crypto");
     init_access();
     init_currentAuthorization();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_serializableTransaction();
-    hash3 = (value) => (0, import_node_crypto8.createHash)("sha256").update(value).digest("hex");
+    hash3 = (value) => (0, import_node_crypto10.createHash)("sha256").update(value).digest("hex");
     optionalDate = (value) => {
       if (!value) return null;
       const result = new Date(value);
@@ -8433,7 +9520,7 @@ async function seatWalkInQueueEntry(_root, args, context) {
           requestedBarberId: barber.id
         }
       });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
         eventKey: `queue:${entry.id}:seated:${appointment.id}:v1`,
         eventType: "queue.seated",
@@ -8474,7 +9561,7 @@ var init_seatWalkInQueueEntry = __esm({
     init_shop_time();
     init_bookingCapacity();
     init_serializableTransaction();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_practitionerAuthority();
     init_waiverEvidence();
     ACTIVE_APPOINTMENT_STATUSES2 = ["requested", "confirmed", "checked_in", "in_chair"];
@@ -8540,8 +9627,10 @@ async function transitionAppointment(_root, args, context) {
   if (toStatus === "no_show") {
     return { success: false, error: "Use Mark no-show so the grace period and no-show policy are applied.", appointment: null };
   }
+  let confirmedNow = false;
   try {
     const appointment = await runSerializableTransaction(context.prisma, async (client) => {
+      confirmedNow = false;
       const transaction = client;
       const shopId = await requireCurrentShopPermission(context.session, "canManageAppointments", transaction);
       await transaction.$executeRawUnsafe(
@@ -8553,7 +9642,7 @@ async function transitionAppointment(_root, args, context) {
       if (!current || !current.shopId) throw new Error("Appointment not found.");
       const commandHash = hashPublicAccessToken(idempotencyKey);
       const eventKey = `appointment-command:${commandHash}:v1`;
-      const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+      const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
       if (replay) {
         const payload = replay.payload;
         if (payload?.aggregateId !== appointmentId || payload.shopId !== shopId || payload.data?.transition?.toStatus !== toStatus || payload.data.transition.actorId !== void 0 && payload.data.transition.actorId !== (context.session?.itemId ?? null)) {
@@ -8569,6 +9658,13 @@ async function transitionAppointment(_root, args, context) {
         paymentStatus: current.paymentStatus,
         startsAt: current.startsAt
       });
+      if (toStatus === "checked_in" || toStatus === "in_chair") {
+        const shop = await transaction.shop.findUnique({ where: { id: shopId }, select: { timezone: true } });
+        const timeZone = shop?.timezone || "UTC";
+        if (current.startsAt && shopDateKey(current.startsAt, timeZone) !== shopDateKey(/* @__PURE__ */ new Date(), timeZone)) {
+          throw new Error("Check-in and seating happen on the appointment\u2019s day.");
+        }
+      }
       if (toStatus === "in_chair") {
         if (!current.barberId || !current.serviceId) throw new Error("Appointment practitioner and service are required.");
         await lockBookingResources(transaction, { serviceId: current.serviceId, barberId: current.barberId, chairNumber: current.barberChairNumberSnapshot || null });
@@ -8617,6 +9713,7 @@ async function transitionAppointment(_root, args, context) {
       });
       if (toStatus === "confirmed") {
         await transaction.$executeRawUnsafe('UPDATE "Appointment" SET "bookingAuthoritySnapshot" = $2::jsonb WHERE id = $1', current.id, JSON.stringify(authorityEvidence));
+        confirmedNow = true;
       }
       if (toStatus === "in_chair") {
         await transaction.$executeRawUnsafe('UPDATE "Appointment" SET "executionAuthoritySnapshot" = $2::jsonb, "serviceStartedAt" = $3 WHERE id = $1', current.id, JSON.stringify(authorityEvidence), updated.updatedAt);
@@ -8624,7 +9721,7 @@ async function transitionAppointment(_root, args, context) {
       if (toStatus === "completed") {
         await transaction.$executeRawUnsafe('UPDATE "Appointment" SET "serviceCompletedAt" = $2 WHERE id = $1', current.id, updated.updatedAt);
       }
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
         eventKey,
         eventType: `appointment.${toStatus}`,
@@ -8661,12 +9758,13 @@ var init_transitionAppointment = __esm({
     init_access();
     init_currentAuthorization();
     init_bookingCapacity();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_lifecycleState();
     init_publicAccessToken();
     init_serializableTransaction();
     init_practitionerAuthority();
     init_waiverEvidence();
+    init_shop_time();
     STATUSES = /* @__PURE__ */ new Set(["requested", "confirmed", "checked_in", "in_chair", "completed", "cancelled", "no_show"]);
   }
 });
@@ -8695,7 +9793,7 @@ async function transitionQueueEntry(_root, args, context) {
       if (!current || !current.shopId) throw new Error("Queue entry not found.");
       const commandHash = hashPublicAccessToken(idempotencyKey);
       const eventKey = `queue-command:${commandHash}:v1`;
-      const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+      const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
       if (replay) {
         const payload = replay.payload;
         if (payload?.aggregateId !== queueEntryId || payload.data?.transition?.toStatus !== toStatus) {
@@ -8712,7 +9810,7 @@ async function transitionQueueEntry(_root, args, context) {
         where: { id: current.id },
         data: { status: toStatus }
       });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
         eventKey,
         eventType: `queue.${toStatus}`,
@@ -8743,7 +9841,7 @@ var init_transitionQueueEntry = __esm({
     "use strict";
     init_access();
     init_currentAuthorization();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_lifecycleState();
     init_publicAccessToken();
     init_serializableTransaction();
@@ -8768,9 +9866,9 @@ async function selectActiveShop(_root, args, context) {
       if (user?.activeShopId === shopId) return membership.shop;
       const selectedAt = /* @__PURE__ */ new Date();
       await transaction.user.update({ where: { id: userId }, data: { activeShopId: shopId } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
-        eventKey: `user:${userId}:active-shop:${shopId}:${(0, import_node_crypto9.randomUUID)()}:v1`,
+        eventKey: `user:${userId}:active-shop:${shopId}:${(0, import_node_crypto11.randomUUID)()}:v1`,
         eventType: "user.active_shop_selected",
         aggregateType: "user",
         aggregateId: userId,
@@ -8789,13 +9887,168 @@ async function selectActiveShop(_root, args, context) {
     };
   }
 }
-var import_node_crypto9;
+var import_node_crypto11;
 var init_selectActiveShop = __esm({
   "features/keystone/mutations/selectActiveShop.ts"() {
     "use strict";
-    import_node_crypto9 = require("node:crypto");
-    init_lifecycleOutbox();
+    import_node_crypto11 = require("node:crypto");
+    init_commandReceipt();
     init_serializableTransaction();
+  }
+});
+
+// features/keystone/mutations/claimShopOwnership.ts
+async function isInstanceAdmin(context) {
+  const session = context.session;
+  if (!session?.itemId) return false;
+  const [people, roles] = await Promise.all([
+    hasCurrentRolePermission(session, "canManagePeople", context.prisma),
+    hasCurrentRolePermission(session, "canManageRoles", context.prisma)
+  ]);
+  return people && roles;
+}
+async function claimableShops(_root, _args, context) {
+  if (!await isInstanceAdmin(context)) return [];
+  const userId = context.session.itemId;
+  return context.prisma.shop.findMany({
+    where: { status: "active", memberships: { none: { userId, status: "active" } } },
+    orderBy: [{ isPublic: "desc" }, { createdAt: "asc" }],
+    take: 25,
+    select: { id: true, name: true, slug: true, isPublic: true }
+  });
+}
+async function claimShopOwnership(_root, args, context) {
+  const userId = context.session?.itemId;
+  const shopId = args.shopId?.trim();
+  if (!userId || !shopId) return { success: false, error: "A signed-in user and shop are required.", shop: null };
+  if (!await isInstanceAdmin(context)) return { success: false, error: "Only an administrator who manages people and roles can take over a shop.", shop: null };
+  try {
+    const shop = await runSerializableTransaction(context.prisma, async (client) => {
+      const transaction = client;
+      const target = await transaction.shop.findFirst({ where: { id: shopId, status: "active" }, select: { id: true, name: true, slug: true } });
+      if (!target) throw new Error("That shop is not active.");
+      const membershipKey = `${shopId}:${userId}`;
+      const membership = await transaction.shopMembership.upsert({
+        where: { membershipKey },
+        create: { membershipKey, shopId, userId, membershipRole: "owner", status: "active" },
+        update: { membershipRole: "owner", status: "active" },
+        select: { id: true }
+      });
+      const [services, barbers] = await Promise.all([
+        transaction.service.count({ where: { shopId } }),
+        transaction.barber.count({ where: { shopId } })
+      ]);
+      await transaction.user.update({ where: { id: userId }, data: { activeShopId: shopId, ...services && barbers ? { onboardingStatus: "completed" } : {} } });
+      await recordCommandReceipt(transaction, buildCommandReceipt({
+        actorId: userId,
+        eventKey: `shop:${shopId}:owner-claimed:${userId}:${(0, import_node_crypto12.randomUUID)()}:v1`,
+        eventType: "shop.owner_claimed",
+        aggregateType: "shop",
+        aggregateId: shopId,
+        shopId,
+        occurredAt: /* @__PURE__ */ new Date(),
+        data: { claim: { userId, shopId, membershipId: membership.id } }
+      }));
+      return target;
+    });
+    return { success: true, error: null, shop };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Unable to take over this shop.", shop: null };
+  }
+}
+var import_node_crypto12;
+var init_claimShopOwnership = __esm({
+  "features/keystone/mutations/claimShopOwnership.ts"() {
+    "use strict";
+    import_node_crypto12 = require("node:crypto");
+    init_currentAuthorization();
+    init_commandReceipt();
+    init_serializableTransaction();
+  }
+});
+
+// features/keystone/mutations/manageTeam.ts
+async function ensureStaffRole(prisma, userId) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: { select: { canAccessDashboard: true } } } });
+  if (user?.role) return;
+  const role = await prisma.role.findFirst({ where: { name: STAFF_ROLE_NAME } }) || await prisma.role.create({ data: { name: STAFF_ROLE_NAME, ...STAFF_ROLE_FLAGS } });
+  await prisma.user.update({ where: { id: userId }, data: { roleId: role.id } });
+}
+async function managedShop(context) {
+  const shopId = requireSingleActiveShop(context.session);
+  const managed = await currentManagedActiveShopIds(context.session, context.prisma);
+  if (!managed.includes(shopId)) throw new Error("Only a shop owner or manager can manage the team.");
+  return shopId;
+}
+async function platformTeam(_root, _args, context) {
+  try {
+    const shopId = await managedShop(context);
+    const memberships = await context.sudo().prisma.shopMembership.findMany({
+      where: { shopId },
+      orderBy: [{ status: "asc" }, { createdAt: "asc" }],
+      select: { id: true, membershipRole: true, status: true, createdAt: true, user: { select: { id: true, name: true, email: true, barberProfile: { select: { id: true, displayName: true } } } } }
+    });
+    return { success: true, error: null, data: { selfId: context.session?.itemId || null, memberships } };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Unable to load the team.", data: null };
+  }
+}
+async function addShopMemberByEmail(_root, args, context) {
+  try {
+    const shopId = await managedShop(context);
+    const email = String(args.email || "").trim().toLowerCase();
+    const membershipRole = String(args.membershipRole || "viewer");
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 254) throw new Error("Enter a valid email.");
+    if (!ROLES.has(membershipRole)) throw new Error("Choose a role.");
+    let user = await context.sudo().prisma.user.findFirst({ where: { email: { equals: email, mode: "insensitive" } }, select: { id: true } });
+    let invited = false;
+    if (!user) {
+      user = await context.sudo().db.User.createOne({ data: { name: email.split("@")[0], email, password: (0, import_node_crypto13.randomBytes)(32).toString("base64url") } });
+      invited = true;
+    }
+    const existing = await context.sudo().prisma.shopMembership.findFirst({ where: { shopId, userId: user.id }, select: { id: true, status: true } });
+    if (existing) throw new Error(existing.status === "active" ? "They are already on the team." : "They already have a membership here. Restore it from the team list.");
+    const created = await context.db.ShopMembership.createOne({ data: { shop: { connect: { id: shopId } }, user: { connect: { id: user.id } }, membershipRole, status: "active" } });
+    await ensureStaffRole(context.sudo().prisma, user.id);
+    let emailed = false;
+    if (invited) {
+      try {
+        await context.sudo().graphql.run({ query: "mutation($email: String!) { sendUserPasswordResetLink(email: $email) }", variables: { email } });
+        emailed = true;
+      } catch {
+        emailed = false;
+      }
+    }
+    return { success: true, error: null, data: { id: created.id, invited, emailed } };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const readable = message.includes("You provided invalid data") ? message.split("\n").slice(1).map((line) => line.replace(/^\s*-\s*[\w.]+:\s*/, "")).join(" ") : message;
+    return { success: false, error: readable || "Unable to add this member.", data: null };
+  }
+}
+var import_node_crypto13, ROLES, STAFF_ROLE_NAME, STAFF_ROLE_FLAGS;
+var init_manageTeam = __esm({
+  "features/keystone/mutations/manageTeam.ts"() {
+    "use strict";
+    import_node_crypto13 = require("node:crypto");
+    init_access();
+    init_currentAuthorization();
+    ROLES = /* @__PURE__ */ new Set(["owner", "manager", "front_desk", "barber", "viewer"]);
+    STAFF_ROLE_NAME = "Shop staff";
+    STAFF_ROLE_FLAGS = {
+      canAccessDashboard: true,
+      canManageOnboarding: true,
+      canManageServices: true,
+      canManageStaff: true,
+      canManageSchedules: true,
+      canManageAppointments: true,
+      canManageQueue: true,
+      canManageCustomers: true,
+      canManageCustomerNotes: true,
+      canManageMemberships: true,
+      canManagePayments: true,
+      canViewReports: true
+    };
   }
 });
 
@@ -8835,192 +10088,6 @@ var init_remainingLifecycle = __esm({
   }
 });
 
-// features/keystone/mutations/markAppointmentNoShow.ts
-async function markAppointmentNoShow(_root, args, context) {
-  if (!permissions.canManageAppointments({ session: context.session })) {
-    return { success: false, error: "Not authorized to mark no-shows.", evidence: null };
-  }
-  const appointmentId = args.appointmentId?.trim();
-  const reason = args.reason?.trim();
-  const idempotencyKey = args.idempotencyKey?.trim();
-  if (!appointmentId || !reason || reason.length > 500 || !idempotencyKey) {
-    return { success: false, error: "Appointment, reason, and idempotency key are required.", evidence: null };
-  }
-  try {
-    const evidence = await runSerializableTransaction(context.prisma, async (client) => {
-      const transaction = client;
-      const shopId = await requireCurrentShopPermission(context.session, "canManageAppointments", transaction);
-      await transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", "barbershop-no-show", appointmentId);
-      const now = /* @__PURE__ */ new Date();
-      const appointment = await transaction.appointment.findFirst({
-        where: { id: appointmentId, shopId },
-        include: { customer: { include: { packageBalances: {
-          where: { status: "active", membershipPlanId: { not: null }, startsAt: { lte: now }, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
-          take: 1
-        } } } }
-      });
-      if (!appointment) throw new Error("Appointment not found.");
-      const commandHash = hashPublicAccessToken(idempotencyKey);
-      const eventKey = `appointment-no-show:${commandHash}:v1`;
-      const replay = await transaction.noShowEvent.findUnique({ where: { eventKey } });
-      if (replay) {
-        if (replay.appointmentId !== appointmentId || replay.reason !== reason || args.policyId && replay.policyId !== args.policyId) throw new Error("No-show idempotency key was reused with different input.");
-        return replay;
-      }
-      if (!["confirmed", "checked_in"].includes(String(appointment.status))) {
-        throw new Error(`Appointment in ${appointment.status} state cannot be marked no-show.`);
-      }
-      const policy = args.policyId ? await transaction.noShowPolicy.findFirst({ where: { id: args.policyId, shopId: appointment.shopId, status: "active" } }) : await transaction.noShowPolicy.findFirst({ where: { shopId: appointment.shopId, status: "active" }, orderBy: { createdAt: "asc" } });
-      if (!policy) throw new Error("An active no-show policy is required.");
-      const snapshot = calculateNoShowEvidence(policy, { hasMembership: Boolean(appointment.customer?.packageBalances.length) });
-      const eligibleAt = new Date(appointment.startsAt.getTime() + snapshot.graceMinutes * 6e4);
-      if (/* @__PURE__ */ new Date() < eligibleAt) throw new Error(`No-show can be recorded after the ${snapshot.graceMinutes}-minute grace period.`);
-      const markedAt = /* @__PURE__ */ new Date();
-      const created = await transaction.noShowEvent.create({
-        data: {
-          shopId: appointment.shopId,
-          eventKey,
-          appointmentId,
-          customerId: appointment.customerId,
-          policyId: policy.id,
-          policyNameSnapshot: policy.name,
-          feeAmount: snapshot.feeAmount,
-          graceMinutes: snapshot.graceMinutes,
-          feeWaived: snapshot.feeWaived,
-          reason,
-          markedAt
-        }
-      });
-      await transaction.appointment.update({ where: { id: appointmentId }, data: { status: "no_show", cancellationReason: reason } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
-        actorId: context.session?.itemId,
-        eventKey: `${eventKey}:outbox`,
-        eventType: "appointment.no_show",
-        aggregateType: "appointment",
-        aggregateId: appointmentId,
-        shopId: appointment.shopId,
-        occurredAt: markedAt,
-        data: { noShow: { evidenceId: created.id, policyId: policy.id, policyName: policy.name, ...snapshot, reason, actorId: context.session?.itemId ?? null } }
-      }));
-      return created;
-    });
-    return { success: true, error: null, evidence: { id: evidence.id, appointmentId: evidence.appointmentId, feeAmount: evidence.feeAmount, feeWaived: evidence.feeWaived, markedAt: evidence.markedAt.toISOString() } };
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : "Unable to mark no-show.", evidence: null };
-  }
-}
-var init_markAppointmentNoShow = __esm({
-  "features/keystone/mutations/markAppointmentNoShow.ts"() {
-    "use strict";
-    init_access();
-    init_currentAuthorization();
-    init_lifecycleOutbox();
-    init_remainingLifecycle();
-    init_publicAccessToken();
-    init_serializableTransaction();
-  }
-});
-
-// features/keystone/mutations/manageCommissions.ts
-async function transitionCommission(_root, args, context) {
-  if (!permissions.canManagePayments({ session: context.session })) return { success: false, error: "Not authorized to manage commissions.", commission: null };
-  try {
-    const commandHash = hashPublicAccessToken(args.idempotencyKey?.trim() || "");
-    if (!args.commissionId || !args.idempotencyKey?.trim()) throw new Error("Commission and idempotency key are required.");
-    if (!["approved", "voided"].includes(args.toStatus)) throw new Error("Commissions can be approved or voided here. Record payment with Create payout.");
-    const result = await runSerializableTransaction(context.prisma, async (client) => {
-      const transaction = client;
-      const shopId = await requireCurrentShopPermission(context.session, "canManagePayments", transaction);
-      await transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", "barbershop-commission", args.commissionId);
-      const commission = await transaction.commission.findFirst({ where: { id: args.commissionId, shopId } });
-      if (!commission) throw new Error("Commission not found.");
-      const eventKey = `commission-command:${commandHash}:v1`;
-      const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
-      if (replay) {
-        const payload = replay.payload;
-        if (payload?.data?.transition?.commissionId !== commission.id || payload.data.transition.toStatus !== args.toStatus || String(payload.data.transition.reason || "") !== (args.reason?.trim() || "")) throw new Error("Commission idempotency key was reused for a different command.");
-        return commission;
-      }
-      assertCommissionTransition(String(commission.status), args.toStatus);
-      const updated = await transaction.commission.update({ where: { id: commission.id }, data: { status: args.toStatus } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
-        actorId: context.session?.itemId,
-        eventKey,
-        eventType: `commission.${args.toStatus}`,
-        aggregateType: "commission",
-        aggregateId: commission.id,
-        shopId: commission.shopId,
-        occurredAt: updated.updatedAt,
-        data: { transition: { commissionId: commission.id, fromStatus: commission.status, toStatus: args.toStatus, reason: args.reason?.trim() || "", actorId: context.session?.itemId ?? null }, amount: commission.commissionAmount }
-      }));
-      return updated;
-    });
-    return { success: true, error: null, commission: { id: result.id, status: result.status, commissionAmount: result.commissionAmount } };
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : "Unable to transition commission.", commission: null };
-  }
-}
-async function createCommissionPayout(_root, args, context) {
-  if (!permissions.canManagePayments({ session: context.session })) return { success: false, error: "Not authorized to create payouts.", payout: null };
-  const ids = Array.from(new Set(args.commissionIds || [])).filter(Boolean);
-  if (ids.length < 1 || ids.length > 100 || !args.notes?.trim() || args.notes.trim().length > 500 || !args.idempotencyKey?.trim()) return { success: false, error: "Choose 1\u2013100 commissions and provide a payout method/reference plus idempotency key.", payout: null };
-  try {
-    const hash9 = hashPublicAccessToken(args.idempotencyKey.trim());
-    const payout = await runSerializableTransaction(context.prisma, async (client) => {
-      const transaction = client;
-      await transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", "barbershop-payout", hash9);
-      const activeShopId = await requireCurrentShopPermission(context.session, "canManagePayments", transaction);
-      const replay = await transaction.commissionPayout.findUnique({ where: { idempotencyKeyHash: hash9 }, include: { commissions: { select: { id: true } } } });
-      if (replay) {
-        if (replay.shopId !== activeShopId) throw new Error("Payout idempotency key was reused with different input.");
-        const replayIds = replay.commissions.map((item) => item.id).sort();
-        if (replayIds.join(",") !== [...ids].sort().join(",") || replay.notes !== (args.notes?.trim() || "")) {
-          throw new Error("Payout idempotency key was reused with different input.");
-        }
-        return replay;
-      }
-      const commissions = await transaction.commission.findMany({ where: { id: { in: ids }, shopId: activeShopId }, orderBy: { id: "asc" } });
-      if (commissions.length !== ids.length) throw new Error("One or more commissions were not found.");
-      const shopId = activeShopId;
-      if (commissions.some((item) => item.shopId !== shopId)) throw new Error("Payout commissions must belong to one shop.");
-      if (commissions.some((item) => item.status !== "approved")) throw new Error("Only approved commissions can be paid.");
-      const barberId = commissions[0].barberId;
-      if (!barberId || commissions.some((item) => item.barberId !== barberId)) throw new Error("A payout must contain commissions for one barber.");
-      const paidAt = /* @__PURE__ */ new Date();
-      const totalAmount = commissions.reduce((sum, item) => sum + (item.commissionAmount || 0), 0);
-      const created = await transaction.commissionPayout.create({
-        data: { shopId, payoutNumber: `payout-${hash9.slice(0, 20)}`, idempotencyKeyHash: hash9, barberId, commissionCount: commissions.length, totalAmount, paidAt, notes: args.notes?.trim() || "" }
-      });
-      await transaction.commission.updateMany({ where: { id: { in: ids }, status: "approved" }, data: { status: "paid", paidAt, payoutId: created.id } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
-        actorId: context.session?.itemId,
-        eventKey: `commission-payout:${created.id}:paid:v1`,
-        eventType: "commission_payout.paid",
-        aggregateType: "commission_payout",
-        aggregateId: created.id,
-        shopId,
-        occurredAt: paidAt,
-        data: { payout: { id: created.id, barberId, commissionIds: ids.sort(), commissionCount: commissions.length, totalAmount, payoutReference: args.notes.trim(), actorId: context.session?.itemId ?? null } }
-      }));
-      return created;
-    });
-    return { success: true, error: null, payout: { id: payout.id, payoutNumber: payout.payoutNumber, commissionCount: payout.commissionCount, totalAmount: payout.totalAmount, paidAt: payout.paidAt.toISOString() } };
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : "Unable to create payout.", payout: null };
-  }
-}
-var init_manageCommissions = __esm({
-  "features/keystone/mutations/manageCommissions.ts"() {
-    "use strict";
-    init_access();
-    init_currentAuthorization();
-    init_lifecycleOutbox();
-    init_remainingLifecycle();
-    init_publicAccessToken();
-    init_serializableTransaction();
-  }
-});
-
 // features/keystone/mutations/manageProductSales.ts
 function lockLot(transaction, lotId) {
   return transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", "barbershop-inventory", `lot:${lotId}`);
@@ -9033,9 +10100,96 @@ function allocatedReturnTax(originalTax, originalQuantity, returnedBefore, quant
   const cumulative = (units) => Math.round(tax * units / originalQuantity);
   return cumulative(returnedBefore + quantity) - cumulative(returnedBefore);
 }
+async function createProductSaleInTransaction(transaction, input) {
+  const { shopId, lineNumber, actorId } = input;
+  const product = await transaction.product.findFirst({ where: { id: input.productId, shopId } });
+  if (!product || product.status !== "active") throw new Error("Product is not available.");
+  const shop = await transaction.shop.findUnique({ where: { id: shopId }, select: { currencyCode: true } });
+  assertUsdSettlementCurrency(shop?.currencyCode);
+  const totals = calculateProductSale({ unitPrice: product.price || 0, quantity: input.quantity, taxRateBps: input.taxRateBps || 0 });
+  const occurredAt = /* @__PURE__ */ new Date();
+  const allocations = [];
+  if (product.inventoryTracked !== false) {
+    const candidates = await transaction.inventoryLot.findMany({
+      where: sellableLotWhere(shopId, product.id, occurredAt),
+      orderBy: [{ expiresAt: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }, { id: "asc" }],
+      take: MAX_ALLOCATION_LOTS,
+      select: { id: true }
+    });
+    for (const lotId of candidates.map((lot) => lot.id).sort()) await lockLot(transaction, lotId);
+    const lots = await transaction.inventoryLot.findMany({
+      where: { ...sellableLotWhere(shopId, product.id, occurredAt), id: { in: candidates.map((lot) => lot.id) } },
+      orderBy: [{ expiresAt: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }, { id: "asc" }]
+    });
+    let remaining = totals.quantity;
+    for (const lot of lots) {
+      if (remaining <= 0) break;
+      const take = Math.min(remaining, lot.quantityRemaining || 0);
+      if (take <= 0) continue;
+      const quantityAfter = (lot.quantityRemaining || 0) - take;
+      allocations.push({ lotId: lot.id, quantity: take, quantityAfter, becomesConsumed: quantityAfter === 0 });
+      remaining -= take;
+    }
+    if (remaining > 0 && !input.online) throw new Error("Insufficient sellable inventory for this product sale.");
+  }
+  const checkout = await transaction.checkoutTransaction.create({ data: {
+    shopId,
+    status: "paid",
+    subtotal: totals.subtotal,
+    taxAmount: totals.taxAmount,
+    total: totals.total,
+    currencyCode: "USD",
+    paymentMethod: input.paymentMethod,
+    paymentSessionId: input.paymentSessionId ?? void 0,
+    completedAt: occurredAt,
+    notes: `Retail sale \xB7 ${product.name} (${product.sku}) \xD7 ${totals.quantity}`
+  } });
+  const created = await transaction.productSaleLine.create({ data: {
+    shopId,
+    lineNumber,
+    transactionId: checkout.id,
+    productId: product.id,
+    lineType: "sale",
+    productNameSnapshot: product.name,
+    skuSnapshot: product.sku ?? "",
+    quantity: totals.quantity,
+    unitPrice: totals.unitPrice,
+    subtotal: totals.subtotal,
+    taxAmount: totals.taxAmount,
+    total: totals.total,
+    occurredAt
+  }, include: { transaction: true } });
+  for (const [index, allocation] of allocations.entries()) {
+    await transaction.inventoryMovement.create({ data: {
+      shopId,
+      productId: product.id,
+      inventoryLotId: allocation.lotId,
+      // The first lot links 1:1 to the sale line; further lots share its reference prefix.
+      ...index === 0 ? { productSaleLineId: created.id } : {},
+      movementType: "sale",
+      quantityDelta: -allocation.quantity,
+      quantityAfter: allocation.quantityAfter,
+      reason: "Product POS sale",
+      referenceKey: index === 0 ? `product-sale:${created.id}` : `product-sale:${created.id}:lot:${allocation.lotId}`,
+      occurredAt
+    } });
+    await transaction.inventoryLot.update({ where: { id: allocation.lotId }, data: { quantityRemaining: allocation.quantityAfter, ...allocation.becomesConsumed ? { status: "consumed" } : {} } });
+  }
+  await recordCommandReceipt(transaction, buildCommandReceipt({
+    actorId: actorId ?? void 0,
+    eventKey: `product-sale:${created.id}:paid:v1`,
+    eventType: "product_sale.paid",
+    aggregateType: "product_sale_line",
+    aggregateId: created.id,
+    shopId,
+    occurredAt,
+    data: { sale: { lineId: created.id, transactionId: checkout.id, productId: product.id, productName: product.name, sku: product.sku, ...totals, paymentMethod: input.paymentMethod, lots: allocations.map(({ lotId, quantity }) => ({ lotId, quantity })), actorId: actorId ?? null } }
+  }));
+  return created;
+}
 async function recordProductSale(_root, args, context) {
   if (!permissions.canManagePayments({ session: context.session })) return { success: false, error: "Not authorized to record product sales.", sale: null };
-  if (!args.productId || !args.idempotencyKey?.trim() || !METHODS.has(args.paymentMethod)) return { success: false, error: "Product, cash tender, and idempotency key are required; other tenders need captured settlement evidence.", sale: null };
+  if (!args.productId || !args.idempotencyKey?.trim() || !METHODS.has(args.paymentMethod)) return { success: false, error: "Choose a product and cash or card.", sale: null };
   try {
     const hash9 = hashPublicAccessToken(args.idempotencyKey.trim());
     const line = await runSerializableTransaction(context.prisma, async (client) => {
@@ -9051,89 +10205,7 @@ async function recordProductSale(_root, args, context) {
         if (replay.productId !== args.productId || replay.quantity !== replayTotals.quantity || replay.taxAmount !== replayTotals.taxAmount || replay.transaction?.paymentMethod !== args.paymentMethod) throw new Error("Product sale idempotency key was reused with different input.");
         return replay;
       }
-      const product = await transaction.product.findFirst({ where: { id: args.productId, shopId } });
-      if (!product || product.status !== "active") throw new Error("Product is not available.");
-      const shop = await transaction.shop.findUnique({ where: { id: shopId }, select: { currencyCode: true } });
-      assertUsdSettlementCurrency(shop?.currencyCode);
-      const totals = calculateProductSale({ unitPrice: product.price || 0, quantity: args.quantity, taxRateBps: args.taxRateBps || 0 });
-      const occurredAt = /* @__PURE__ */ new Date();
-      const allocations = [];
-      if (product.inventoryTracked !== false) {
-        const candidates = await transaction.inventoryLot.findMany({
-          where: sellableLotWhere(shopId, product.id, occurredAt),
-          orderBy: [{ expiresAt: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }, { id: "asc" }],
-          take: MAX_ALLOCATION_LOTS,
-          select: { id: true }
-        });
-        for (const lotId of candidates.map((lot) => lot.id).sort()) await lockLot(transaction, lotId);
-        const lots = await transaction.inventoryLot.findMany({
-          where: { ...sellableLotWhere(shopId, product.id, occurredAt), id: { in: candidates.map((lot) => lot.id) } },
-          orderBy: [{ expiresAt: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }, { id: "asc" }]
-        });
-        let remaining = totals.quantity;
-        for (const lot of lots) {
-          if (remaining <= 0) break;
-          const take = Math.min(remaining, lot.quantityRemaining || 0);
-          if (take <= 0) continue;
-          const quantityAfter = (lot.quantityRemaining || 0) - take;
-          allocations.push({ lotId: lot.id, quantity: take, quantityAfter, becomesConsumed: quantityAfter === 0 });
-          remaining -= take;
-        }
-        if (remaining > 0) throw new Error("Insufficient sellable inventory for this product sale.");
-      }
-      const checkout = await transaction.checkoutTransaction.create({ data: {
-        shopId,
-        status: "paid",
-        subtotal: totals.subtotal,
-        taxAmount: totals.taxAmount,
-        total: totals.total,
-        currencyCode: "USD",
-        paymentMethod: args.paymentMethod,
-        completedAt: occurredAt,
-        notes: `Retail sale \xB7 ${product.name} (${product.sku}) \xD7 ${totals.quantity}`
-      } });
-      const created = await transaction.productSaleLine.create({ data: {
-        shopId,
-        lineNumber,
-        transactionId: checkout.id,
-        productId: product.id,
-        lineType: "sale",
-        productNameSnapshot: product.name,
-        skuSnapshot: product.sku,
-        quantity: totals.quantity,
-        unitPrice: totals.unitPrice,
-        subtotal: totals.subtotal,
-        taxAmount: totals.taxAmount,
-        total: totals.total,
-        occurredAt
-      }, include: { transaction: true } });
-      for (const [index, allocation] of allocations.entries()) {
-        await transaction.inventoryMovement.create({ data: {
-          shopId,
-          productId: product.id,
-          inventoryLotId: allocation.lotId,
-          // The first lot links 1:1 to the sale line; further lots share its reference prefix.
-          ...index === 0 ? { productSaleLineId: created.id } : {},
-          movementType: "sale",
-          quantityDelta: -allocation.quantity,
-          quantityAfter: allocation.quantityAfter,
-          reason: "Product POS sale",
-          referenceKey: index === 0 ? `product-sale:${created.id}` : `product-sale:${created.id}:lot:${allocation.lotId}`,
-          occurredAt
-        } });
-        await transaction.inventoryLot.update({ where: { id: allocation.lotId }, data: { quantityRemaining: allocation.quantityAfter, ...allocation.becomesConsumed ? { status: "consumed" } : {} } });
-      }
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
-        actorId: context.session?.itemId,
-        eventKey: `product-sale:${created.id}:paid:v1`,
-        eventType: "product_sale.paid",
-        aggregateType: "product_sale_line",
-        aggregateId: created.id,
-        shopId,
-        occurredAt,
-        data: { sale: { lineId: created.id, transactionId: checkout.id, productId: product.id, productName: product.name, sku: product.sku, ...totals, paymentMethod: args.paymentMethod, lots: allocations.map(({ lotId, quantity }) => ({ lotId, quantity })), actorId: context.session?.itemId ?? null } }
-      }));
-      return created;
+      return createProductSaleInTransaction(transaction, { shopId, productId: args.productId, quantity: args.quantity, taxRateBps: args.taxRateBps, paymentMethod: args.paymentMethod, lineNumber, actorId: context.session?.itemId });
     });
     return { success: true, error: null, sale: { id: line.id, transactionId: line.transactionId, productName: line.productNameSnapshot, quantity: line.quantity, subtotal: line.subtotal, taxAmount: line.taxAmount, total: line.total } };
   } catch (error) {
@@ -9231,7 +10303,7 @@ async function returnProductSaleLine(_root, args, context) {
         await transaction.inventoryLot.update({ where: { id: restockLot.id }, data: { quantityRemaining: quantityAfter, ...restockLot.status === "consumed" ? { status: "active" } : {} } });
       }
       await transaction.productSaleLine.update({ where: { id: original.id }, data: { returnedQuantity: returnedBefore + quantity } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
         eventKey: `product-return:${created.id}:refunded:v1`,
         eventType: "product_sale.returned",
@@ -9254,172 +10326,527 @@ var init_manageProductSales = __esm({
     "use strict";
     init_access();
     init_currentAuthorization();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_remainingLifecycle();
     init_publicAccessToken();
     init_serializableTransaction();
     init_supportedSettlementCurrency();
-    METHODS = /* @__PURE__ */ new Set(["cash"]);
+    METHODS = /* @__PURE__ */ new Set(["cash", "card"]);
     MAX_ALLOCATION_LOTS = 50;
   }
 });
 
-// features/keystone/mutations/reconcilePaymentSession.ts
-function reconciliationResult(row) {
-  return {
-    id: row.id,
-    paymentSessionId: row.paymentSessionId,
-    localStatusBefore: row.localStatusBefore,
-    remoteStatus: row.remoteStatus,
-    localStatusAfter: row.localStatusAfter,
-    changed: row.changed,
-    observedAt: row.observedAt.toISOString()
-  };
+// features/keystone/mutations/productOrders.ts
+function orderToken2(sessionId) {
+  const secret = process.env.SESSION_SECRET || "";
+  if (secret.length < 32) throw new Error("SESSION_SECRET must be at least 32 characters long");
+  return (0, import_node_crypto14.createHmac)("sha256", secret).update(`barbershop-product:${sessionId}`).digest("hex");
 }
-async function reconcilePaymentSession(_root, args, context) {
-  if (!permissions.canManagePayments({ session: context.session })) return { success: false, error: "Not authorized to reconcile payments.", reconciliation: null };
-  const idempotencyKey = args.idempotencyKey?.trim() || "";
-  if (!args.paymentSessionId?.trim() || !idempotencyKey || idempotencyKey.length > 200) return { success: false, error: "Payment session and idempotency key are required.", reconciliation: null };
+function tokenOk2(sessionId, token) {
+  if (!token || token.length !== 64) return false;
+  const a = Buffer.from(orderToken2(sessionId));
+  const b = Buffer.from(token);
+  return a.length === b.length && (0, import_node_crypto14.timingSafeEqual)(a, b);
+}
+async function startProductCheckout(_root, args, context) {
+  const fail6 = (error) => ({ success: false, error, data: null });
+  try {
+    const buyerName = (args.buyerName || "").trim();
+    const buyerEmail = (args.buyerEmail || "").trim().toLowerCase();
+    if (!buyerName || buyerName.length > 120) return fail6("Enter your name.");
+    if (!EMAIL2.test(buyerEmail)) return fail6("Enter a valid email address.");
+    const prisma = context.sudo().prisma;
+    const shop = await resolvePublishedShop(prisma, { id: true, name: true });
+    if (!shop) return fail6("The shop is unavailable right now.");
+    const product = await prisma.product.findFirst({ where: { id: String(args.productId || ""), shopId: shop.id, status: "active" } });
+    if (!product || !(product.price && product.price > 0)) return fail6("That product is not available.");
+    const provider = await onlineDepositProvider(prisma, shop.id);
+    if (!provider) return fail6("Online checkout is unavailable right now. Try again in a moment.");
+    const key = (0, import_node_crypto14.randomUUID)();
+    const amount = product.price;
+    const sessionId = (0, import_node_crypto14.randomUUID)().replace(/-/g, "");
+    const back = `${trustedOrigin()}/shop/order?id=${sessionId}&token=${orderToken2(sessionId)}`;
+    const result = recordOf(await createPayment({
+      provider: { code: provider.code },
+      amount,
+      currency: "usd",
+      description: `${shop.name} \xB7 ${product.name} \xB7 ${usd2(amount)}`,
+      successUrl: back,
+      cancelUrl: `${back}&result=cancelled`,
+      idempotencyKey: key,
+      customerEmail: buyerEmail,
+      metadata: { purpose: "product_order", productId: product.id }
+    }));
+    if (!result.id || typeof result.url !== "string") throw new Error("Stripe did not open a checkout.");
+    await prisma.paymentSession.create({ data: {
+      id: sessionId,
+      shopId: shop.id,
+      paymentProviderId: provider.id,
+      idempotencyKeyHash: hashPublicAccessToken(`product-order:${key}`),
+      status: "pending",
+      amount,
+      currencyCode: "USD",
+      providerPaymentId: String(result.id),
+      expiresAt: new Date(Date.now() + 23 * 36e5),
+      metadata: { purpose: "product_order", productId: product.id, productName: product.name, quantity: 1, buyerName, buyerEmail, checkoutUrl: result.url }
+    } });
+    return { success: true, error: null, data: { url: result.url } };
+  } catch (error) {
+    console.error("Product checkout could not be opened:", error);
+    return fail6("Online checkout is unavailable right now. Try again in a moment.");
+  }
+}
+async function settleProductOrder(prisma, sessionId) {
+  const session = await prisma.paymentSession.findUnique({ where: { id: sessionId }, include: { paymentProvider: { select: { code: true } }, transaction: { select: { id: true } } } });
+  const meta = recordOf(session?.metadata);
+  if (!session || meta.purpose !== "product_order") throw new Error("Order not found.");
+  if (session.status === "pending" && session.paymentProvider) {
+    const remote = recordOf(await getPaymentStatus({ provider: { code: session.paymentProvider.code }, paymentId: session.providerPaymentId }));
+    if (remote.status === "expired") {
+      await prisma.paymentSession.updateMany({ where: { id: session.id, status: "pending" }, data: { status: "expired", cancelledAt: /* @__PURE__ */ new Date() } });
+    } else if (remote.status === "captured") {
+      if (Number(remote.amount) !== session.amount) throw new Error("The amount paid does not match the order. Contact the shop.");
+      await prisma.paymentSession.updateMany({ where: { id: session.id, status: "pending" }, data: { status: "captured", capturedAt: /* @__PURE__ */ new Date() } });
+    }
+  }
+  const fresh = await prisma.paymentSession.findUniqueOrThrow({ where: { id: session.id }, include: { transaction: { select: { id: true } } } });
+  if (["captured", "partially_refunded", "refunded"].includes(String(fresh.status)) && !fresh.transaction) {
+    await runSerializableTransaction(prisma, async (client) => {
+      const tx = client;
+      await tx.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", "barbershop-product-order", fresh.id);
+      const done = await tx.checkoutTransaction.findUnique({ where: { paymentSessionId: fresh.id }, select: { id: true } });
+      if (done) return;
+      await createProductSaleInTransaction(tx, {
+        shopId: fresh.shopId,
+        productId: String(meta.productId),
+        quantity: 1,
+        taxRateBps: 0,
+        paymentMethod: "card",
+        lineNumber: `product-order-${fresh.id}`,
+        paymentSessionId: fresh.id,
+        online: true
+      });
+    });
+  }
+  return { status: String(fresh.status), name: String(meta.productName || "Product"), amount: fresh.amount, buyerEmail: String(meta.buyerEmail || "") };
+}
+async function confirmProductOrder(_root, args, context) {
+  if (!tokenOk2(args.orderId, args.token)) return { success: false, error: "We could not find that order.", data: null };
+  try {
+    return { success: true, error: null, data: await settleProductOrder(context.sudo().prisma, args.orderId) };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "We could not check the payment yet.", data: null };
+  }
+}
+async function settleOpenProductOrders(prisma, shopId) {
+  const open = await prisma.paymentSession.findMany({ where: { shopId, OR: [{ status: "pending" }, { status: "captured", transaction: null }], metadata: { path: ["purpose"], equals: "product_order" } }, select: { id: true }, take: 20 });
+  for (const row of open) await settleProductOrder(prisma, row.id).catch(() => void 0);
+}
+var import_node_crypto14, EMAIL2, usd2;
+var init_productOrders = __esm({
+  "features/keystone/mutations/productOrders.ts"() {
+    "use strict";
+    import_node_crypto14 = require("node:crypto");
+    init_trusted_origin();
+    init_paymentProviderAdapter();
+    init_publicAccessToken();
+    init_publicShop();
+    init_serializableTransaction();
+    init_manageProductSales();
+    init_publicDeposits();
+    init_paymentSessionResult();
+    EMAIL2 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    usd2 = (cents2) => `$${(cents2 / 100).toFixed(cents2 % 100 ? 2 : 0)}`;
+  }
+});
+
+// features/keystone/mutations/deskCardPayment.ts
+function deskData(session) {
+  return recordOf(session.metadata);
+}
+async function ticketTotal(prisma, shopId, appointmentId, ticket) {
+  const appointment = await prisma.appointment.findFirst({ where: { id: appointmentId, shopId }, select: { id: true, status: true, price: true, paymentStatus: true, depositAmount: true, transactionId: true, serviceTitleSnapshot: true, customer: { select: { email: true } } } });
+  if (!appointment) throw new Error("Appointment not found.");
+  if (appointment.transactionId || appointment.paymentStatus === "paid") throw new Error("This visit is already paid.");
+  if (appointment.status !== "in_chair") throw new Error("Seat this visit before taking payment.");
+  if (appointment.price == null) throw new Error("This appointment has no agreed price.");
+  const subtotal = appointment.price;
+  const discount = Math.min(ticket.discountAmount, subtotal);
+  const total = subtotal + ticket.tipAmount + ticket.taxAmount - discount;
+  const deposit = appointment.paymentStatus === "deposit_paid" ? Math.min(appointment.depositAmount || 0, total) : 0;
+  return { appointment, total, collect: total - deposit };
+}
+async function startDeskCardPayment(_root, args, context) {
+  if (!permissions.canManagePayments({ session: context.session })) return fail("Not authorized to take payments.");
   try {
     const shopId = await requireCurrentShopPermission(context.session, "canManagePayments");
-    const commandHash = hashPublicAccessToken(idempotencyKey);
-    const reconciliation = await runSerializableTransaction(context.prisma, async (client) => {
+    const ticket = { tipAmount: cents(args.tipAmount), discountAmount: cents(args.discountAmount), taxAmount: cents(args.taxAmount), notes: (args.notes || "").trim().slice(0, 500) };
+    const { appointment, collect } = await ticketTotal(context.prisma, shopId, args.appointmentId, ticket);
+    if (collect <= 0) return fail("Nothing to collect by card. Record the visit with cash tender.");
+    const provider = await onlineDepositProvider(context.prisma, shopId);
+    if (!provider) return fail("Card payments need Stripe connected. Use Card terminal to record a payment taken elsewhere.");
+    const open = await context.prisma.paymentSession.findMany({ where: { shopId, appointmentId: appointment.id, status: "pending", paymentProviderId: provider.id }, orderBy: { createdAt: "desc" } });
+    for (const session2 of open) {
+      const data = deskData(session2);
+      if (data.purpose !== "desk_card") continue;
+      const same = session2.amount === collect && JSON.stringify(data.ticket) === JSON.stringify(ticket);
+      if (same && typeof data.checkoutUrl === "string" && (!session2.expiresAt || session2.expiresAt > /* @__PURE__ */ new Date())) {
+        return { success: true, error: null, data: { sessionId: session2.id, url: data.checkoutUrl, amount: session2.amount, status: "pending", recorded: false } };
+      }
+      const status = recordOf(await getPaymentStatus({ provider: { code: provider.code }, paymentId: session2.providerPaymentId }));
+      if (status.status === "captured") return fail("A card payment for this visit was already taken. Press Check payment to record it.");
+      await expireCheckout(session2.providerPaymentId);
+      await context.prisma.paymentSession.update({ where: { id: session2.id }, data: { status: "cancelled", cancelledAt: /* @__PURE__ */ new Date() } });
+    }
+    const key = (0, import_node_crypto15.randomUUID)();
+    const back = `${trustedOrigin()}/pay`;
+    const result = recordOf(await createPayment({
+      provider: { code: provider.code },
+      amount: collect,
+      currency: "usd",
+      description: `${appointment.serviceTitleSnapshot || "Visit"}`,
+      successUrl: `${back}?result=paid`,
+      cancelUrl: `${back}?result=cancelled`,
+      idempotencyKey: key,
+      metadata: { appointmentId: appointment.id, purpose: "desk_card" },
+      customerEmail: appointment.customer?.email || ""
+    }));
+    const url = typeof result.url === "string" ? result.url : "";
+    if (!result.id || !url) throw new Error("Stripe did not open a card page.");
+    const session = await context.prisma.paymentSession.create({ data: {
+      shopId,
+      appointmentId: appointment.id,
+      paymentProviderId: provider.id,
+      idempotencyKeyHash: hashPublicAccessToken(`desk-card:${key}`),
+      status: "pending",
+      amount: collect,
+      currencyCode: "USD",
+      providerPaymentId: String(result.id),
+      expiresAt: new Date(Date.now() + 23 * 36e5),
+      metadata: { purpose: "desk_card", checkoutUrl: url, ticket, operatorId: context.session?.itemId || null }
+    } });
+    return { success: true, error: null, data: { sessionId: session.id, url, amount: collect, status: "pending", recorded: false } };
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : "Unable to open a card payment.");
+  }
+}
+async function expireCheckout(checkoutId) {
+  if (!checkoutId || !process.env.STRIPE_SECRET_KEY) return;
+  await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(checkoutId)}/expire`, { method: "POST", headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` }, redirect: "error" }).catch(() => void 0);
+}
+async function checkDeskCardPayment(_root, args, context) {
+  if (!permissions.canManagePayments({ session: context.session })) return fail("Not authorized to take payments.");
+  try {
+    const shopId = await requireCurrentShopPermission(context.session, "canManagePayments");
+    let session = await context.prisma.paymentSession.findFirst({ where: { id: args.paymentSessionId, shopId }, include: { paymentProvider: { select: { code: true } }, transaction: { select: { id: true } } } });
+    const data = session ? deskData(session) : {};
+    if (!session || data.purpose !== "desk_card" || !session.appointmentId || !session.paymentProvider) return fail("Card payment not found.");
+    if (session.transaction) return { success: true, error: null, data: { sessionId: session.id, url: null, amount: session.amount, status: "captured", recorded: true, transactionId: session.transaction.id } };
+    if (session.status === "pending") {
+      const status = recordOf(await getPaymentStatus({ provider: { code: session.paymentProvider.code }, paymentId: session.providerPaymentId }));
+      if (status.status === "expired") {
+        await context.prisma.paymentSession.update({ where: { id: session.id }, data: { status: "expired", cancelledAt: /* @__PURE__ */ new Date() } });
+        return { success: true, error: "The card page expired without payment.", data: { sessionId: session.id, url: null, amount: session.amount, status: "expired", recorded: false } };
+      }
+      if (status.status !== "captured") return { success: true, error: null, data: { sessionId: session.id, url: String(data.checkoutUrl || ""), amount: session.amount, status: "pending", recorded: false } };
+      if (Number(status.amount) !== session.amount) return fail("Stripe reports a different amount. Check this payment in Stripe.");
+      const capturedAt = /* @__PURE__ */ new Date();
+      await context.prisma.$transaction(async (transaction) => {
+        const claimed = await transaction.paymentSession.updateMany({ where: { id: session.id, status: "pending" }, data: { status: "captured", capturedAt } });
+        if (!claimed.count) return;
+        await recordCommandReceipt(transaction, buildCommandReceipt({
+          actorId: context.session?.itemId,
+          eventKey: `payment-session:${session.id}:captured:v1`,
+          eventType: "payment_session.captured",
+          aggregateType: "payment_session",
+          aggregateId: session.id,
+          shopId,
+          occurredAt: capturedAt,
+          data: { paymentSession: { id: session.id, appointmentId: session.appointmentId, amount: session.amount, purpose: "desk_card" } }
+        }));
+      });
+      session = { ...session, status: "captured" };
+    }
+    if (session.status !== "captured") return { success: true, error: null, data: { sessionId: session.id, url: null, amount: session.amount, status: String(session.status), recorded: false } };
+    const ticket = recordOf(data.ticket);
+    const result = await checkoutAppointment(null, {
+      appointmentId: session.appointmentId,
+      paymentMethod: "card",
+      tipAmount: Number(ticket.tipAmount || 0),
+      discountAmount: Number(ticket.discountAmount || 0),
+      taxAmount: Number(ticket.taxAmount || 0),
+      notes: String(ticket.notes || ""),
+      paymentSessionId: session.id,
+      idempotencyKey: `desk-card-checkout:${session.id}`
+    }, context);
+    if (!result.success) return { success: false, error: `Card paid, but checkout was not recorded: ${result.error}`, data: { sessionId: session.id, url: null, amount: session.amount, status: "captured", recorded: false } };
+    return { success: true, error: null, data: { sessionId: session.id, url: null, amount: session.amount, status: "captured", recorded: true, transactionId: result.transaction?.id || null } };
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : "Unable to check the card payment.");
+  }
+}
+async function cancelDeskCardPayment(_root, args, context) {
+  if (!permissions.canManagePayments({ session: context.session })) return fail("Not authorized to take payments.");
+  try {
+    const shopId = await requireCurrentShopPermission(context.session, "canManagePayments");
+    const session = await context.prisma.paymentSession.findFirst({ where: { id: args.paymentSessionId, shopId }, include: { paymentProvider: { select: { code: true } }, transaction: { select: { id: true } } } });
+    if (!session || deskData(session).purpose !== "desk_card" || !session.paymentProvider) return fail("Card payment not found.");
+    if (session.transaction) return fail("This card payment is on a receipt. Refund it from Payments.");
+    const status = session.status === "pending" ? recordOf(await getPaymentStatus({ provider: { code: session.paymentProvider.code }, paymentId: session.providerPaymentId })) : { status: session.status };
+    if (status.status === "captured") {
+      await refundPayment({ provider: { code: session.paymentProvider.code }, paymentId: session.providerPaymentId, amount: session.amount, idempotencyKey: `desk-card-refund:${session.id}` });
+      await context.prisma.paymentSession.update({ where: { id: session.id }, data: { status: "refunded", refundedAmount: session.amount, capturedAt: session.capturedAt || /* @__PURE__ */ new Date() } });
+      return { success: true, error: null, data: { sessionId: session.id, url: null, amount: session.amount, status: "refunded", recorded: false } };
+    }
+    await expireCheckout(session.providerPaymentId);
+    await context.prisma.paymentSession.update({ where: { id: session.id }, data: { status: "cancelled", cancelledAt: /* @__PURE__ */ new Date() } });
+    return { success: true, error: null, data: { sessionId: session.id, url: null, amount: session.amount, status: "cancelled", recorded: false } };
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : "Unable to cancel the card payment.");
+  }
+}
+async function openDeskCardPayment(_root, args, context) {
+  if (!permissions.canManagePayments({ session: context.session })) return fail("Not authorized to take payments.");
+  try {
+    const shopId = await requireCurrentShopPermission(context.session, "canManagePayments");
+    const rows = await context.prisma.paymentSession.findMany({ where: { shopId, appointmentId: args.appointmentId, status: { in: ["pending", "captured"] }, transaction: null }, orderBy: { createdAt: "desc" }, take: 5 });
+    const session = rows.find((row) => deskData(row).purpose === "desk_card");
+    if (!session) return { success: true, error: null, data: null };
+    return { success: true, error: null, data: { sessionId: session.id, url: String(deskData(session).checkoutUrl || ""), amount: session.amount, status: String(session.status), recorded: false } };
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : "Unable to read card payments.");
+  }
+}
+var import_node_crypto15, fail, cents;
+var init_deskCardPayment = __esm({
+  "features/keystone/mutations/deskCardPayment.ts"() {
+    "use strict";
+    import_node_crypto15 = require("node:crypto");
+    init_access();
+    init_trusted_origin();
+    init_currentAuthorization();
+    init_commandReceipt();
+    init_paymentProviderAdapter();
+    init_publicAccessToken();
+    init_publicDeposits();
+    init_paymentSessionResult();
+    init_checkoutAppointment();
+    fail = (error) => ({ success: false, error, data: null });
+    cents = (value) => {
+      const amount = Number(value ?? 0);
+      if (!Number.isSafeInteger(amount) || amount < 0 || amount > 2e9) throw new Error("Amounts must be whole cents.");
+      return amount;
+    };
+  }
+});
+
+// features/keystone/mutations/markAppointmentNoShow.ts
+async function markAppointmentNoShow(_root, args, context) {
+  if (!permissions.canManageAppointments({ session: context.session })) {
+    return { success: false, error: "Not authorized to mark no-shows.", evidence: null };
+  }
+  const appointmentId = args.appointmentId?.trim();
+  const reason = args.reason?.trim();
+  const idempotencyKey = args.idempotencyKey?.trim();
+  if (!appointmentId || !reason || reason.length > 500 || !idempotencyKey) {
+    return { success: false, error: "Appointment, reason, and idempotency key are required.", evidence: null };
+  }
+  try {
+    const evidence = await runSerializableTransaction(context.prisma, async (client) => {
       const transaction = client;
-      await requireCurrentShopPermission(context.session, "canManagePayments", transaction);
-      await transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", "barbershop-payment-session", args.paymentSessionId);
-      const eventKey = `payment-reconciliation:${commandHash}:v1`;
-      const replay = await transaction.paymentReconciliation.findUnique({ where: { eventKey } });
+      const shopId = await requireCurrentShopPermission(context.session, "canManageAppointments", transaction);
+      await transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", "barbershop-no-show", appointmentId);
+      const now = /* @__PURE__ */ new Date();
+      const appointment = await transaction.appointment.findFirst({
+        where: { id: appointmentId, shopId },
+        include: { customer: { include: { packageBalances: {
+          where: { status: "active", membershipPlanId: { not: null }, startsAt: { lte: now }, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+          take: 1
+        } } } }
+      });
+      if (!appointment) throw new Error("Appointment not found.");
+      const commandHash = hashPublicAccessToken(idempotencyKey);
+      const eventKey = `appointment-no-show:${commandHash}:v1`;
+      const replay = await transaction.noShowEvent.findUnique({ where: { eventKey } });
       if (replay) {
-        if (replay.shopId !== shopId || replay.paymentSessionId !== args.paymentSessionId) throw new Error("Reconciliation idempotency key was already used.");
+        if (replay.appointmentId !== appointmentId || replay.reason !== reason || args.policyId && replay.policyId !== args.policyId) throw new Error("No-show idempotency key was reused with different input.");
         return replay;
       }
-      const paymentSession = await transaction.paymentSession.findFirst({
-        where: { id: args.paymentSessionId, shopId },
-        include: { paymentProvider: true, transaction: true }
+      if (!["confirmed", "checked_in"].includes(String(appointment.status))) {
+        throw new Error(`Appointment in ${appointment.status} state cannot be marked no-show.`);
+      }
+      const policy = args.policyId ? await transaction.noShowPolicy.findFirst({ where: { id: args.policyId, shopId: appointment.shopId, status: "active" } }) : await transaction.noShowPolicy.findFirst({ where: { shopId: appointment.shopId, status: "active" }, orderBy: { createdAt: "asc" } });
+      if (!policy) throw new Error("An active no-show policy is required.");
+      const snapshot = calculateNoShowEvidence(policy, { hasMembership: Boolean(appointment.customer?.packageBalances.length) });
+      const eligibleAt = new Date(appointment.startsAt.getTime() + snapshot.graceMinutes * 6e4);
+      if (/* @__PURE__ */ new Date() < eligibleAt) throw new Error(`No-show can be recorded after the ${snapshot.graceMinutes}-minute grace period.`);
+      const markedAt = /* @__PURE__ */ new Date();
+      const created = await transaction.noShowEvent.create({
+        data: {
+          shopId: appointment.shopId,
+          eventKey,
+          appointmentId,
+          customerId: appointment.customerId,
+          policyId: policy.id,
+          policyNameSnapshot: policy.name,
+          feeAmount: snapshot.feeAmount,
+          graceMinutes: snapshot.graceMinutes,
+          feeWaived: snapshot.feeWaived,
+          reason,
+          markedAt
+        }
       });
-      if (!paymentSession || !paymentSession.paymentProvider) throw new Error("Payment session or provider was not found.");
-      if (isOfflinePaymentProvider(paymentSession.paymentProvider)) {
-        throw new Error("Pay-in-person sessions have no processor status to reconcile. Record payment at checkout.");
-      }
-      if (!paymentSession.providerPaymentId) throw new Error("This session has no processor payment reference to reconcile.");
-      const providerResult = recordOf(await getPaymentStatus({
-        provider: paymentSession.paymentProvider,
-        paymentId: paymentSession.providerPaymentId,
-        amount: paymentSession.amount,
-        currency: paymentSession.currencyCode.toLowerCase(),
-        paymentSessionId: paymentSession.id,
-        appointmentId: paymentSession.appointmentId
-      }));
-      const remoteStatus = String(providerResult.status || "").toLowerCase();
-      const observed = REMOTE_STATUS[remoteStatus];
-      if (!observed) throw new Error("The provider returned a payment status that cannot be reconciled automatically.");
-      if (providerResult.amount != null && Number(providerResult.amount) !== paymentSession.amount) {
-        throw new Error("The provider reported a different amount. Review this payment with the provider.");
-      }
-      if (typeof providerResult.currency === "string" && providerResult.currency.toUpperCase() !== paymentSession.currencyCode.toUpperCase()) {
-        throw new Error("The provider reported a different currency. Review this payment with the provider.");
-      }
-      const before = String(paymentSession.status);
-      const reportedRefund = Number(providerResult.refundedAmount);
-      const refundKnown = Number.isSafeInteger(reportedRefund) && reportedRefund >= 0 && reportedRefund <= paymentSession.amount;
-      let next = before;
-      let refundedAmount = paymentSession.refundedAmount ?? 0;
-      if (observed !== before && ALLOWED[before]?.includes(observed)) {
-        if (observed === "refunded" || observed === "partially_refunded") {
-          if (refundKnown && reportedRefund > refundedAmount) {
-            refundedAmount = reportedRefund;
-            next = reportedRefund >= paymentSession.amount ? "refunded" : "partially_refunded";
-          }
-        } else {
-          next = observed;
-        }
-      } else if (before === "partially_refunded" && observed === "partially_refunded" && refundKnown && reportedRefund > refundedAmount) {
-        refundedAmount = reportedRefund;
-      }
-      const changed = next !== before || refundedAmount !== (paymentSession.refundedAmount ?? 0);
-      const observedAt = /* @__PURE__ */ new Date();
-      if (changed) {
-        await lockAppointmentMoney(transaction, paymentSession.appointmentId);
-        await transaction.paymentSession.update({
-          where: { id: paymentSession.id },
-          data: {
-            status: next,
-            refundedAmount,
-            ...next === "captured" && !paymentSession.capturedAt ? { capturedAt: observedAt } : {}
-          }
-        });
-        const appointment = paymentSession.appointmentId ? await transaction.appointment.findFirst({ where: { id: paymentSession.appointmentId, shopId }, select: { id: true, paymentStatus: true, transactionId: true } }) : null;
-        if (appointment && !appointmentSettledElsewhere(appointment.paymentStatus) && next === "captured") {
-          await transaction.appointment.update({ where: { id: appointment.id }, data: { paymentStatus: "deposit_paid" } });
-        }
-        if (appointment && next === "refunded" && appointment.paymentStatus === "deposit_paid" && !appointment.transactionId) {
-          await transaction.appointment.update({ where: { id: appointment.id }, data: { paymentStatus: "refunded" } });
-        }
-        if (paymentSession.transaction?.id && ["partially_refunded", "refunded"].includes(next)) {
-          await transaction.checkoutTransaction.update({ where: { id: paymentSession.transaction.id }, data: { status: next } });
-        }
-      }
-      const providerPayloadHash = (0, import_node_crypto10.createHash)("sha256").update(canonicalJson(providerResult)).digest("hex");
-      const created = await transaction.paymentReconciliation.create({ data: {
-        shopId,
-        eventKey,
-        paymentSessionId: paymentSession.id,
-        localStatusBefore: before,
-        remoteStatus,
-        localStatusAfter: next,
-        changed,
-        amount: paymentSession.amount,
-        providerPayloadHash,
-        observedAt
-      } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await transaction.appointment.update({ where: { id: appointmentId }, data: { status: "no_show", cancellationReason: reason } });
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
-        eventKey: `${eventKey}:outbox`,
-        eventType: "payment_session.reconciled",
-        aggregateType: "payment_session",
-        aggregateId: paymentSession.id,
-        shopId,
-        occurredAt: observedAt,
-        data: { reconciliation: { id: created.id, localStatusBefore: before, remoteStatus, localStatusAfter: next, changed, amount: paymentSession.amount, refundedAmount } }
+        eventKey: `${eventKey}:receipt`,
+        eventType: "appointment.no_show",
+        aggregateType: "appointment",
+        aggregateId: appointmentId,
+        shopId: appointment.shopId,
+        occurredAt: markedAt,
+        data: { noShow: { evidenceId: created.id, policyId: policy.id, policyName: policy.name, ...snapshot, reason, actorId: context.session?.itemId ?? null } }
       }));
       return created;
     });
-    return { success: true, error: null, reconciliation: reconciliationResult(reconciliation) };
+    return { success: true, error: null, evidence: { id: evidence.id, appointmentId: evidence.appointmentId, feeAmount: evidence.feeAmount, feeWaived: evidence.feeWaived, markedAt: evidence.markedAt.toISOString() } };
   } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : "Unable to reconcile payment.", reconciliation: null };
+    return { success: false, error: error instanceof Error ? error.message : "Unable to mark no-show.", evidence: null };
   }
 }
-var import_node_crypto10, REMOTE_STATUS, ALLOWED;
-var init_reconcilePaymentSession = __esm({
-  "features/keystone/mutations/reconcilePaymentSession.ts"() {
+var init_markAppointmentNoShow = __esm({
+  "features/keystone/mutations/markAppointmentNoShow.ts"() {
     "use strict";
-    import_node_crypto10 = require("node:crypto");
     init_access();
     init_currentAuthorization();
-    init_lifecycleOutbox();
-    init_paymentProviderAdapter();
+    init_commandReceipt();
+    init_remainingLifecycle();
     init_publicAccessToken();
     init_serializableTransaction();
-    init_paymentSessionResult();
-    REMOTE_STATUS = {
-      pending: "pending",
-      authorized: "authorized",
-      captured: "captured",
-      paid: "captured",
-      succeeded: "captured",
-      partially_refunded: "partially_refunded",
-      refunded: "refunded",
-      cancelled: "cancelled",
-      canceled: "cancelled",
-      expired: "expired",
-      failed: "failed"
-    };
-    ALLOWED = {
-      pending: ["authorized", "captured", "failed", "cancelled", "expired"],
-      authorized: ["captured", "failed", "cancelled", "expired"],
-      captured: ["partially_refunded", "refunded"],
-      partially_refunded: ["partially_refunded", "refunded"]
-    };
+  }
+});
+
+// features/keystone/mutations/manageCommissions.ts
+async function transitionCommission(_root, args, context) {
+  if (!permissions.canManagePayments({ session: context.session })) return { success: false, error: "Not authorized to manage commissions.", commission: null };
+  try {
+    const commandHash = hashPublicAccessToken(args.idempotencyKey?.trim() || "");
+    if (!args.commissionId || !args.idempotencyKey?.trim()) throw new Error("Commission and idempotency key are required.");
+    if (!["approved", "voided"].includes(args.toStatus)) throw new Error("Commissions can be approved or voided here. Record payment with Create payout.");
+    const result = await runSerializableTransaction(context.prisma, async (client) => {
+      const transaction = client;
+      const shopId = await requireCurrentShopPermission(context.session, "canManagePayments", transaction);
+      await transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", "barbershop-commission", args.commissionId);
+      const commission = await transaction.commission.findFirst({ where: { id: args.commissionId, shopId } });
+      if (!commission) throw new Error("Commission not found.");
+      const eventKey = `commission-command:${commandHash}:v1`;
+      const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
+      if (replay) {
+        const payload = replay.payload;
+        if (payload?.data?.transition?.commissionId !== commission.id || payload.data.transition.toStatus !== args.toStatus || String(payload.data.transition.reason || "") !== (args.reason?.trim() || "")) throw new Error("Commission idempotency key was reused for a different command.");
+        return commission;
+      }
+      assertCommissionTransition(String(commission.status), args.toStatus);
+      const updated = await transaction.commission.update({ where: { id: commission.id }, data: { status: args.toStatus } });
+      await recordCommandReceipt(transaction, buildCommandReceipt({
+        actorId: context.session?.itemId,
+        eventKey,
+        eventType: `commission.${args.toStatus}`,
+        aggregateType: "commission",
+        aggregateId: commission.id,
+        shopId: commission.shopId,
+        occurredAt: updated.updatedAt,
+        data: { transition: { commissionId: commission.id, fromStatus: commission.status, toStatus: args.toStatus, reason: args.reason?.trim() || "", actorId: context.session?.itemId ?? null }, amount: commission.commissionAmount }
+      }));
+      return updated;
+    });
+    return { success: true, error: null, commission: { id: result.id, status: result.status, commissionAmount: result.commissionAmount } };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Unable to transition commission.", commission: null };
+  }
+}
+async function createCommissionPayout(_root, args, context) {
+  if (!permissions.canManagePayments({ session: context.session })) return { success: false, error: "Not authorized to create payouts.", payout: null };
+  const ids = Array.from(new Set(args.commissionIds || [])).filter(Boolean);
+  if (ids.length < 1 || ids.length > 100 || !args.notes?.trim() || args.notes.trim().length > 500 || !args.idempotencyKey?.trim()) return { success: false, error: "Choose 1\u2013100 commissions and provide a payout method/reference plus idempotency key.", payout: null };
+  try {
+    const hash9 = hashPublicAccessToken(args.idempotencyKey.trim());
+    const payout = await runSerializableTransaction(context.prisma, async (client) => {
+      const transaction = client;
+      await transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", "barbershop-payout", hash9);
+      const activeShopId = await requireCurrentShopPermission(context.session, "canManagePayments", transaction);
+      const replay = await transaction.commissionPayout.findUnique({ where: { idempotencyKeyHash: hash9 }, include: { commissions: { select: { id: true } } } });
+      if (replay) {
+        if (replay.shopId !== activeShopId) throw new Error("Payout idempotency key was reused with different input.");
+        const replayIds = replay.commissions.map((item) => item.id).sort();
+        if (replayIds.join(",") !== [...ids].sort().join(",") || replay.notes !== (args.notes?.trim() || "")) {
+          throw new Error("Payout idempotency key was reused with different input.");
+        }
+        return replay;
+      }
+      const commissions = await transaction.commission.findMany({ where: { id: { in: ids }, shopId: activeShopId }, orderBy: { id: "asc" } });
+      if (commissions.length !== ids.length) throw new Error("One or more commissions were not found.");
+      const shopId = activeShopId;
+      if (commissions.some((item) => item.shopId !== shopId)) throw new Error("Payout commissions must belong to one shop.");
+      if (commissions.some((item) => item.status !== "approved")) throw new Error("Only approved commissions can be paid.");
+      const barberId = commissions[0].barberId;
+      if (!barberId || commissions.some((item) => item.barberId !== barberId)) throw new Error("A payout must contain commissions for one barber.");
+      const paidAt = /* @__PURE__ */ new Date();
+      const totalAmount = commissions.reduce((sum, item) => sum + (item.commissionAmount || 0), 0);
+      const created = await transaction.commissionPayout.create({
+        data: { shopId, payoutNumber: `payout-${hash9.slice(0, 20)}`, idempotencyKeyHash: hash9, barberId, commissionCount: commissions.length, totalAmount, paidAt, notes: args.notes?.trim() || "" }
+      });
+      await transaction.commission.updateMany({ where: { id: { in: ids }, status: "approved" }, data: { status: "paid", paidAt, payoutId: created.id } });
+      await recordCommandReceipt(transaction, buildCommandReceipt({
+        actorId: context.session?.itemId,
+        eventKey: `commission-payout:${created.id}:paid:v1`,
+        eventType: "commission_payout.paid",
+        aggregateType: "commission_payout",
+        aggregateId: created.id,
+        shopId,
+        occurredAt: paidAt,
+        data: { payout: { id: created.id, barberId, commissionIds: ids.sort(), commissionCount: commissions.length, totalAmount, payoutReference: args.notes.trim(), actorId: context.session?.itemId ?? null } }
+      }));
+      return created;
+    });
+    return { success: true, error: null, payout: { id: payout.id, payoutNumber: payout.payoutNumber, commissionCount: payout.commissionCount, totalAmount: payout.totalAmount, paidAt: payout.paidAt.toISOString() } };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Unable to create payout.", payout: null };
+  }
+}
+var init_manageCommissions = __esm({
+  "features/keystone/mutations/manageCommissions.ts"() {
+    "use strict";
+    init_access();
+    init_currentAuthorization();
+    init_commandReceipt();
+    init_remainingLifecycle();
+    init_publicAccessToken();
+    init_serializableTransaction();
+  }
+});
+
+// features/keystone/utils/customerMerge.ts
+function mergedCustomerFields(kept, duplicate) {
+  const data = {};
+  if (!kept.email && duplicate.email) data.email = duplicate.email;
+  if (!kept.phone && duplicate.phone) data.phone = duplicate.phone;
+  if (!kept.birthday && duplicate.birthday) data.birthday = duplicate.birthday;
+  if (!kept.preferredBarberId && duplicate.preferredBarberId) data.preferredBarberId = duplicate.preferredBarberId;
+  if (duplicate.lastVisitAt && (!kept.lastVisitAt || duplicate.lastVisitAt > kept.lastVisitAt)) data.lastVisitAt = duplicate.lastVisitAt;
+  if (kept.acceptsMarketing && !duplicate.acceptsMarketing) data.acceptsMarketing = false;
+  if (!kept.userId && duplicate.userId) data.userId = duplicate.userId;
+  return data;
+}
+function mergeRefusal(kept, duplicate, shopId) {
+  if (!kept || !duplicate || kept.shopId !== shopId || duplicate.shopId !== shopId) return "Customer not found.";
+  if (kept.id === duplicate.id) return "Choose a different customer to merge into.";
+  if (kept.userId && duplicate.userId && kept.userId !== duplicate.userId) return "These customers belong to two different online accounts and can\u2019t be merged.";
+  return null;
+}
+var init_customerMerge = __esm({
+  "features/keystone/utils/customerMerge.ts"() {
+    "use strict";
   }
 });
 
@@ -9437,7 +10864,7 @@ async function addCustomerNote(_root, args, context) {
       const isOwner = await hasCurrentOwnerMembership(context.session, shopId, transaction);
       if (visibility === "owner" && !isOwner) throw new Error("Only a shop owner can add owner-only notes.");
       const eventKey = `customer-note:${hash9}:v1`;
-      const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+      const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
       if (replay) {
         const payload = replay.payload;
         if (replay.shopId !== shopId || payload?.data?.note?.customerId !== args.customerId || payload.data.note.createdById !== context.session?.itemId) throw new Error("Customer note idempotency key was reused.");
@@ -9463,7 +10890,7 @@ async function addCustomerNote(_root, args, context) {
         visibility,
         body
       } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
         eventKey,
         eventType: "customer_note.created",
@@ -9492,7 +10919,7 @@ async function setCustomerStatus(_root, args, context) {
       const current = await transaction.customer.findFirst({ where: { id: args.customerId, shopId } });
       if (!current) throw new Error("Customer not found.");
       const eventKey = `customer-status:${hash9}:v1`;
-      const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+      const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
       if (replay) {
         const payload = replay.payload;
         if (replay.shopId !== shopId || payload?.aggregateId !== current.id || payload?.data?.transition?.toStatus !== args.status || String(payload.data.transition.reason || "") !== (args.reason?.trim() || "")) {
@@ -9501,7 +10928,7 @@ async function setCustomerStatus(_root, args, context) {
         return current;
       }
       const updated = await transaction.customer.update({ where: { id: current.id }, data: { status: args.status } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
         eventKey,
         eventType: "customer.status_changed",
@@ -9531,14 +10958,14 @@ async function setCustomerConsent(_root, args, context) {
       await transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", "barbershop-customer", args.customerId);
       const current = await transaction.customer.findFirst({ where: { id: args.customerId, shopId } });
       if (!current) throw new Error("Customer not found.");
-      const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+      const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
       if (replay) {
         const payload = replay.payload;
         if (replay.shopId !== shopId || payload?.data?.preference?.customerId !== current.id || payload.data.preference.acceptsMarketing !== args.acceptsMarketing || payload.data.preference.preferredContactMethod !== contact) throw new Error("Customer-consent idempotency key was reused with different input.");
         return current;
       }
       const updated = await transaction.customer.update({ where: { id: current.id }, data: { acceptsMarketing: args.acceptsMarketing, preferredContactMethod: contact } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId, eventKey, eventType: "customer.marketing_preference_recorded", aggregateType: "customer", aggregateId: current.id, shopId: current.shopId, occurredAt: updated.updatedAt, data: { preference: { customerId: current.id, acceptsMarketing: args.acceptsMarketing, preferredContactMethod: contact, previousAcceptsMarketing: current.acceptsMarketing, source: "staff_attestation", recordedById: context.session?.itemId ?? null, customerAssentEvidence: null } } }));
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId, eventKey, eventType: "customer.marketing_preference_recorded", aggregateType: "customer", aggregateId: current.id, shopId: current.shopId, occurredAt: updated.updatedAt, data: { preference: { customerId: current.id, acceptsMarketing: args.acceptsMarketing, preferredContactMethod: contact, previousAcceptsMarketing: current.acceptsMarketing, source: "staff_attestation", recordedById: context.session?.itemId ?? null, customerAssentEvidence: null } } }));
       return updated;
     });
     return { success: true, error: null, customer: { id: customer.id, acceptsMarketing: customer.acceptsMarketing, preferredContactMethod: customer.preferredContactMethod } };
@@ -9558,7 +10985,7 @@ async function issueCustomerWaiver(_root, args, context) {
       const transaction = client;
       const eventKey = `customer-waiver:${commandHash}:v1`;
       const shopId = await requireCurrentShopPermission(context.session, "canManageCustomers", transaction);
-      const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+      const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
       if (replay) {
         const payload = replay.payload;
         const saved = payload?.data?.waiver;
@@ -9569,7 +10996,7 @@ async function issueCustomerWaiver(_root, args, context) {
       if (!customer) throw new Error("Customer not found.");
       if (args.appointmentId && !await transaction.appointment.findFirst({ where: { id: args.appointmentId, shopId: customer.shopId, customerId: customer.id } })) throw new Error("Appointment does not belong to this customer and shop.");
       const created = await transaction.waiverForm.create({ data: { shopId: customer.shopId, customerId: customer.id, appointmentId: args.appointmentId || null, title, waiverType: type, status: "draft", signatureKeyHash: hashPublicAccessToken(`draft:${eventKey}`), metadata: { source: "operator_issue", signatureRequired: true, deliveryRequested: requestedDelivery, delivered: false, issuedById: context.session?.itemId ?? null } } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId, eventKey, eventType: "waiver.issued", aggregateType: "waiver_form", aggregateId: created.id, shopId: customer.shopId, occurredAt: created.createdAt, data: { waiver: { id: created.id, customerId: customer.id, appointmentId: args.appointmentId || null, title, type, status: "draft", deliveryRequested: requestedDelivery, issuedById: context.session?.itemId ?? null } } }));
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId, eventKey, eventType: "waiver.issued", aggregateType: "waiver_form", aggregateId: created.id, shopId: customer.shopId, occurredAt: created.createdAt, data: { waiver: { id: created.id, customerId: customer.id, appointmentId: args.appointmentId || null, title, type, status: "draft", deliveryRequested: requestedDelivery, issuedById: context.session?.itemId ?? null } } }));
       return created;
     });
     return { success: true, error: null, waiver: { id: waiver.id, title: waiver.title, waiverType: waiver.waiverType, status: waiver.status } };
@@ -9577,20 +11004,80 @@ async function issueCustomerWaiver(_root, args, context) {
     return { success: false, error: error instanceof Error ? error.message : "Unable to issue waiver.", waiver: null };
   }
 }
+async function mergeCustomers(_root, args, context) {
+  if (!permissions.canManageCustomers({ session: context.session })) return { success: false, error: "Not authorized to merge customers.", customer: null };
+  if (!args.keepCustomerId || !args.duplicateCustomerId || !args.idempotencyKey?.trim()) return { success: false, error: "Both customers and an idempotency key are required.", customer: null };
+  try {
+    const hash9 = hashPublicAccessToken(args.idempotencyKey.trim());
+    const result = await runSerializableTransaction(context.prisma, async (client) => {
+      const transaction = client;
+      const shopId = await requireCurrentShopPermission(context.session, "canManageCustomers", transaction);
+      for (const id of [args.keepCustomerId, args.duplicateCustomerId].sort()) {
+        await transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", "barbershop-customer", id);
+      }
+      const eventKey = `customer-merge:${hash9}:v1`;
+      const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
+      if (replay) {
+        const payload = replay.payload;
+        if (replay.shopId !== shopId || payload?.aggregateId !== args.keepCustomerId || payload?.data?.merge?.duplicateCustomerId !== args.duplicateCustomerId) throw new Error("Merge idempotency key was reused with different customers.");
+        return { id: args.keepCustomerId, moved: payload.data.merge.moved || {} };
+      }
+      const fields = { id: true, shopId: true, userId: true, lastVisitAt: true, email: true, phone: true, acceptsMarketing: true, birthday: true, preferredBarberId: true };
+      const [kept, duplicate] = await Promise.all([
+        transaction.customer.findFirst({ where: { id: args.keepCustomerId, shopId }, select: fields }),
+        transaction.customer.findFirst({ where: { id: args.duplicateCustomerId, shopId }, select: fields })
+      ]);
+      const refusal = mergeRefusal(kept, duplicate, shopId);
+      if (refusal) throw new Error(refusal);
+      const moved = {};
+      const where = { customerId: duplicate.id };
+      const data = { customerId: kept.id };
+      moved.appointment = (await transaction.appointment.updateMany({ where, data })).count;
+      moved.customerNote = (await transaction.customerNote.updateMany({ where, data })).count;
+      moved.checkoutTransaction = (await transaction.checkoutTransaction.updateMany({ where, data })).count;
+      moved.customerPackage = (await transaction.customerPackage.updateMany({ where, data })).count;
+      moved.membershipEvent = (await transaction.membershipEvent.updateMany({ where, data })).count;
+      moved.noShowEvent = (await transaction.noShowEvent.updateMany({ where, data })).count;
+      moved.walkInQueueEntry = (await transaction.walkInQueueEntry.updateMany({ where, data })).count;
+      moved.waiverForm = (await transaction.waiverForm.updateMany({ where, data })).count;
+      moved.groomingNote = (await transaction.groomingNote.updateMany({ where, data })).count;
+      moved.waitlistEntry = (await transaction.waitlistEntry.updateMany({ where, data })).count;
+      moved.tip = (await transaction.tip.updateMany({ where, data })).count;
+      const merged = mergedCustomerFields(kept, duplicate);
+      await transaction.customer.delete({ where: { id: duplicate.id } });
+      const updated = Object.keys(merged).length ? await transaction.customer.update({ where: { id: kept.id }, data: merged }) : await transaction.customer.findUniqueOrThrow({ where: { id: kept.id } });
+      await recordCommandReceipt(transaction, buildCommandReceipt({
+        actorId: context.session?.itemId,
+        eventKey,
+        eventType: "customer.merged",
+        aggregateType: "customer",
+        aggregateId: kept.id,
+        shopId,
+        occurredAt: updated.updatedAt,
+        data: { merge: { duplicateCustomerId: duplicate.id, moved, filled: Object.keys(merged), actorId: context.session?.itemId ?? null } }
+      }));
+      return { id: kept.id, moved };
+    });
+    return { success: true, error: null, customer: result };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Unable to merge customers.", customer: null };
+  }
+}
 var init_manageCustomers = __esm({
   "features/keystone/mutations/manageCustomers.ts"() {
     "use strict";
     init_access();
     init_currentAuthorization();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_publicAccessToken();
     init_serializableTransaction();
+    init_customerMerge();
   }
 });
 
 // features/keystone/mutations/manageMemberships.ts
 function hash4(value) {
-  return (0, import_node_crypto11.createHash)("sha256").update(value).digest("hex");
+  return (0, import_node_crypto16.createHash)("sha256").update(value).digest("hex");
 }
 function membershipEventType(action) {
   return action === "purchase" || action === "purchase_package" ? "purchased" : action === "renew" ? "renewed" : action === "pause" ? "paused" : action === "resume" ? "resumed" : "cancelled";
@@ -9695,7 +11182,7 @@ async function manageMembership(_root, args, context) {
           occurredAt: now,
           reason: args.reason?.trim() || ""
         } });
-        await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+        await recordCommandReceipt(transaction, buildCommandReceipt({
           actorId: context.session?.itemId,
           eventKey: `membership:${event2.id}:purchased:v1`,
           eventType: "service_package.purchased",
@@ -9821,7 +11308,7 @@ async function manageMembership(_root, args, context) {
         occurredAt: now,
         reason: args.reason?.trim() || ""
       } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
         eventKey: `membership:${event.id}:${eventType}:v1`,
         eventType: `membership.${eventType}`,
@@ -9839,13 +11326,13 @@ async function manageMembership(_root, args, context) {
     return { success: false, error: error instanceof Error ? error.message : "Unable to manage membership.", membership: null };
   }
 }
-var import_node_crypto11, ACTIONS, PAID_ACTIONS, PAYMENT_METHODS;
+var import_node_crypto16, ACTIONS, PAID_ACTIONS, PAYMENT_METHODS;
 var init_manageMemberships = __esm({
   "features/keystone/mutations/manageMemberships.ts"() {
     "use strict";
-    import_node_crypto11 = require("node:crypto");
+    import_node_crypto16 = require("node:crypto");
     init_access();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_serializableTransaction();
     init_currentAuthorization();
     init_supportedSettlementCurrency();
@@ -9862,7 +11349,7 @@ async function refundCashCheckout(_root, args, context) {
     const reason = args.reason?.trim();
     const key = args.idempotencyKey?.trim();
     if (!args.cashReturned || !reason || reason.length < 3 || reason.length > 1e3 || !key || key.length > 200) throw new Error("Confirm the cash has been returned and provide a reason and retry key.");
-    const eventKey = `cash-refund:${shopId}:${(0, import_node_crypto12.createHash)("sha256").update(key).digest("hex")}`;
+    const eventKey = `cash-refund:${shopId}:${(0, import_node_crypto17.createHash)("sha256").update(key).digest("hex")}`;
     const data = await runSerializableTransaction(context.prisma, async (client) => {
       const tx = client;
       await requireCurrentShopPermission(context.session, "canManagePayments", tx);
@@ -9884,7 +11371,7 @@ async function refundCashCheckout(_root, args, context) {
       await tx.checkoutTransaction.update({ where: { id: receipt.id }, data: { status: "refunded" } });
       await tx.appointment.updateMany({ where: { transactionId: receipt.id, shopId }, data: { paymentStatus: "refunded" } });
       await tx.commission.updateMany({ where: { transactionId: receipt.id, status: { in: ["projected", "approved"] } }, data: { status: "voided" } });
-      await enqueueLifecycleEvent(tx, buildLifecycleEnvelope({ actorId: context.session?.itemId, eventKey: `${eventKey}:outbox`, eventType: "checkout.cash_refunded", aggregateType: "checkout_transaction", aggregateId: receipt.id, shopId, occurredAt: refundedAt, data: { refundId: refund.id, amount: refund.amount, tipAmount: refund.tipAmount, taxAmount: refund.taxAmount, reason, actorId: context.session.itemId, settlement: "owner_attested_cash_return" } }));
+      await recordCommandReceipt(tx, buildCommandReceipt({ actorId: context.session?.itemId, eventKey: `${eventKey}:receipt`, eventType: "checkout.cash_refunded", aggregateType: "checkout_transaction", aggregateId: receipt.id, shopId, occurredAt: refundedAt, data: { refundId: refund.id, amount: refund.amount, tipAmount: refund.tipAmount, taxAmount: refund.taxAmount, reason, actorId: context.session.itemId, settlement: "owner_attested_cash_return" } }));
       return { id: refund.id, amount: refund.amount, replayed: false };
     });
     return { success: true, error: null, data };
@@ -9892,13 +11379,13 @@ async function refundCashCheckout(_root, args, context) {
     return { success: false, error: error instanceof Error ? error.message : "Unable to record cash refund.", data: null };
   }
 }
-var import_node_crypto12;
+var import_node_crypto17;
 var init_refundCashCheckout = __esm({
   "features/keystone/mutations/refundCashCheckout.ts"() {
     "use strict";
-    import_node_crypto12 = require("node:crypto");
+    import_node_crypto17 = require("node:crypto");
     init_currentAuthorization();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_serializableTransaction();
     init_supportedSettlementCurrency();
   }
@@ -9923,7 +11410,7 @@ async function acceptedAppointmentsInWindow(transaction, input) {
   } });
 }
 function hash5(value) {
-  return (0, import_node_crypto13.createHash)("sha256").update(value).digest("hex");
+  return (0, import_node_crypto18.createHash)("sha256").update(value).digest("hex");
 }
 function date(value) {
   if (!value) return null;
@@ -9977,7 +11464,7 @@ async function manageStaffShift(_root, args, context) {
           scheduledEnd: endsAt,
           notes: args.notes?.trim() || ""
         } });
-        await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+        await recordCommandReceipt(transaction, buildCommandReceipt({
           actorId: context.session?.itemId,
           eventKey: `shift:${created.id}:scheduled:v1`,
           eventType: "shift.scheduled",
@@ -9991,7 +11478,7 @@ async function manageStaffShift(_root, args, context) {
       }
       if (!args.shiftId) throw new Error("Shift is required.");
       const eventKey = `shift-command:${commandHash}:v1`;
-      const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+      const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
       if (replay) {
         const payload = replay.payload;
         if (replay.shopId !== shopId || payload?.data?.shift?.id !== args.shiftId || payload.data.shift.action !== action) throw new Error("Shift idempotency key was reused for different input.");
@@ -10010,7 +11497,7 @@ async function manageStaffShift(_root, args, context) {
         if (stranded) throw new Error(`${stranded} booked appointment(s) rely on this shift. Reschedule or reassign them before cancelling it.`);
       }
       const updated = await transaction.staffShift.update({ where: { id: current.id }, data });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
         eventKey,
         eventType: `shift.${updated.status}`,
@@ -10073,7 +11560,7 @@ async function manageScheduleException(_root, args, context) {
           endsAt,
           reason: args.reason.trim()
         } });
-        await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+        await recordCommandReceipt(transaction, buildCommandReceipt({
           actorId: context.session?.itemId,
           eventKey: `schedule-exception:${created.id}:created:v1`,
           eventType: "schedule_exception.created",
@@ -10087,7 +11574,7 @@ async function manageScheduleException(_root, args, context) {
       }
       if (!args.exceptionId) throw new Error("Schedule exception is required.");
       const eventKey = `schedule-exception-command:${commandHash}:v1`;
-      const replayEvent = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+      const replayEvent = await transaction.commandReceipt.findUnique({ where: { eventKey } });
       if (replayEvent) {
         const payload = replayEvent.payload;
         if (replayEvent.shopId !== shopId || payload?.data?.exception?.id !== args.exceptionId || payload.data.exception.action !== "cancel") throw new Error("Schedule-exception idempotency key was reused for different input.");
@@ -10097,7 +11584,7 @@ async function manageScheduleException(_root, args, context) {
       if (!current || current.shopId !== shopId) throw new Error("Schedule exception was not found in the active shop.");
       if (current.status === "cancelled") return current;
       const updated = await transaction.scheduleException.update({ where: { id: current.id }, data: { status: "cancelled" } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
         eventKey,
         eventType: "schedule_exception.cancelled",
@@ -10136,7 +11623,7 @@ async function linkBarberAccount(_root, args, context) {
         if (linked) throw new Error("This account is already linked to another barber profile.");
       }
       const updated = await transaction.barber.update({ where: { id: current.id }, data: { userId } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         actorId: context.session?.itemId,
         eventKey: `barber-account:${hash5(key)}:v1`,
         eventType: userId ? "barber.account_linked" : "barber.account_unlinked",
@@ -10153,13 +11640,13 @@ async function linkBarberAccount(_root, args, context) {
     return { success: false, error: error instanceof Error ? error.message : "Unable to link staff account.", barber: null };
   }
 }
-var import_node_crypto13, SHIFT_ACTIONS, EXCEPTION_ACTIONS, EXCEPTION_TYPES, ACCEPTED_APPOINTMENT_STATUSES;
+var import_node_crypto18, SHIFT_ACTIONS, EXCEPTION_ACTIONS, EXCEPTION_TYPES, ACCEPTED_APPOINTMENT_STATUSES;
 var init_manageWorkforce = __esm({
   "features/keystone/mutations/manageWorkforce.ts"() {
     "use strict";
-    import_node_crypto13 = require("node:crypto");
+    import_node_crypto18 = require("node:crypto");
     init_access();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_serializableTransaction();
     init_currentAuthorization();
     SHIFT_ACTIONS = /* @__PURE__ */ new Set(["schedule", "clock_in", "clock_out", "cancel"]);
@@ -10184,7 +11671,7 @@ async function manageWaitlist(_root, args, context) {
       await requireCurrentShopPermission(context.session, "canManageQueue", transaction);
       const inputHash = hash6(JSON.stringify([action, args.waitlistEntryId || null, args.customerName?.trim() || null, args.phone?.trim() || null, args.customerId || null, args.requestedServiceId || null, args.requestedBarberId || null, args.preferredAt || null, args.notes?.trim() || null, context.session?.itemId || null]));
       await transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", "barbershop-waitlist", args.waitlistEntryId || `${shopId}:${args.phone || commandHash}`);
-      const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+      const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
       if (replay) {
         if (replay.shopId !== shopId) throw new Error("Waitlist idempotency key belongs to another shop.");
         const payload = replay.payload;
@@ -10203,7 +11690,7 @@ async function manageWaitlist(_root, args, context) {
         const duplicate = await transaction.waitlistEntry.findFirst({ where: { shopId, phone, status: { in: ["waiting", "notified"] }, requestedServiceId: service?.id || null } });
         if (duplicate) throw new Error("This customer already has an active waitlist request for that service.");
         const created = await transaction.waitlistEntry.create({ data: { shopId, customerName, phone, customerId: customer?.id || null, requestedServiceId: service?.id || null, requestedBarberId: barber?.id || null, status: "waiting", preferredAt, notes: args.notes?.trim() || "", metadata: { source: "operator" } } });
-        await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId, eventKey, eventType: "waitlist.created", aggregateType: "waitlist_entry", aggregateId: created.id, shopId, occurredAt: created.createdAt, data: { waitlist: { id: created.id, action, inputHash, customerId: customer?.id || null, requestedServiceId: service?.id || null, requestedBarberId: barber?.id || null, preferredAt: args.preferredAt || null, actorId: context.session?.itemId ?? null } } }));
+        await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId, eventKey, eventType: "waitlist.created", aggregateType: "waitlist_entry", aggregateId: created.id, shopId, occurredAt: created.createdAt, data: { waitlist: { id: created.id, action, inputHash, customerId: customer?.id || null, requestedServiceId: service?.id || null, requestedBarberId: barber?.id || null, preferredAt: args.preferredAt || null, actorId: context.session?.itemId ?? null } } }));
         return created;
       }
       if (!args.waitlistEntryId) throw new Error("Waitlist entry is required.");
@@ -10211,7 +11698,7 @@ async function manageWaitlist(_root, args, context) {
       if (!current) throw new Error("Waitlist entry was not found in the active shop.");
       if (action === "notify" ? current.status !== "waiting" : !["waiting", "notified"].includes(String(current.status))) throw new Error(`Waitlist entry in ${current.status} state cannot ${action}.`);
       const updated = await transaction.waitlistEntry.update({ where: { id: current.id }, data: action === "notify" ? { status: "notified", notifiedAt: /* @__PURE__ */ new Date() } : { status: "expired" } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId, eventKey, eventType: `waitlist.${updated.status}`, aggregateType: "waitlist_entry", aggregateId: updated.id, shopId, occurredAt: updated.updatedAt, data: { waitlist: { id: updated.id, action, inputHash, fromStatus: current.status, toStatus: updated.status, actorId: context.session?.itemId ?? null } } }));
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId, eventKey, eventType: `waitlist.${updated.status}`, aggregateType: "waitlist_entry", aggregateId: updated.id, shopId, occurredAt: updated.updatedAt, data: { waitlist: { id: updated.id, action, inputHash, fromStatus: current.status, toStatus: updated.status, actorId: context.session?.itemId ?? null } } }));
       return updated;
     });
     return { success: true, error: null, entry: { id: entry.id, status: entry.status, customerName: entry.customerName, preferredAt: entry.preferredAt?.toISOString() || null, notifiedAt: entry.notifiedAt?.toISOString() || null } };
@@ -10219,25 +11706,25 @@ async function manageWaitlist(_root, args, context) {
     return { success: false, error: error instanceof Error ? error.message : "Unable to manage waitlist.", entry: null };
   }
 }
-var import_node_crypto14, ACTIONS2, hash6;
+var import_node_crypto19, ACTIONS2, hash6;
 var init_manageWaitlist = __esm({
   "features/keystone/mutations/manageWaitlist.ts"() {
     "use strict";
-    import_node_crypto14 = require("node:crypto");
+    import_node_crypto19 = require("node:crypto");
     init_access();
     init_currentAuthorization();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_serializableTransaction();
     ACTIONS2 = /* @__PURE__ */ new Set(["create", "notify", "expire"]);
-    hash6 = (value) => (0, import_node_crypto14.createHash)("sha256").update(value).digest("hex");
+    hash6 = (value) => (0, import_node_crypto19.createHash)("sha256").update(value).digest("hex");
   }
 });
 
 // features/keystone/mutations/staffAppointments.ts
 function digest(value) {
-  return (0, import_node_crypto15.createHash)("sha256").update(value).digest("hex");
+  return (0, import_node_crypto20.createHash)("sha256").update(value).digest("hex");
 }
-function fail(error) {
+function fail2(error) {
   return { success: false, error, data: null };
 }
 function clean5(value) {
@@ -10328,7 +11815,7 @@ async function assertStaffSlot(transaction, input) {
   return { service, barber, chairId, endsAt, durationMinutes, authority, timeZone };
 }
 async function readReplay(transaction, eventKey, shopId, request) {
-  const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+  const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
   if (!replay) return null;
   const payload = replay.payload;
   const saved = payload?.data?.command;
@@ -10338,7 +11825,7 @@ async function readReplay(transaction, eventKey, shopId, request) {
   return saved.appointmentId;
 }
 async function createStaffAppointment(_root, args, context) {
-  if (!permissions.canManageAppointments({ session: context.session })) return fail("Not authorized to book appointments.");
+  if (!permissions.canManageAppointments({ session: context.session })) return fail2("Not authorized to book appointments.");
   const key = clean5(args.idempotencyKey);
   const serviceId = clean5(args.serviceId);
   const barberId = clean5(args.barberId);
@@ -10351,27 +11838,27 @@ async function createStaffAppointment(_root, args, context) {
   const source = SOURCES.has(clean5(args.source)) ? clean5(args.source) : "staff";
   const waitlistEntryId = clean5(args.waitlistEntryId);
   const startsAt = new Date(args.startsAt || "");
-  if (key.length < 8 || key.length > 200) return fail("A valid request key is required.");
-  if (!serviceId || !barberId) return fail("Choose a service and a barber.");
-  if (Number.isNaN(startsAt.getTime())) return fail("Choose a valid appointment time.");
-  if (startsAt.getTime() <= Date.now()) return fail("Choose a future appointment time.");
-  if (startsAt.getTime() > Date.now() + 365 * 864e5) return fail("Choose a time within the next year.");
+  if (key.length < 8 || key.length > 200) return fail2("A valid request key is required.");
+  if (!serviceId || !barberId) return fail2("Choose a service and a barber.");
+  if (Number.isNaN(startsAt.getTime())) return fail2("Choose a valid appointment time.");
+  if (startsAt.getTime() <= Date.now()) return fail2("Choose a future appointment time.");
+  if (startsAt.getTime() > Date.now() + 365 * 864e5) return fail2("Choose a time within the next year.");
   if (!customerId) {
-    if (firstName.length < 1 || firstName.length > 80 || lastName.length > 80) return fail("Enter the new customer\u2019s first name.");
-    if (phone.replace(/\D/g, "").length < 7 || phone.length > 40) return fail("Enter a valid phone number for the new customer.");
-    if (email && (email.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) return fail("Enter a valid email or leave it blank.");
+    if (firstName.length < 1 || firstName.length > 80 || lastName.length > 80) return fail2("Enter the new customer\u2019s first name.");
+    if (phone.replace(/\D/g, "").length < 7 || phone.length > 40) return fail2("Enter a valid phone number for the new customer.");
+    if (email && (email.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) return fail2("Enter a valid email or leave it blank.");
   }
   let shopId;
   try {
     shopId = await requireCurrentShopPermission(context.session, "canManageAppointments", context.prisma);
   } catch (error) {
-    return fail(safeError(error, "Not authorized to book appointments for this shop."));
+    return fail2(safeError(error, "Not authorized to book appointments for this shop."));
   }
   if (waitlistEntryId) {
     try {
       await requireCurrentShopPermission(context.session, "canManageQueue", context.prisma);
     } catch {
-      return fail("Waitlist promotion also requires queue access for this shop.");
+      return fail2("Waitlist promotion also requires queue access for this shop.");
     }
   }
   const request = canonicalJson({ customerId: customerId || null, firstName: customerId ? null : firstName, lastName: customerId ? null : lastName, phone: customerId ? null : phone, email: customerId ? null : email, serviceId, barberId, startsAt: startsAt.toISOString(), notes, source, waitlistEntryId: waitlistEntryId || null });
@@ -10420,12 +11907,15 @@ async function createStaffAppointment(_root, args, context) {
           serviceModifiersSnapshot: [],
           barberNameSnapshot: slot.barber.displayName || "",
           barberChairNumberSnapshot: slot.barber.chairNumber || "",
-          status: "requested",
+          // Staff took the booking themselves, so it is confirmed on entry.
+          status: "confirmed",
           source,
           paymentStatus: slot.service.depositRequired ? "deposit_due" : "not_required",
           price: slot.service.price || 0,
           depositAmount: slot.service.depositAmount || 0,
           internalNotes: notes,
+          // The customer's status link greets them by the name staff entered.
+          guestNameSnapshot: [customer.firstName, customer.lastName].filter(Boolean).join(" "),
           publicAccessTokenHash: access.hash,
           serviceId: slot.service.id,
           barberId: slot.barber.id,
@@ -10442,7 +11932,7 @@ async function createStaffAppointment(_root, args, context) {
         const metadata = waitlist.metadata && typeof waitlist.metadata === "object" && !Array.isArray(waitlist.metadata) ? waitlist.metadata : {};
         await transaction.waitlistEntry.update({ where: { id: waitlist.id }, data: { status: "booked", customerId: customer.id, metadata: { ...metadata, appointmentId: appointment.id, bookedAt: appointment.createdAt.toISOString() } } });
       }
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         eventKey,
         eventType: "appointment.created",
         aggregateType: "appointment",
@@ -10473,30 +11963,31 @@ async function createStaffAppointment(_root, args, context) {
     });
     return { success: true, error: null, data };
   } catch (error) {
-    return fail(safeError(error, "Unable to book this appointment. Refresh the booking board before retrying."));
+    return fail2(safeError(error, "Unable to book this appointment. Refresh the booking board before retrying."));
   }
 }
 async function manageStaffAppointment(_root, args, context) {
-  if (!permissions.canManageAppointments({ session: context.session })) return fail("Not authorized to change appointments.");
+  if (!permissions.canManageAppointments({ session: context.session })) return fail2("Not authorized to change appointments.");
   const action = clean5(args.action).toLowerCase();
   const appointmentId = clean5(args.appointmentId);
   const reason = clean5(args.reason);
   const key = clean5(args.idempotencyKey);
   const nextBarberId = clean5(args.barberId);
-  if (!["cancel", "reschedule"].includes(action)) return fail("Action must be cancel or reschedule.");
-  if (!appointmentId || key.length < 8 || key.length > 200) return fail("Appointment and request key are required.");
-  if (reason.length < 2 || reason.length > 1e3) return fail("Enter a reason for this change.");
+  if (!["cancel", "reschedule"].includes(action)) return fail2("Action must be cancel or reschedule.");
+  if (!appointmentId || key.length < 8 || key.length > 200) return fail2("Appointment and request key are required.");
+  if (reason.length < 2 || reason.length > 1e3) return fail2("Enter a reason for this change.");
   const requestedStart = action === "reschedule" && args.startsAt ? new Date(args.startsAt) : null;
-  if (requestedStart && (Number.isNaN(requestedStart.getTime()) || requestedStart <= /* @__PURE__ */ new Date())) return fail("Choose a future appointment time.");
-  if (action === "reschedule" && !requestedStart && !nextBarberId) return fail("Choose a new time or barber.");
+  if (requestedStart && (Number.isNaN(requestedStart.getTime()) || requestedStart <= /* @__PURE__ */ new Date())) return fail2("Choose a future appointment time.");
+  if (action === "reschedule" && !requestedStart && !nextBarberId) return fail2("Choose a new time or barber.");
   let shopId;
   try {
     shopId = await requireCurrentShopPermission(context.session, "canManageAppointments", context.prisma);
   } catch (error) {
-    return fail(safeError(error, "Not authorized to change appointments for this shop."));
+    return fail2(safeError(error, "Not authorized to change appointments for this shop."));
   }
   const eventKey = `staff-appointment-change:${appointmentId}:${digest(`${shopId}:${key}`)}`;
   try {
+    let staleCheckouts = [];
     const data = await runSerializableBookingTransaction(context.prisma, async (rawTransaction) => {
       const transaction = rawTransaction;
       await transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", "barbershop-appointment-transition", appointmentId);
@@ -10509,7 +12000,7 @@ async function manageStaffAppointment(_root, args, context) {
         return { appointmentId, action, status: appointment.status, startsAt: appointment.startsAt.toISOString(), barberId: appointment.barberId, replayed: true };
       }
       if (!["requested", "confirmed"].includes(String(appointment.status))) throw new Error("Only requested or confirmed appointments can be cancelled or rescheduled. Use the board status actions for guests already in the shop.");
-      if (appointment.paymentStatus === "paid" || appointment.paymentStatus === "refunded") throw new Error("Settled appointments cannot be changed here.");
+      if (appointment.paymentStatus === "paid" || appointment.paymentStatus === "refunded" && action !== "cancel") throw new Error("Settled appointments cannot be changed here.");
       if (!appointment.serviceId || !appointment.barberId) throw new Error("This appointment is missing its service or barber.");
       const snapshot = (await transaction.$queryRawUnsafe('SELECT "bookingPolicySnapshot", "bookingAuthoritySnapshot" FROM "Appointment" WHERE id = $1 FOR UPDATE', appointmentId))[0];
       const policy = snapshot?.bookingPolicySnapshot;
@@ -10539,10 +12030,11 @@ async function manageStaffAppointment(_root, args, context) {
         );
       } else {
         await transaction.appointment.update({ where: { id: appointmentId }, data: { status: "cancelled", cancellationReason: reason } });
+        staleCheckouts = await closeOpenDepositSessions(transaction, appointmentId);
       }
       await transaction.$executeRawUnsafe(
         `INSERT INTO "AppointmentChangeEvent" (id, "eventKey", action, "actorType", "actorReferenceHash", reason, "previousStartsAt", "previousEndsAt", "nextStartsAt", "nextEndsAt", "policySnapshot", "authoritySnapshot", "feeAmount", "depositConsequence", "occurredAt", "shop", "appointment", "createdAt", "updatedAt") VALUES ($1,$2,$3::"AppointmentChangeEventActionType",'operator',$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13::"AppointmentChangeEventDepositConsequenceType",$14,$15,$16,$14,$14)`,
-        (0, import_node_crypto15.randomUUID)(),
+        (0, import_node_crypto20.randomUUID)(),
         eventKey,
         action === "cancel" ? "cancelled" : "rescheduled",
         digest(context.session?.itemId || ""),
@@ -10559,8 +12051,8 @@ async function manageStaffAppointment(_root, args, context) {
         shopId,
         appointment.id
       );
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
-        eventKey: `${eventKey}:outbox`,
+      await recordCommandReceipt(transaction, buildCommandReceipt({
+        eventKey: `${eventKey}:receipt`,
         eventType: action === "cancel" ? "appointment.operator_cancelled" : "appointment.operator_rescheduled",
         aggregateType: "appointment",
         aggregateId: appointment.id,
@@ -10579,23 +12071,25 @@ async function manageStaffAppointment(_root, args, context) {
         replayed: false
       };
     });
+    await Promise.all(staleCheckouts.map((id) => expireAtStripe(id)));
     return { success: true, error: null, data };
   } catch (error) {
-    return fail(safeError(error, "Unable to change this appointment. Refresh the booking board before retrying."));
+    return fail2(safeError(error, "Unable to change this appointment. Refresh the booking board before retrying."));
   }
 }
-var import_node_crypto15, ACTIVE_STATUSES, SOURCES;
+var import_node_crypto20, ACTIVE_STATUSES, SOURCES;
 var init_staffAppointments = __esm({
   "features/keystone/mutations/staffAppointments.ts"() {
     "use strict";
-    import_node_crypto15 = require("node:crypto");
+    import_node_crypto20 = require("node:crypto");
+    init_expireStalePaymentSessions();
     init_shop_time();
     init_access();
     init_availability();
     init_bookingCapacity();
     init_bookingPolicy();
     init_currentAuthorization();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_practitionerAuthority();
     init_publicAccessToken();
     init_waiverEvidence();
@@ -10606,9 +12100,9 @@ var init_staffAppointments = __esm({
 
 // features/keystone/mutations/staffQueueEntries.ts
 function digest2(value) {
-  return (0, import_node_crypto16.createHash)("sha256").update(value).digest("hex");
+  return (0, import_node_crypto21.createHash)("sha256").update(value).digest("hex");
 }
-function fail2(error) {
+function fail3(error) {
   return { success: false, error, data: null };
 }
 function clean6(value) {
@@ -10627,14 +12121,14 @@ async function assertQueueChoices(transaction, shopId, serviceId, barberId) {
   if (service?.specialists.length && barberId && !service.specialists.some((item) => item.id === barberId)) throw new Error("Selected barber does not provide this service.");
 }
 async function readReplay2(transaction, eventKey, shopId, request) {
-  const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+  const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
   if (!replay) return null;
   const saved = replay.payload?.data?.command;
   if (replay.shopId !== shopId || !saved?.queueEntryId || saved.request !== request) throw new Error("This request key was already used for a different queue command.");
   return saved.queueEntryId;
 }
 async function createStaffQueueEntry(_root, args, context) {
-  if (!permissions.canManageQueue({ session: context.session })) return fail2("Not authorized to add walk-ins.");
+  if (!permissions.canManageQueue({ session: context.session })) return fail3("Not authorized to add walk-ins.");
   const customerName = clean6(args.customerName);
   const phone = clean6(args.phone);
   const serviceId = clean6(args.requestedServiceId);
@@ -10643,16 +12137,16 @@ async function createStaffQueueEntry(_root, args, context) {
   const key = clean6(args.idempotencyKey);
   const partySize = Number(args.partySize ?? 1);
   const quotedWaitMinutes = args.quotedWaitMinutes == null ? null : Number(args.quotedWaitMinutes);
-  if (customerName.length < 2 || customerName.length > 120) return fail2("Enter the guest\u2019s name.");
-  if (phone && (phone.replace(/\D/g, "").length < 7 || phone.length > 40)) return fail2("Enter a valid phone number or leave it blank.");
-  if (!Number.isInteger(partySize) || partySize < 1 || partySize > 8) return fail2("Party size must be a whole number from 1 to 8.");
-  if (quotedWaitMinutes !== null && (!Number.isInteger(quotedWaitMinutes) || quotedWaitMinutes < 0 || quotedWaitMinutes > 480)) return fail2("Quoted wait must be a whole number of minutes from 0 to 480.");
-  if (key.length < 8 || key.length > 200) return fail2("A valid request key is required.");
+  if (customerName.length < 2 || customerName.length > 120) return fail3("Enter the guest\u2019s name.");
+  if (phone && (phone.replace(/\D/g, "").length < 7 || phone.length > 40)) return fail3("Enter a valid phone number or leave it blank.");
+  if (!Number.isInteger(partySize) || partySize < 1 || partySize > 8) return fail3("Party size must be a whole number from 1 to 8.");
+  if (quotedWaitMinutes !== null && (!Number.isInteger(quotedWaitMinutes) || quotedWaitMinutes < 0 || quotedWaitMinutes > 480)) return fail3("Quoted wait must be a whole number of minutes from 0 to 480.");
+  if (key.length < 8 || key.length > 200) return fail3("A valid request key is required.");
   let shopId;
   try {
     shopId = await requireCurrentShopPermission(context.session, "canManageQueue", context.prisma);
   } catch (error) {
-    return fail2(safeError2(error, "Not authorized to manage this shop\u2019s queue."));
+    return fail3(safeError2(error, "Not authorized to manage this shop\u2019s queue."));
   }
   const request = canonicalJson({ customerName, phone, partySize, serviceId: serviceId || null, barberId: barberId || null, notes, quotedWaitMinutes });
   const eventKey = `staff-queue-create:${digest2(`${shopId}:${key}`)}:v1`;
@@ -10673,7 +12167,7 @@ async function createStaffQueueEntry(_root, args, context) {
         data: { shopId, customerName, phone, partySize, status: "waiting", quotedWaitMinutes, notes, requestedServiceId: serviceId || null, requestedBarberId: barberId || null },
         select: { id: true, status: true, createdAt: true }
       });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         eventKey,
         eventType: "queue.checked_in",
         aggregateType: "walk_in_queue_entry",
@@ -10686,22 +12180,22 @@ async function createStaffQueueEntry(_root, args, context) {
     });
     return { success: true, error: null, data };
   } catch (error) {
-    return fail2(safeError2(error, "Unable to add this walk-in. Refresh the queue before retrying."));
+    return fail3(safeError2(error, "Unable to add this walk-in. Refresh the queue before retrying."));
   }
 }
 async function assignWalkInQueueEntry(_root, args, context) {
-  if (!permissions.canManageQueue({ session: context.session })) return fail2("Not authorized to update walk-ins.");
+  if (!permissions.canManageQueue({ session: context.session })) return fail3("Not authorized to update walk-ins.");
   const queueEntryId = clean6(args.queueEntryId);
   const serviceId = clean6(args.requestedServiceId);
   const barberId = clean6(args.requestedBarberId);
   const key = clean6(args.idempotencyKey);
-  if (!queueEntryId || !serviceId) return fail2("Choose a service for this guest.");
-  if (key.length < 8 || key.length > 200) return fail2("A valid request key is required.");
+  if (!queueEntryId || !serviceId) return fail3("Choose a service for this guest.");
+  if (key.length < 8 || key.length > 200) return fail3("A valid request key is required.");
   let shopId;
   try {
     shopId = await requireCurrentShopPermission(context.session, "canManageQueue", context.prisma);
   } catch (error) {
-    return fail2(safeError2(error, "Not authorized to manage this shop\u2019s queue."));
+    return fail3(safeError2(error, "Not authorized to manage this shop\u2019s queue."));
   }
   const request = canonicalJson({ queueEntryId, serviceId, barberId: barberId || null });
   const eventKey = `staff-queue-assign:${digest2(`${shopId}:${key}`)}:v1`;
@@ -10717,7 +12211,7 @@ async function assignWalkInQueueEntry(_root, args, context) {
       if (!["waiting", "texted"].includes(String(entry.status)) || entry.appointment) throw new Error("Only waiting guests can be reassigned.");
       await assertQueueChoices(transaction, shopId, serviceId, barberId);
       const updated = await transaction.walkInQueueEntry.update({ where: { id: entry.id }, data: { requestedServiceId: serviceId, requestedBarberId: barberId || null }, select: { id: true, updatedAt: true } });
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({
+      await recordCommandReceipt(transaction, buildCommandReceipt({
         eventKey,
         eventType: "queue.assigned",
         aggregateType: "walk_in_queue_entry",
@@ -10730,26 +12224,26 @@ async function assignWalkInQueueEntry(_root, args, context) {
     });
     return { success: true, error: null, data };
   } catch (error) {
-    return fail2(safeError2(error, "Unable to update this walk-in. Refresh the queue before retrying."));
+    return fail3(safeError2(error, "Unable to update this walk-in. Refresh the queue before retrying."));
   }
 }
-var import_node_crypto16;
+var import_node_crypto21;
 var init_staffQueueEntries = __esm({
   "features/keystone/mutations/staffQueueEntries.ts"() {
     "use strict";
-    import_node_crypto16 = require("node:crypto");
+    import_node_crypto21 = require("node:crypto");
     init_access();
     init_currentAuthorization();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_serializableTransaction();
   }
 });
 
 // features/keystone/mutations/managePublicAppointment.ts
 function digest3(value) {
-  return (0, import_node_crypto17.createHash)("sha256").update(value).digest("hex");
+  return (0, import_node_crypto22.createHash)("sha256").update(value).digest("hex");
 }
-function fail3(error) {
+function fail4(error) {
   return { success: false, error, data: null };
 }
 async function assertRescheduleSlot(transaction, appointment, startsAt) {
@@ -10766,7 +12260,7 @@ async function assertRescheduleSlot(transaction, appointment, startsAt) {
   const endsAt = new Date(startsAt.getTime() + durationMinutes * 6e4);
   const bufferMinutes = occupiedBufferMinutes(barber.bufferMinutes, service.bookingBufferMinutes);
   const occupiedEndsAt = new Date(endsAt.getTime() + bufferMinutes * 6e4);
-  const shop = await transaction.shop.findUnique({ where: { id: appointment.shopId }, select: { timezone: true } });
+  const shop = await transaction.shop.findUnique({ where: { id: appointment.shopId }, select: { timezone: true, hours: true } });
   const timeZone = shop?.timezone || "UTC";
   const { start, end } = dayRange(startsAt, timeZone);
   const minute = (value) => value <= start ? 0 : value >= end ? 1440 : shopMinute(value, timeZone);
@@ -10781,7 +12275,7 @@ async function assertRescheduleSlot(transaction, appointment, startsAt) {
   if (blocking.length) throw new Error(blocking[0].reason || "That time is blocked.");
   if (shifts.length && !shifts.some((shift) => startsAt >= shift.scheduledStart && occupiedEndsAt <= shift.scheduledEnd)) throw new Error("That time is outside the barber\u2019s shift.");
   const override = exceptions.find((item) => item.exceptionType === "working_override");
-  const effectiveSchedule = override ? { ...schedule, id: override.id, barberId: appointment.barberId, dayOfWeek: dayKeyForDate(startsAt, timeZone), isWorking: true, startMinute: minute(override.startsAt), endMinute: minute(override.endsAt), breakStartMinute: null, breakEndMinute: null, notes: override.reason, createdAt: override.createdAt, updatedAt: override.updatedAt } : schedule;
+  const effectiveSchedule = clipToPostedHours(override ? { ...schedule, id: override.id, barberId: appointment.barberId, dayOfWeek: dayKeyForDate(startsAt, timeZone), isWorking: true, startMinute: minute(override.startsAt), endMinute: minute(override.endsAt), breakStartMinute: null, breakEndMinute: null, notes: override.reason, createdAt: override.createdAt, updatedAt: override.updatedAt } : schedule, shop?.hours, dayKeyForDate(startsAt, timeZone));
   if (!isSlotAvailable({
     startsAt,
     timeZone,
@@ -10811,12 +12305,13 @@ async function managePublicAppointment(_root, args, context) {
   const accessToken = args.accessToken?.trim() || "";
   const sessionItemId = context.session?.itemId || null;
   const preview = args.preview === true;
-  if (!["cancel", "reschedule"].includes(action)) return fail3("Action must be cancel or reschedule.");
-  if (!appointmentId || !accessToken && !sessionItemId || key.length < 8 || key.length > 200 || reason.length < 2 || reason.length > 1e3) return fail3("Enter a reason for the change.");
+  if (!["cancel", "reschedule"].includes(action)) return fail4("Action must be cancel or reschedule.");
+  if (!appointmentId || !accessToken && !sessionItemId || key.length < 8 || key.length > 200 || reason.length < 2 || reason.length > 1e3) return fail4("Enter a reason for the change.");
   const requestedStart = action === "reschedule" ? new Date(args.startsAt || "") : null;
-  if (requestedStart && Number.isNaN(requestedStart.getTime())) return fail3("Choose a new appointment time.");
+  if (requestedStart && Number.isNaN(requestedStart.getTime())) return fail4("Choose a new appointment time.");
   const eventKey = `public-appointment-change:${appointmentId}:${digest3(key)}`;
   try {
+    let staleCheckouts = [];
     const data = await runSerializableBookingTransaction(context.prisma, async (rawTransaction) => {
       const transaction = rawTransaction;
       await transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", "barbershop-public-appointment", appointmentId);
@@ -10852,28 +12347,32 @@ async function managePublicAppointment(_root, args, context) {
         await transaction.$executeRawUnsafe('UPDATE "Appointment" SET "startsAt" = $2, "endsAt" = $3, "bookingAuthoritySnapshot" = $4::jsonb, "customerRescheduleCount" = "customerRescheduleCount" + 1, "updatedAt" = $5 WHERE id = $1', appointmentId, nextStartsAt, nextEndsAt, JSON.stringify(nextAuthority), /* @__PURE__ */ new Date());
       } else {
         await transaction.appointment.update({ where: { id: appointmentId }, data: { status: "cancelled", cancellationReason: reason } });
+        staleCheckouts = await closeOpenDepositSessions(transaction, appointmentId);
       }
       const occurredAt = /* @__PURE__ */ new Date();
       const actorReference = appointment.accountId ? `account:${appointment.accountId}` : appointment.publicAccessTokenHash || "";
-      await transaction.$executeRawUnsafe(`INSERT INTO "AppointmentChangeEvent" (id, "eventKey", action, "actorType", "actorReferenceHash", reason, "previousStartsAt", "previousEndsAt", "nextStartsAt", "nextEndsAt", "policySnapshot", "authoritySnapshot", "feeAmount", "depositConsequence", "occurredAt", "shop", "appointment", "createdAt", "updatedAt") VALUES ($1,$2,$3::"AppointmentChangeEventActionType",'customer',$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13::"AppointmentChangeEventDepositConsequenceType",$14,$15,$16,$14,$14)`, (0, import_node_crypto17.randomUUID)(), eventKey, action === "cancel" ? "cancelled" : "rescheduled", digest3(actorReference), reason, appointment.startsAt, appointment.endsAt, nextStartsAt, nextEndsAt, JSON.stringify(snapshot.bookingPolicySnapshot), JSON.stringify(nextAuthority), consequence.feeAmount, consequence.depositConsequence, occurredAt, appointment.shopId, appointment.id);
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ eventKey: `${eventKey}:outbox`, eventType: action === "cancel" ? "appointment.customer_cancelled" : "appointment.customer_rescheduled", aggregateType: "appointment", aggregateId: appointment.id, shopId: appointment.shopId, occurredAt, data: { appointmentId, action, previousStartsAt: appointment.startsAt.toISOString(), nextStartsAt: nextStartsAt?.toISOString() || null, feeAmount: consequence.feeAmount, depositConsequence: consequence.depositConsequence, policy: snapshot.bookingPolicySnapshot, authority: nextAuthority } }));
+      await transaction.$executeRawUnsafe(`INSERT INTO "AppointmentChangeEvent" (id, "eventKey", action, "actorType", "actorReferenceHash", reason, "previousStartsAt", "previousEndsAt", "nextStartsAt", "nextEndsAt", "policySnapshot", "authoritySnapshot", "feeAmount", "depositConsequence", "occurredAt", "shop", "appointment", "createdAt", "updatedAt") VALUES ($1,$2,$3::"AppointmentChangeEventActionType",'customer',$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13::"AppointmentChangeEventDepositConsequenceType",$14,$15,$16,$14,$14)`, (0, import_node_crypto22.randomUUID)(), eventKey, action === "cancel" ? "cancelled" : "rescheduled", digest3(actorReference), reason, appointment.startsAt, appointment.endsAt, nextStartsAt, nextEndsAt, JSON.stringify(snapshot.bookingPolicySnapshot), JSON.stringify(nextAuthority), consequence.feeAmount, consequence.depositConsequence, occurredAt, appointment.shopId, appointment.id);
+      await recordCommandReceipt(transaction, buildCommandReceipt({ eventKey: `${eventKey}:receipt`, eventType: action === "cancel" ? "appointment.customer_cancelled" : "appointment.customer_rescheduled", aggregateType: "appointment", aggregateId: appointment.id, shopId: appointment.shopId, occurredAt, data: { appointmentId, action, previousStartsAt: appointment.startsAt.toISOString(), nextStartsAt: nextStartsAt?.toISOString() || null, feeAmount: consequence.feeAmount, depositConsequence: consequence.depositConsequence, policy: snapshot.bookingPolicySnapshot, authority: nextAuthority } }));
       return { appointmentId, action, startsAt: nextStartsAt?.toISOString() || appointment.startsAt.toISOString(), feeAmount: consequence.feeAmount, depositConsequence: consequence.depositConsequence, replayed: false };
     });
+    await Promise.all(staleCheckouts.map((id) => expireAtStripe(id)));
     return { success: true, error: null, data };
   } catch (error) {
-    return fail3(error instanceof Error && !error.message.includes("Invalid `") ? error.message : "Unable to change this appointment. Contact the shop.");
+    return fail4(error instanceof Error && !error.message.includes("Invalid `") ? error.message : "Unable to change this appointment. Contact the shop.");
   }
 }
-var import_node_crypto17, ACTIVE_STATUSES2;
+var import_node_crypto22, ACTIVE_STATUSES2;
 var init_managePublicAppointment = __esm({
   "features/keystone/mutations/managePublicAppointment.ts"() {
     "use strict";
-    import_node_crypto17 = require("node:crypto");
+    import_node_crypto22 = require("node:crypto");
+    init_expireStalePaymentSessions();
     init_shop_time();
     init_availability();
+    init_shop_hours();
     init_bookingCapacity();
     init_bookingPolicy();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_practitionerAuthority();
     init_waiverEvidence();
     ACTIVE_STATUSES2 = ["requested", "confirmed", "checked_in", "in_chair"];
@@ -10882,9 +12381,9 @@ var init_managePublicAppointment = __esm({
 
 // features/keystone/mutations/signPublicWaiver.ts
 function hash7(value) {
-  return (0, import_node_crypto18.createHash)("sha256").update(value).digest("hex");
+  return (0, import_node_crypto23.createHash)("sha256").update(value).digest("hex");
 }
-function fail4(error) {
+function fail5(error) {
   return { success: false, error, data: null };
 }
 async function signPublicWaiver(_root, args, context) {
@@ -10892,12 +12391,12 @@ async function signPublicWaiver(_root, args, context) {
   const idempotencyKey = args.idempotencyKey.trim();
   const accessToken = args.accessToken?.trim() || "";
   const sessionItemId = context.session?.itemId || null;
-  if (!appointmentId || !accessToken && !sessionItemId || idempotencyKey.length < 8 || idempotencyKey.length > 200) return fail4("This appointment link is invalid. Open it again from your confirmation.");
+  if (!appointmentId || !accessToken && !sessionItemId || idempotencyKey.length < 8 || idempotencyKey.length > 200) return fail5("This appointment link is invalid. Open it again from your confirmation.");
   let signer;
   try {
     signer = assertWaiverSigner(args);
   } catch (error) {
-    return fail4(error instanceof Error ? error.message : "Invalid signer evidence.");
+    return fail5(error instanceof Error ? error.message : "Invalid signer evidence.");
   }
   const signatureKeyHash = hash7(`${appointmentId}:${idempotencyKey}`);
   try {
@@ -10917,31 +12416,31 @@ async function signPublicWaiver(_root, args, context) {
       const requirement = await getAppointmentWaiverRequirement(transaction, appointment.id);
       if (!requirement.required) throw new Error("This service does not require a waiver.");
       const occurredAt = /* @__PURE__ */ new Date();
-      const waiverId = (0, import_node_crypto18.randomUUID)();
+      const waiverId = (0, import_node_crypto23.randomUUID)();
       const affirmationHash = hash7(JSON.stringify({ appointmentId, serviceId: appointment.serviceId, customerId: appointment.customerId, templateKey: requirement.templateKey, templateVersion: requirement.templateVersion, templateHash: requirement.templateHash, signerName: signer.signerName, signerRole: signer.signerRole, guardianName: signer.guardianName, affirmation: true, signedAt: occurredAt.toISOString() }));
       await transaction.$executeRawUnsafe(`INSERT INTO "WaiverForm" (id, title, "waiverType", status, "templateKey", "templateVersion", "templateHash", "signatureKeyHash", "signedByName", "signerRole", "guardianName", affirmation, "affirmationHash", "signedAt", metadata, "shop", "customer", "appointment", "service", "createdAt", "updatedAt") VALUES ($1,$2,'service','signed',$3,$4,$5,$6,$7,$8,$9,true,$10,$11,$12::jsonb,$13,$14,$15,$16,$11,$11)`, waiverId, `${requirement.templateKey} ${requirement.templateVersion}`, requirement.templateKey, requirement.templateVersion, requirement.templateHash, signatureKeyHash, signer.signerName, signer.signerRole, signer.guardianName || null, affirmationHash, occurredAt, JSON.stringify({ source: "public_appointment", signerControlled: true }), appointment.shopId, appointment.customerId, appointment.id, appointment.serviceId);
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ eventKey: `waiver:${waiverId}:signed:v1`, eventType: "waiver.signed", aggregateType: "waiver", aggregateId: waiverId, shopId: appointment.shopId, occurredAt, data: { waiverId, appointmentId, serviceId: appointment.serviceId, customerId: appointment.customerId, templateKey: requirement.templateKey, templateVersion: requirement.templateVersion, templateHash: requirement.templateHash, signerRole: signer.signerRole, guardianAuthorityRecorded: signer.signerRole === "guardian", signedAt: occurredAt.toISOString(), affirmationHash } }));
+      await recordCommandReceipt(transaction, buildCommandReceipt({ eventKey: `waiver:${waiverId}:signed:v1`, eventType: "waiver.signed", aggregateType: "waiver", aggregateId: waiverId, shopId: appointment.shopId, occurredAt, data: { waiverId, appointmentId, serviceId: appointment.serviceId, customerId: appointment.customerId, templateKey: requirement.templateKey, templateVersion: requirement.templateVersion, templateHash: requirement.templateHash, signerRole: signer.signerRole, guardianAuthorityRecorded: signer.signerRole === "guardian", signedAt: occurredAt.toISOString(), affirmationHash } }));
       return { waiverId, templateKey: requirement.templateKey, templateVersion: requirement.templateVersion, signedAt: occurredAt.toISOString(), replayed: false };
     });
     return { success: true, error: null, data };
   } catch (error) {
-    return fail4(error instanceof Error ? error.message : "Unable to record waiver evidence.");
+    return fail5(error instanceof Error ? error.message : "Unable to record waiver evidence.");
   }
 }
-var import_node_crypto18;
+var import_node_crypto23;
 var init_signPublicWaiver = __esm({
   "features/keystone/mutations/signPublicWaiver.ts"() {
     "use strict";
-    import_node_crypto18 = require("node:crypto");
+    import_node_crypto23 = require("node:crypto");
     init_bookingCapacity();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_waiverEvidence();
   }
 });
 
 // features/keystone/mutations/setPractitionerCredentialStatus.ts
 function hash8(value) {
-  return (0, import_node_crypto19.createHash)("sha256").update(value).digest("hex");
+  return (0, import_node_crypto24.createHash)("sha256").update(value).digest("hex");
 }
 async function setPractitionerCredentialStatus(_root, args, context) {
   if (!permissions.canManageStaff({ session: context.session })) return { success: false, error: "Not authorized to manage practitioner authority.", data: null };
@@ -10959,7 +12458,7 @@ async function setPractitionerCredentialStatus(_root, args, context) {
       const credential = rows[0];
       if (!credential) throw new Error("Practitioner credential not found.");
       const eventKey = `credential:${credentialId}:status:${hash8(key)}`;
-      const replay = await transaction.lifecycleOutboxEvent.findUnique({ where: { eventKey } });
+      const replay = await transaction.commandReceipt.findUnique({ where: { eventKey } });
       if (replay) {
         const payload = replay.payload;
         if (payload?.data?.status !== status || payload.data.reason !== reason) throw new Error("Idempotency key was reused with different credential status evidence.");
@@ -10968,7 +12467,7 @@ async function setPractitionerCredentialStatus(_root, args, context) {
       if (credential.status !== "active") throw new Error("Only an active credential can transition to a terminal authority status.");
       const occurredAt = /* @__PURE__ */ new Date();
       await transaction.$executeRawUnsafe(`UPDATE "PractitionerCredential" SET status = $2, "updatedAt" = $3 WHERE id = $1 AND status = 'active'`, credentialId, status, occurredAt);
-      await enqueueLifecycleEvent(transaction, buildLifecycleEnvelope({ actorId: context.session?.itemId, eventKey, eventType: `practitioner_credential.${status}`, aggregateType: "practitioner_credential", aggregateId: credentialId, shopId: credential.shopId, occurredAt, data: { status, previousStatus: credential.status, reason, barberId: credential.barberId, serviceId: credential.serviceId, evidenceHash: credential.evidenceHash, actorId: context.session?.itemId ?? null } }));
+      await recordCommandReceipt(transaction, buildCommandReceipt({ actorId: context.session?.itemId, eventKey, eventType: `practitioner_credential.${status}`, aggregateType: "practitioner_credential", aggregateId: credentialId, shopId: credential.shopId, occurredAt, data: { status, previousStatus: credential.status, reason, barberId: credential.barberId, serviceId: credential.serviceId, evidenceHash: credential.evidenceHash, actorId: context.session?.itemId ?? null } }));
       return { credentialId, status, replayed: false };
     });
     return { success: true, error: null, data };
@@ -10976,14 +12475,14 @@ async function setPractitionerCredentialStatus(_root, args, context) {
     return { success: false, error: error instanceof Error ? error.message : "Unable to update practitioner authority.", data: null };
   }
 }
-var import_node_crypto19;
+var import_node_crypto24;
 var init_setPractitionerCredentialStatus = __esm({
   "features/keystone/mutations/setPractitionerCredentialStatus.ts"() {
     "use strict";
-    import_node_crypto19 = require("node:crypto");
+    import_node_crypto24 = require("node:crypto");
     init_access();
     init_currentAuthorization();
-    init_lifecycleOutbox();
+    init_commandReceipt();
     init_serializableTransaction();
   }
 });
@@ -11013,7 +12512,14 @@ function parseStorefrontSettingsInput(args) {
   } catch {
     throw new Error("Timezone must be a valid IANA timezone.");
   }
+  let hours;
+  if (args.hours !== void 0 && args.hours !== null) {
+    const normalized = normalizeShopHours(args.hours);
+    if ("error" in normalized) throw new Error(normalized.error);
+    hours = normalized.hours;
+  }
   return {
+    ...hours ? { hours } : {},
     name: boundedText(args.name, "Shop name", 120, true),
     tagline: boundedText(args.tagline, "Tagline", 240),
     address: boundedText(args.address, "Address", 300),
@@ -11034,6 +12540,7 @@ var init_storefrontSettingsInput = __esm({
     init_store_logo();
     init_storefront_settings();
     init_supportedSettlementCurrency();
+    init_shop_hours();
   }
 });
 
@@ -11091,6 +12598,19 @@ var init_manageStorefrontSettings = __esm({
   }
 });
 
+// features/shared/receipt-net.ts
+function netReceiptTotal(receipt) {
+  const total = receipt.total || 0;
+  if (total < 0) return total;
+  if (receipt.status === "refunded") return 0;
+  return Math.max(0, total - (receipt.paymentSession?.refundedAmount || 0) - (receipt.cashRefund?.amount || 0));
+}
+var init_receipt_net = __esm({
+  "features/shared/receipt-net.ts"() {
+    "use strict";
+  }
+});
+
 // features/keystone/utils/serviceCatalogProjection.ts
 function uncategorizedServiceWhere(shopId) {
   return { shopId, categoryId: null };
@@ -11100,6 +12620,51 @@ function countProjectedServices(categories, uncategorizedServices) {
 }
 var init_serviceCatalogProjection = __esm({
   "features/keystone/utils/serviceCatalogProjection.ts"() {
+    "use strict";
+  }
+});
+
+// features/keystone/utils/customerDuplicates.ts
+function phoneKey(phone) {
+  const digits = (phone || "").replace(/\D/g, "");
+  return digits.length >= 7 ? digits.slice(-10) : "";
+}
+function emailKey(email) {
+  return (email || "").trim().toLowerCase();
+}
+function duplicateHint(customer, others) {
+  const phone = phoneKey(customer.phone);
+  const email = emailKey(customer.email);
+  if (!phone && !email) return null;
+  let byPhone = false;
+  let byEmail = false;
+  const ids = /* @__PURE__ */ new Set();
+  for (const other of others) {
+    if (other.id === customer.id) continue;
+    const samePhone = Boolean(phone) && phoneKey(other.phone) === phone;
+    const sameEmail = Boolean(email) && emailKey(other.email) === email;
+    if (samePhone) byPhone = true;
+    if (sameEmail) byEmail = true;
+    if (samePhone || sameEmail) ids.add(other.id);
+  }
+  if (!ids.size) return null;
+  return {
+    count: ids.size,
+    matchedOn: byPhone && byEmail ? "phone and email" : byPhone ? "phone" : "email",
+    // Search by what matched so the directory lists both records for the merge.
+    search: byPhone ? (customer.phone || "").trim() : (customer.email || "").trim()
+  };
+}
+function duplicateCandidateWhere(customer) {
+  const phone = phoneKey(customer.phone);
+  const email = emailKey(customer.email);
+  const or = [];
+  if (phone) or.push({ phone: { contains: phone.slice(-4) } });
+  if (email) or.push({ email: { equals: email, mode: "insensitive" } });
+  return or.length ? { id: { not: { equals: customer.id } }, OR: or } : null;
+}
+var init_customerDuplicates = __esm({
+  "features/keystone/utils/customerDuplicates.ts"() {
     "use strict";
   }
 });
@@ -11219,8 +12784,10 @@ async function scope(context, permission, message) {
   try {
     const shopId = await requireCurrentShopPermission(context.session, permission, context.prisma);
     const dependencies = {
-      canManageAppointments: ["canManageCustomers", "canManageStaff", "canManageServices"],
-      canManageQueue: ["canManageCustomers", "canManageStaff", "canManageServices", "canManageAppointments"],
+      // The board lists barbers and services through the projection itself, so front desk and
+      // barber (who manage appointments and the queue but not the catalog) are not locked out.
+      canManageAppointments: ["canManageCustomers"],
+      canManageQueue: ["canManageCustomers", "canManageAppointments"],
       canViewReports: ["canManageAppointments", "canManagePayments", "canManageQueue", "canManageSchedules", "canManageStaff", "canManageMemberships"],
       canManageSchedules: ["canManageStaff"]
     };
@@ -11245,6 +12812,7 @@ async function getBookingProjection(_root, args, context) {
   const page = Math.max(1, Math.floor(Number(args.page) || 1));
   const dayWhere = { shopId, startsAt: { gte: start, lt: end } };
   const listWhere = { ...dayWhere, ...status ? { status } : {} };
+  const canRefund = await currentShopForPermission(context.session, "canManagePayments", context.prisma) === shopId;
   const [appointments, matching, grouped, bookedValue, barbers, services] = await Promise.all([
     context.prisma.appointment.findMany({
       where: listWhere,
@@ -11276,9 +12844,34 @@ async function getBookingProjection(_root, args, context) {
     context.prisma.appointment.count({ where: listWhere }),
     context.prisma.appointment.groupBy({ by: ["status"], where: dayWhere, _count: true }),
     context.prisma.appointment.aggregate({ where: { ...dayWhere, status: { notIn: ["cancelled", "no_show"] } }, _sum: { price: true } }),
-    context.prisma.barber.findMany({ where: { shopId, status: "active" }, orderBy: [{ displayName: "asc" }, { id: "asc" }], select: { id: true, displayName: true, chairNumber: true, bookingEnabled: true } }),
+    context.prisma.barber.findMany({ where: { shopId, status: "active" }, orderBy: [{ displayName: "asc" }, { id: "asc" }], select: {
+      id: true,
+      displayName: true,
+      chairNumber: true,
+      bookingEnabled: true,
+      schedules: { where: { dayOfWeek: dayKeyForDate(shopDateKey(start, timeZone), timeZone), isWorking: true }, select: { startMinute: true, endMinute: true } },
+      scheduleExceptions: { where: { status: "active", exceptionType: "time_off", startsAt: { lt: end }, endsAt: { gt: start } }, select: { id: true } }
+    } }),
     context.prisma.service.findMany({ where: { shopId, status: "active" }, orderBy: [{ name: "asc" }, { id: "asc" }], select: { id: true, name: true, durationMinutes: true, price: true, depositRequired: true, specialists: { select: { id: true } } } })
   ]);
+  const depositRows = canRefund && appointments.length ? await context.prisma.paymentSession.findMany({
+    where: { shopId, appointmentId: { in: appointments.map((item) => item.id) }, status: { in: ["captured", "partially_refunded", "refunded"] }, transaction: { is: null } },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, appointmentId: true, status: true, amount: true, refundedAmount: true, paymentProvider: { select: { code: true } } }
+  }) : [];
+  const depositsByAppointment = /* @__PURE__ */ new Map();
+  for (const { appointmentId, paymentProvider, ...session } of depositRows) {
+    if (!appointmentId) continue;
+    const list49 = depositsByAppointment.get(appointmentId) || [];
+    list49.push({ ...session, status: session.status ? String(session.status) : null, processor: paymentProvider ? paymentProviderSettlement(paymentProvider) === "processor" : false });
+    depositsByAppointment.set(appointmentId, list49);
+  }
+  const dayBarbers = barbers.map(({ schedules, scheduleExceptions, ...barber }) => ({
+    ...barber,
+    workingDay: schedules.length > 0 && scheduleExceptions.length === 0,
+    dayStartMinute: schedules[0]?.startMinute ?? null,
+    dayEndMinute: schedules[0]?.endMinute ?? null
+  }));
   const counted = Object.fromEntries(grouped.map((item) => [String(item.status), item._count]));
   const statusCounts = Object.fromEntries(BOOKING_STATUSES.map((value) => [value, counted[value] || 0]));
   const total = BOOKING_STATUSES.reduce((sum, value) => sum + statusCounts[value], 0);
@@ -11289,8 +12882,13 @@ async function getBookingProjection(_root, args, context) {
     page,
     pageSize: BOOKING_PAGE_SIZE,
     matching,
-    appointments: appointments.map(({ bookingPolicySnapshot, ...appointment }) => ({ ...appointment, bookingEligibility: bookingEligibilityFromSnapshot(bookingPolicySnapshot) })),
-    barbers,
+    canRefundDeposits: canRefund,
+    appointments: appointments.map(({ bookingPolicySnapshot, ...appointment }) => ({
+      ...appointment,
+      bookingEligibility: bookingEligibilityFromSnapshot(bookingPolicySnapshot),
+      depositSessions: canRefund ? depositsByAppointment.get(appointment.id) || [] : null
+    })),
+    barbers: dayBarbers,
     services: services.map(({ specialists, ...service }) => ({ ...service, specialistIds: specialists.map((item) => item.id) })),
     statusCounts,
     metrics: {
@@ -11320,6 +12918,9 @@ async function getQueueProjection(_root, args, context) {
   };
   const search = args.search?.trim().slice(0, 120) || "";
   const page = Math.max(1, Math.floor(Number(args.page) || 1));
+  const timeZone = await shopTimeZone(context.prisma, shopId);
+  const { start: shopDayStart } = shopDayRange(/* @__PURE__ */ new Date(), timeZone);
+  await context.prisma.walkInQueueEntry.updateMany({ where: { shopId, status: { in: ["waiting", "texted"] }, checkedInAt: { lt: shopDayStart } }, data: { status: "left" } });
   const activeWhere = {
     shopId,
     status: { in: ["waiting", "texted", "in_chair"] },
@@ -11344,6 +12945,7 @@ async function getQueueProjection(_root, args, context) {
     search,
     page,
     pageSize: QUEUE_PAGE_SIZE,
+    timeZone,
     hasMoreActive: page * QUEUE_PAGE_SIZE < activeMatching,
     services: services.map(({ specialists, ...service }) => ({ ...service, specialistIds: specialists.map((item) => item.id) })),
     barbers
@@ -11359,7 +12961,7 @@ async function getCustomersProjection(_root, args, context) {
   const isOwner = await hasCurrentOwnerMembership(context.session, shopId, context.prisma);
   const shopFilter = { shop: { id: { equals: shopId } } };
   const timeZone = await shopTimeZone(context.prisma, shopId);
-  const customerSelection = "id firstName lastName phone email status preferredContactMethod acceptsMarketing lastVisitAt preferredBarber { id }";
+  const customerSelection = "id firstName lastName phone email status preferredContactMethod acceptsMarketing lastVisitAt createdAt preferredBarber { id }";
   const directoryWhere = { ...shopFilter, ...search ? { OR: [
     { firstName: { contains: search, mode: "insensitive" } },
     { lastName: { contains: search, mode: "insensitive" } },
@@ -11382,11 +12984,20 @@ async function getCustomersProjection(_root, args, context) {
   const requestedCustomer = requested[0] && !pageCustomers.some((customer) => customer.id === requested[0].id) ? requested[0] : null;
   const customers = requestedCustomer ? [requestedCustomer, ...pageCustomers] : pageCustomers;
   const statuses = ["active", "vip", "needs_attention", "blocked"];
-  const [statusCounts, waiversByCustomer, relations, preferred] = await Promise.all([
+  const [statusCounts, waiversByCustomer, relations, preferred, appointmentCounts, duplicates] = await Promise.all([
     Promise.all(statuses.map((status) => context.query.Customer.count({ where: { ...shopFilter, status: { equals: status } } }))),
     Promise.all(customers.map((customer) => context.query.WaiverForm.findMany({ where: { ...shopFilter, customer: { id: { equals: customer.id } } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: CUSTOMER_HISTORY_PREVIEW, query: "id title waiverType status signedAt createdAt" }))),
     loadProtectedCustomerRelations(context, shopId, customers.map((customer) => customer.id), { planSearch: args.planSearch }),
-    loadPreferredBarbers(context, shopId, customers.map((customer) => customer.preferredBarber?.id))
+    loadPreferredBarbers(context, shopId, customers.map((customer) => customer.preferredBarber?.id)),
+    // Full visit counts (the history preview is capped), only with appointment authority.
+    sameShopAccess(context, "canManageAppointments", shopId).then((access) => access === "granted" ? Promise.all(customers.map((customer) => context.query.Appointment.count({ where: { ...shopFilter, customer: { id: { equals: customer.id } } } }))) : customers.map(() => null)),
+    // Same-shop records sharing this phone or email: a staff hint only, never an automatic match.
+    Promise.all(customers.map(async (customer) => {
+      const where = duplicateCandidateWhere(customer);
+      if (!where) return null;
+      const others = await context.query.Customer.findMany({ where: { ...shopFilter, ...where }, take: 50, query: "id phone email" });
+      return duplicateHint(customer, others);
+    }))
   ]);
   const notesAccess = await currentShopForPermission(context.session, "canManageCustomerNotes", context.prisma) === shopId ? "granted" : "restricted";
   const noteVisibility = isOwner ? {} : { visibility: { equals: "staff" } };
@@ -11416,6 +13027,8 @@ async function getCustomersProjection(_root, args, context) {
         notes: notesByCustomer[index],
         preferredBarber: preferred.staffAccess === "granted" && preferredBarberId ? preferred.barbersById.get(preferredBarberId) ?? null : null,
         appointments: relations.appointmentsByCustomer[index],
+        appointmentsCount: appointmentCounts[index],
+        possibleDuplicate: duplicates[index],
         transactions: relations.transactionsByCustomer[index],
         packageBalances: relations.balancesByCustomer[index]
       };
@@ -11436,6 +13049,7 @@ async function getCustomersProjection(_root, args, context) {
 }
 async function getPosProjection(_root, args, context) {
   const shopId = await scope(context, "canManagePayments", "Not authorized to access POS settlement.");
+  await expireStalePaymentSessions(context.prisma, shopId).catch(() => 0);
   for (const permission of ["canManageAppointments", "canManageCustomers", "canManageMemberships"]) await requireCurrentShopPermission(context.session, permission, context.prisma);
   const shop = await context.prisma.shop.findUnique({ where: { id: shopId }, select: { currencyCode: true } });
   assertUsdSettlementCurrency(shop?.currencyCode);
@@ -11446,7 +13060,7 @@ async function getPosProjection(_root, args, context) {
   const ticketSearch = args?.ticketSearch?.trim().slice(0, 120) || "";
   const saleSearch = args?.saleSearch?.trim().slice(0, 120) || "";
   const receiptId = args?.receiptId?.trim().slice(0, 64) || "";
-  const openTicketWhere = { shopId, status: { in: ["checked_in", "in_chair", "completed"] }, paymentStatus: { notIn: ["paid", "refunded"] } };
+  const openTicketWhere = { shopId, status: { in: ["checked_in", "in_chair"] }, paymentStatus: { notIn: ["paid", "refunded"] } };
   const ticketWhere = { ...openTicketWhere, ...ticketSearch ? { OR: [
     { customer: { firstName: { contains: ticketSearch, mode: "insensitive" } } },
     { customer: { lastName: { contains: ticketSearch, mode: "insensitive" } } },
@@ -11474,8 +13088,8 @@ async function getPosProjection(_root, args, context) {
     { transactionId: saleSearch }
   ] } : {} };
   const receiptWhere = { shopId, appointments: { some: {} }, status: { in: ["paid", "refunded", "partially_refunded"] }, ...receiptId ? { id: receiptId } : {} };
-  const [appointments, ticketTotal, outstanding, packageHolders, requested, products, productLines, saleTotal, receipts, receiptTotal, paidToday] = await Promise.all([
-    context.prisma.appointment.findMany({ where: ticketWhere, orderBy: [{ startsAt: "asc" }, { id: "asc" }], take: POS_PAGE_SIZE, skip: (ticketPage - 1) * POS_PAGE_SIZE, select: ticketSelect }),
+  const [appointments, ticketTotal2, outstanding, packageHolders, requested, products, productLines, saleTotal, receipts, receiptTotal, paidToday] = await Promise.all([
+    context.prisma.appointment.findMany({ where: ticketWhere, orderBy: [{ status: "desc" }, { startsAt: "desc" }, { id: "asc" }], take: POS_PAGE_SIZE, skip: (ticketPage - 1) * POS_PAGE_SIZE, select: ticketSelect }),
     context.prisma.appointment.count({ where: ticketWhere }),
     context.prisma.appointment.aggregate({ where: openTicketWhere, _sum: { price: true } }),
     context.prisma.appointment.count({ where: { ...openTicketWhere, customer: { packageBalances: { some: usableBalances } } } }),
@@ -11509,10 +13123,11 @@ async function getPosProjection(_root, args, context) {
   } : ticket;
   return {
     timeZone,
+    onlineCard: Boolean(await onlineDepositProvider(context.prisma, shopId)),
     appointments: appointments.map(eligible),
     requestedAppointment: requested ? eligible(requested) : null,
     requestedAppointmentId: args?.appointmentId || null,
-    tickets: { page: ticketPage, pageSize: POS_PAGE_SIZE, total: ticketTotal, search: ticketSearch },
+    tickets: { page: ticketPage, pageSize: POS_PAGE_SIZE, total: ticketTotal2, search: ticketSearch },
     products: products.map((product) => ({ ...product, availableQuantity: product.inventoryLots.reduce((sum, lot) => sum + (lot.quantityRemaining || 0), 0), inventoryLots: void 0 })),
     productLines: productLines.map(({ transaction, ...line }) => ({ ...line, paymentMethod: transaction?.paymentMethod ?? null })),
     sales: { page: salePage, pageSize: POS_PAGE_SIZE, total: saleTotal, search: saleSearch },
@@ -11547,7 +13162,8 @@ async function getReportsProjection(_root, args, context) {
     context.prisma.walkInQueueEntry.groupBy({ by: ["status"], where: { shopId, checkedInAt: { gte: start, lt: end } }, _count: true }),
     context.prisma.commissionPayout.aggregate({ where: { shopId, paidAt: { gte: start, lt: end } }, _sum: { totalAmount: true }, _count: true }),
     context.prisma.productSaleLine.findMany({ take: 5001, where: { shopId, occurredAt: { gte: start, lt: end } }, select: { lineType: true, total: true } }),
-    context.prisma.appointment.findMany({ take: 5001, where: { shopId, status: "completed", startsAt: { gte: start, lt: end } }, select: { durationMinutes: true, barber: { select: { displayName: true } } } }),
+    // Completions count when the service finished, the same clock receipts use.
+    context.prisma.appointment.findMany({ take: 5001, where: { shopId, status: "completed", OR: [{ serviceCompletedAt: { gte: start, lt: end } }, { serviceCompletedAt: null, startsAt: { gte: start, lt: end } }] }, select: { durationMinutes: true, barber: { select: { displayName: true } } } }),
     context.prisma.barberSchedule.findMany({ take: 5001, where: { barber: { shopId, status: "active" }, isWorking: true }, select: { startMinute: true, endMinute: true, breakStartMinute: true, breakEndMinute: true } }),
     context.prisma.scheduleException.findMany({ take: 5001, where: { shopId, status: "active", exceptionType: { in: ["time_off", "shop_closure", "chair_unavailable"] }, startsAt: { lt: end }, endsAt: { gt: start } }, select: { startsAt: true, endsAt: true } }),
     context.prisma.customerPackage.findMany({ take: 5001, where: { shopId, status: { in: ["active", "paused"] } }, select: { id: true, remainingVisits: true, membershipPlan: { select: { price: true, includedVisits: true } }, servicePackage: { select: { price: true, items: { select: { quantity: true } } } } } }),
@@ -11556,12 +13172,12 @@ async function getReportsProjection(_root, args, context) {
   for (const rows of [settledTransactions, productLines, completedAppointments, schedules, blockingExceptions, membershipBalances, membershipEvents]) {
     if (rows.length > 5e3) throw new Error("Report range exceeds the supported record limit.");
   }
-  const appointmentCounts = Object.fromEntries(appointments.map((item) => [String(item.status), item._count]));
+  const appointmentCounts = { ...Object.fromEntries(appointments.map((item) => [String(item.status), item._count])), completed: completedAppointments.length };
   const queueCounts = Object.fromEntries(queue.map((item) => [String(item.status), item._count]));
   const appointmentTotal = appointments.reduce((sum, item) => sum + item._count, 0);
   const queueClosed = (queueCounts.served || 0) + (queueCounts.left || 0);
   const serviceLines = settledTransactions.flatMap((transaction) => {
-    const refundableServiceTotal = Math.max(0, (transaction.subtotal || 0) - (transaction.discountAmount || 0) - (transaction.paymentSession?.refundedAmount || 0) - Math.max(0, (transaction.cashRefund?.amount || 0) - (transaction.cashRefund?.tipAmount || 0) - (transaction.cashRefund?.taxAmount || 0)));
+    const refundableServiceTotal = transaction.status === "refunded" ? 0 : Math.max(0, (transaction.subtotal || 0) - (transaction.discountAmount || 0) - (transaction.paymentSession?.refundedAmount || 0) - Math.max(0, (transaction.cashRefund?.amount || 0) - (transaction.cashRefund?.tipAmount || 0) - (transaction.cashRefund?.taxAmount || 0)));
     const lineTotal = transaction.lineItems.reduce((sum, line) => sum + Math.max(0, line.price || 0), 0);
     return transaction.lineItems.map((line) => ({ ...line, netRevenue: lineTotal ? Math.round(refundableServiceTotal * Math.max(0, line.price || 0) / lineTotal) : 0 }));
   });
@@ -11603,12 +13219,9 @@ async function getReportsProjection(_root, args, context) {
     const packageVisits = balance.servicePackage?.items.reduce((total, item) => total + (item.quantity || 0), 0) || 1;
     return sum + Math.round((balance.servicePackage?.price || 0) * visits / packageVisits);
   }, 0);
-  const netPaidTotal = settledTransactions.reduce((sum, transaction) => {
-    const total = transaction.total || 0;
-    return sum + (total < 0 ? total : Math.max(0, total - (transaction.paymentSession?.refundedAmount || 0) - (transaction.cashRefund?.amount || 0)));
-  }, 0);
+  const netPaidTotal = settledTransactions.reduce((sum, transaction) => sum + netReceiptTotal(transaction), 0);
   const netTips = settledTransactions.reduce((sum, transaction) => sum + (transaction.status === "refunded" ? 0 : transaction.tipAmount || 0), 0);
-  return { range: { start, end, startDate, endDate, days, timeZone, currencyCode: shopRow?.currencyCode || "USD" }, appointments: { total: appointmentTotal, ...appointmentCounts }, revenue: { paidTotal: netPaidTotal, tips: netTips, transactionCount: settledTransactions.length, productSales: productLines.reduce((sum, line) => sum + (line.total || 0), 0), productSaleCount: productLines.filter((line) => line.lineType === "sale").length }, queue: queueCounts, payouts: { total: payouts._sum.totalAmount || 0, count: payouts._count }, rates: { completion: appointmentTotal ? Math.round((appointmentCounts.completed || 0) / appointmentTotal * 100) : 0, queueConversion: queueClosed ? Math.round((queueCounts.served || 0) / queueClosed * 100) : 0, utilization: capacityMinutes ? Math.round(completedMinutes / capacityMinutes * 100) : 0 }, liabilities: { memberships: membershipLiability, activeBalances: membershipBalances.length }, servicePerformance, barberPerformance };
+  return { range: { start, end, startDate, endDate, days, timeZone, currencyCode: shopRow?.currencyCode || "USD" }, appointments: { total: appointmentTotal, ...appointmentCounts }, revenue: { paidTotal: netPaidTotal, tips: netTips, transactionCount: settledTransactions.length, productSales: productLines.reduce((sum, line) => sum + (line.total || 0), 0), productSaleCount: productLines.filter((line) => line.lineType === "sale").length }, queue: queueCounts, payouts: { total: payouts._sum.totalAmount || 0, count: payouts._count }, rates: { completion: appointmentTotal ? Math.min(100, Math.round((appointmentCounts.completed || 0) / appointmentTotal * 100)) : 0, queueConversion: queueClosed ? Math.round((queueCounts.served || 0) / queueClosed * 100) : 0, utilization: capacityMinutes ? Math.round(completedMinutes / capacityMinutes * 100) : 0 }, liabilities: { memberships: membershipLiability, activeBalances: membershipBalances.length }, servicePerformance, barberPerformance };
 }
 async function getServicesProjection(_root, _args, context) {
   const shopId = await scope(context, "canManageServices", "Not authorized to access service management.");
@@ -11695,6 +13308,7 @@ async function getStaffProjection(_root, _args, context) {
 }
 async function getOperationsProjection(_root, _args, context) {
   const shopId = await scope(context, "canManagePayments", "Not authorized to access owner operations.");
+  await expireStalePaymentSessions(context.prisma, shopId).catch(() => 0);
   const sectionAccess = async (permission) => await currentShopForPermission(context.session, permission, context.prisma) === shopId ? "granted" : "restricted";
   const [staffAccess, inventoryAccess, queueAccess, customersAccess, policiesAccess] = await Promise.all([
     sectionAccess("canManageStaff"),
@@ -11716,7 +13330,7 @@ async function getOperationsProjection(_root, _args, context) {
     when(queueAccess, () => context.prisma.service.findMany({ where: { shopId, status: "active" }, orderBy: [{ name: "asc" }, { id: "asc" }], select: { id: true, name: true } })),
     when(queueAccess, () => context.prisma.barber.findMany({ where: { shopId, status: "active" }, orderBy: [{ displayName: "asc" }, { id: "asc" }], select: { id: true, displayName: true } })),
     // Unresolved commissions first, oldest first, so older approved work is never starved by newer rows.
-    context.prisma.commission.findMany({ where: actionableCommission, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: OPERATIONS_ROW_LIMIT, select: { id: true, commissionNumber: true, status: true, commissionAmount: true, commissionRate: true, createdAt: true, barber: { select: { id: true, displayName: true } } } }),
+    context.prisma.commission.findMany({ where: actionableCommission, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: OPERATIONS_ROW_LIMIT, select: { id: true, commissionNumber: true, status: true, commissionAmount: true, commissionRate: true, createdAt: true, barber: { select: { id: true, displayName: true } }, appointment: { select: { startsAt: true, serviceTitleSnapshot: true } }, transaction: { select: { completedAt: true } } } }),
     context.prisma.commissionPayout.findMany({ where: { shopId }, orderBy: [{ paidAt: "desc" }, { id: "desc" }], take: OPERATIONS_ROW_LIMIT, select: { id: true, payoutNumber: true, status: true, commissionCount: true, totalAmount: true, paidAt: true, notes: true, barber: { select: { id: true, displayName: true } } } }),
     context.prisma.tip.findMany({ where: { shopId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: OPERATIONS_ROW_LIMIT, select: { id: true, tipNumber: true, amount: true, paymentMethod: true, createdAt: true, barber: { select: { id: true, displayName: true } }, customer: { select: { id: true, firstName: true, lastName: true } } } }),
     when(policiesAccess, () => context.prisma.noShowPolicy.findMany({ where: { shopId }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: OPERATIONS_ROW_LIMIT, select: { id: true, name: true, status: true, feeAmount: true, graceMinutes: true, appliesToMemberships: true } })),
@@ -11781,14 +13395,19 @@ var GROOMING_NOTE_LIMIT, PREFERRED_BARBER_LIMIT, CUSTOMER_NOTE_SELECTION, COMMIS
 var init_getPlatformProjections = __esm({
   "features/keystone/queries/getPlatformProjections.ts"() {
     "use strict";
+    init_expireStalePaymentSessions();
+    init_publicDeposits();
     init_shop_time();
+    init_availability();
     init_access();
+    init_receipt_net();
     init_currentAuthorization();
     init_supportedSettlementCurrency();
     init_serviceCatalogProjection();
     init_bookingPolicy();
     init_public_booking_eligibility();
     init_paymentProviderAdapter();
+    init_customerDuplicates();
     GROOMING_NOTE_LIMIT = 10;
     PREFERRED_BARBER_LIMIT = 50;
     CUSTOMER_NOTE_SELECTION = "id noteType body visibility createdAt appointment { id startsAt serviceTitleSnapshot }";
@@ -11812,7 +13431,7 @@ var init_getPlatformProjections = __esm({
 function extendGraphqlSchema(baseSchema) {
   return (0, import_schema.mergeSchemas)({
     schemas: [baseSchema],
-    typeDefs: graphql8`
+    typeDefs: graphql9`
       type PublicService {
         id: ID
         name: String
@@ -12063,6 +13682,59 @@ function extendGraphqlSchema(baseSchema) {
         slug: String!
       }
 
+      type PublicPaymentOptions {
+        onlineDeposits: Boolean!
+      }
+
+      type PublicPackageLine {
+        quantity: Int!
+        serviceId: ID!
+        serviceName: String!
+      }
+
+      type PublicPackageOffer {
+        id: ID!
+        name: String!
+        description: String
+        price: Int!
+        items: [PublicPackageLine!]!
+      }
+
+      type PublicPlanOffer {
+        id: ID!
+        name: String!
+        description: String
+        price: Int!
+        billingInterval: String!
+        includedVisits: Int
+        discountPercent: Int
+      }
+
+      type PublicMembershipOffers {
+        packages: [PublicPackageOffer!]!
+        plans: [PublicPlanOffer!]!
+      }
+
+      type PublicBarberDay {
+        dayOfWeek: String!
+        startMinute: Int
+        endMinute: Int
+      }
+
+      type PublicWalkInStatus {
+        open: Boolean!
+        barbersOnNow: Int!
+        opensAt: String
+        onNowIds: [ID!]!
+      }
+
+      type ClaimableShop {
+        id: ID!
+        name: String!
+        slug: String!
+        isPublic: Boolean!
+      }
+
       type SelectActiveShopResult {
         success: Boolean!
         error: String
@@ -12110,6 +13782,9 @@ function extendGraphqlSchema(baseSchema) {
       type Query {
         redirectToInit: Boolean
         accountBookings(page: Int): PlatformProjectionResult!
+        accountBalances: PlatformProjectionResult!
+        getPublicMembershipOffers: PublicMembershipOffers!
+        getPublicBarberWeek(barberId: ID!): [PublicBarberDay!]!
         exportMyAccountData: PlatformProjectionResult!
         getPublicStorefrontSettings: PublicStorefrontSettings
         getPublicServiceCatalog: [PublicServiceCategory!]!
@@ -12133,6 +13808,13 @@ function extendGraphqlSchema(baseSchema) {
           includeUnavailable: Boolean
         ): [AvailabilitySlot!]!
         getPublicQueue: [PublicQueueEntry!]!
+        claimableShops: [ClaimableShop!]!
+        getPublicWalkInStatus: PublicWalkInStatus!
+        getPublicPaymentOptions: PublicPaymentOptions!
+        openDeskCardPayment(appointmentId: ID!): DomainCommandResult!
+        giftCardOptions: JSON
+        lookupGiftCard(code: String!): DomainCommandResult!
+        platformTeam: PlatformProjectionResult!
         getPublicQueueEntry(
           queueEntryId: ID!
           accessToken: String!
@@ -12165,6 +13847,7 @@ function extendGraphqlSchema(baseSchema) {
           logoColor: String
           isPublic: Boolean!
           isDemo: Boolean!
+          hours: JSON
           expectedShopId: ID
           expectedVersion: String
         ): DomainCommandResult!
@@ -12208,6 +13891,7 @@ function extendGraphqlSchema(baseSchema) {
           taxAmount: Int
           notes: String
           paymentSessionId: ID
+          giftCardCode: String
           idempotencyKey: String
         ): CheckoutAppointmentResult!
 
@@ -12238,6 +13922,19 @@ function extendGraphqlSchema(baseSchema) {
         ): TransitionQueueEntryResult!
 
         selectActiveShop(shopId: ID!): SelectActiveShopResult!
+        claimShopOwnership(shopId: ID!): SelectActiveShopResult!
+        addShopMemberByEmail(email: String!, membershipRole: String!): DomainCommandResult!
+        startDepositCheckout(appointmentId: ID!, accessToken: String): DomainCommandResult!
+        startDeskCardPayment(appointmentId: ID!, tipAmount: Int, discountAmount: Int, taxAmount: Int, notes: String): DomainCommandResult!
+        checkDeskCardPayment(paymentSessionId: ID!): DomainCommandResult!
+        cancelDeskCardPayment(paymentSessionId: ID!): DomainCommandResult!
+        expireStalePaymentSessions(force: Boolean): DomainCommandResult!
+        startGiftCardCheckout(amount: Int!, purchaserName: String!, purchaserEmail: String!, recipientName: String, recipientEmail: String, message: String): DomainCommandResult!
+        returnGiftCardCheckout(transactionId: ID!, reason: String!, idempotencyKey: String!): DomainCommandResult!
+        confirmGiftCardOrder(giftCardId: ID!, token: String!): DomainCommandResult!
+        startProductCheckout(productId: ID!, buyerName: String!, buyerEmail: String!): DomainCommandResult!
+        confirmProductOrder(orderId: ID!, token: String!): DomainCommandResult!
+        confirmDepositCheckout(appointmentId: ID!, accessToken: String): DomainCommandResult!
 
         markAppointmentNoShow(appointmentId: ID!, policyId: ID, reason: String!, idempotencyKey: String!): DomainCommandResult!
         transitionCommission(commissionId: ID!, toStatus: String!, reason: String, idempotencyKey: String!): DomainCommandResult!
@@ -12248,6 +13945,7 @@ function extendGraphqlSchema(baseSchema) {
         reconcilePaymentSession(paymentSessionId: ID!, idempotencyKey: String!): DomainCommandResult!
         addCustomerNote(customerId: ID!, body: String!, noteType: String, visibility: String, appointmentId: ID, idempotencyKey: String!): DomainCommandResult!
         setCustomerStatus(customerId: ID!, status: String!, reason: String, idempotencyKey: String!): DomainCommandResult!
+        mergeCustomers(keepCustomerId: ID!, duplicateCustomerId: ID!, idempotencyKey: String!): DomainCommandResult!
         setCustomerConsent(customerId: ID!, acceptsMarketing: Boolean!, preferredContactMethod: String, idempotencyKey: String!): DomainCommandResult!
         issueCustomerWaiver(customerId: ID!, appointmentId: ID, title: String!, waiverType: String, deliveryStatus: String, idempotencyKey: String!): DomainCommandResult!
         manageMembership(action: String!, customerId: ID, membershipPlanId: ID, servicePackageId: ID, customerPackageId: ID, paymentMethod: String, reason: String, idempotencyKey: String!): DomainCommandResult!
@@ -12264,6 +13962,10 @@ function extendGraphqlSchema(baseSchema) {
 
         runBarbershopOnboarding(
           mode: String!
+          shopName: String
+          shopAddress: String
+          shopPhone: String
+          shopTimezone: String
         ): RunBarbershopOnboardingResult!
 
       }
@@ -12274,6 +13976,9 @@ function extendGraphqlSchema(baseSchema) {
         getPublicStorefrontSettings,
         getPublicServiceCatalog,
         accountBookings: getAccountBookings,
+        accountBalances: getAccountBalances,
+        getPublicMembershipOffers,
+        getPublicBarberWeek,
         exportMyAccountData,
         getPublicBookingEligibility,
         getPublicBarbers,
@@ -12344,6 +14049,13 @@ function extendGraphqlSchema(baseSchema) {
         checkBarberAvailability,
         getPublicQueue,
         getPublicQueueEntry,
+        claimableShops,
+        getPublicWalkInStatus,
+        getPublicPaymentOptions,
+        openDeskCardPayment,
+        giftCardOptions: async (_root, _args, context) => giftCardOptions(context.sudo().prisma),
+        lookupGiftCard,
+        platformTeam,
         getPublicAppointment
       },
       Mutation: {
@@ -12370,6 +14082,30 @@ function extendGraphqlSchema(baseSchema) {
         transitionAppointment,
         transitionQueueEntry,
         selectActiveShop,
+        claimShopOwnership,
+        addShopMemberByEmail,
+        startDepositCheckout,
+        startDeskCardPayment,
+        checkDeskCardPayment,
+        cancelDeskCardPayment,
+        startGiftCardCheckout,
+        returnGiftCardCheckout,
+        confirmGiftCardOrder,
+        startProductCheckout,
+        confirmProductOrder,
+        expireStalePaymentSessions: async (_root, _args, context) => {
+          try {
+            const shopId = await requireCurrentShopPermission(context.session, "canManagePayments");
+            await settleOpenGiftCards(context.prisma, shopId).catch(() => void 0);
+            await settleOpenProductOrders(context.prisma, shopId).catch(() => void 0);
+            const force = Boolean(_args && _args.force);
+            const result = await sweepStalePaymentSessions(context.prisma, shopId, /* @__PURE__ */ new Date(), { force });
+            return { success: true, error: null, data: result };
+          } catch (error) {
+            return { success: false, error: error instanceof Error ? error.message : "Unable to expire payments.", data: null };
+          }
+        },
+        confirmDepositCheckout,
         markAppointmentNoShow: async (root, args, context) => {
           const result = await markAppointmentNoShow(root, args, context);
           return { success: result.success, error: result.error, data: result.evidence };
@@ -12398,6 +14134,10 @@ function extendGraphqlSchema(baseSchema) {
         addCustomerNote: async (root, args, context) => {
           const result = await addCustomerNote(root, args, context);
           return { success: result.success, error: result.error, data: result.note };
+        },
+        mergeCustomers: async (root, args, context) => {
+          const result = await mergeCustomers(root, args, context);
+          return { success: result.success, error: result.error, data: result.customer };
         },
         setCustomerStatus: async (root, args, context) => {
           const result = await setCustomerStatus(root, args, context);
@@ -12457,7 +14197,7 @@ function extendGraphqlSchema(baseSchema) {
     }
   });
 }
-var import_schema, graphql8;
+var import_schema, graphql9;
 var init_mutations = __esm({
   "features/keystone/mutations/index.ts"() {
     "use strict";
@@ -12466,6 +14206,7 @@ var init_mutations = __esm({
     init_checkBarberAvailability();
     init_createOnlineBooking();
     init_getAccountBookings();
+    init_getPublicOffers();
     init_guestBookingCommand();
     init_checkoutAppointment();
     init_ensureDefaultPaymentProvider();
@@ -12486,6 +14227,14 @@ var init_mutations = __esm({
     init_transitionAppointment();
     init_transitionQueueEntry();
     init_selectActiveShop();
+    init_claimShopOwnership();
+    init_manageTeam();
+    init_publicDeposits();
+    init_expireStalePaymentSessions();
+    init_currentAuthorization();
+    init_giftCards();
+    init_productOrders();
+    init_deskCardPayment();
     init_markAppointmentNoShow();
     init_manageCommissions();
     init_manageProductSales();
@@ -12502,7 +14251,100 @@ var init_mutations = __esm({
     init_setPractitionerCredentialStatus();
     init_manageStorefrontSettings();
     init_getPlatformProjections();
-    graphql8 = String.raw;
+    graphql9 = String.raw;
+  }
+});
+
+// features/keystone/lib/email-layout.ts
+function storeNameFromEnv(fallback = "Barbershop") {
+  const match = /^\s*"?([^"<]+?)"?\s*</.exec(process.env.SMTP_FROM || "");
+  return match?.[1]?.trim() || fallback;
+}
+function emailButton(label, href) {
+  return `<table role="presentation" border="0" cellspacing="0" cellpadding="0" style="margin:8px 0 24px;">
+<tr><td class="em-btn" align="center" bgcolor="${C.button}" style="border-radius:8px;background:${C.button};">
+<a class="em-btn-a" href="${escapeHtml(href)}" target="_blank" style="display:inline-block;padding:14px 28px;font-family:${FONT};font-size:16px;font-weight:600;line-height:20px;color:${C.buttonText};text-decoration:none;border-radius:8px;">${escapeHtml(label)}</a>
+</td></tr></table>`;
+}
+function emailLayout(input) {
+  const store = escapeHtml(input.storeName || storeNameFromEnv());
+  const support = escapeHtml(input.supportEmail || SUPPORT_EMAIL);
+  return `<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>${escapeHtml(input.title)}</title>
+<style>
+:root { color-scheme: light dark; supported-color-schemes: light dark; }
+body { margin:0; padding:0; -webkit-text-size-adjust:100%; }
+a { color:${C.link}; }
+@media (max-width: 620px) { .em-pad { padding-left:20px !important; padding-right:20px !important; } }
+@media (prefers-color-scheme: dark) {
+  .em-canvas { background:#09090b !important; }
+  .em-card { background:#18181b !important; border-color:#27272a !important; }
+  .em-text { color:#fafafa !important; }
+  .em-muted { color:#a1a1aa !important; }
+  .em-line { border-color:#3f3f46 !important; }
+  .em-panel { background:#27272a !important; border-color:#3f3f46 !important; color:#fafafa !important; }
+  .em-btn { background:#fafafa !important; }
+  .em-btn-a { color:#18181b !important; }
+  .em-link { color:#fafafa !important; }
+}
+[data-ogsc] .em-text { color:#fafafa !important; }
+[data-ogsc] .em-muted { color:#a1a1aa !important; }
+[data-ogsb] .em-canvas { background:#09090b !important; }
+[data-ogsb] .em-card { background:#18181b !important; }
+</style>
+</head>
+<body class="em-canvas" style="margin:0;padding:0;background:${C.canvas};">
+${input.preheader ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">${escapeHtml(input.preheader)}</div>` : ""}
+<table role="presentation" class="em-canvas" width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="${C.canvas}" style="background:${C.canvas};">
+<tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width:600px;">
+<tr><td class="em-pad" style="padding:8px 32px 20px;font-family:${FONT};font-size:18px;line-height:24px;font-weight:700;letter-spacing:-0.01em;"><span class="em-text" style="color:${C.text};">${store}</span></td></tr>
+<tr><td class="em-card" bgcolor="${C.card}" style="background:${C.card};border:1px solid ${C.line};border-radius:12px;">
+<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr><td class="em-pad" style="padding:32px 32px 16px;">
+<h1 class="em-text" style="margin:0 0 16px;font-family:${FONT};font-size:24px;line-height:32px;font-weight:700;letter-spacing:-0.02em;color:${C.text};">${escapeHtml(input.title)}</h1>
+${input.body}
+</td></tr>
+</table>
+</td></tr>
+<tr><td class="em-pad" style="padding:20px 32px 8px;font-family:${FONT};font-size:13px;line-height:20px;color:${C.subtle};">
+<span class="em-muted" style="color:${C.subtle};">${input.footerNote ? `${input.footerNote}<br>` : ""}Questions? Email <a class="em-link" href="mailto:${support}" style="color:${C.muted};text-decoration:underline;">${support}</a>.<br>${store}</span>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+}
+var SUPPORT_EMAIL, FONT, C, escapeHtml, p, emailParagraph, emailMuted;
+var init_email_layout = __esm({
+  "features/keystone/lib/email-layout.ts"() {
+    "use strict";
+    SUPPORT_EMAIL = "hello@barbershop.openship.org";
+    FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
+    C = {
+      canvas: "#f4f4f5",
+      card: "#ffffff",
+      text: "#18181b",
+      muted: "#52525b",
+      subtle: "#71717a",
+      line: "#e4e4e7",
+      panel: "#fafafa",
+      button: "#18181b",
+      buttonText: "#ffffff",
+      link: "#18181b"
+    };
+    escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+    p = (html, style = "") => `<p class="em-text" style="margin:0 0 16px;font-family:${FONT};font-size:16px;line-height:24px;color:${C.text};${style}">${html}</p>`;
+    emailParagraph = p;
+    emailMuted = (html) => `<p class="em-muted" style="margin:0 0 16px;font-family:${FONT};font-size:14px;line-height:22px;color:${C.muted};">${html}</p>`;
   }
 });
 
@@ -12531,9 +14373,6 @@ async function resetPathFor(email) {
   });
   return user?.role?.canAccessDashboard || user?.shopMemberships?.length ? "/dashboard/reset" : "/account/reset";
 }
-function escapeHtmlAttribute(value) {
-  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
 function mailTransport() {
   const { SMTP_HOST: host, SMTP_USER: user, SMTP_PASSWORD: pass } = process.env;
   const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : void 0;
@@ -12541,37 +14380,13 @@ function mailTransport() {
   return (0, import_nodemailer.createTransport)({ host, port, auth: { user, pass }, disableFileAccess: true, disableUrlAccess: true });
 }
 function passwordResetEmail({ url }) {
-  const backgroundColor = "#f9f9f9";
-  const textColor = "#444444";
-  const mainBackgroundColor = "#ffffff";
-  const buttonBackgroundColor = "#346df1";
-  const buttonBorderColor = "#346df1";
-  const buttonTextColor = "#ffffff";
-  return `
-    <body style="background: ${backgroundColor};">
-      <table width="100%" border="0" cellspacing="20" cellpadding="0" style="background: ${mainBackgroundColor}; max-width: 600px; margin: auto; border-radius: 10px;">
-        <tr>
-          <td align="center" style="padding: 10px 0px 0px 0px; font-size: 18px; font-family: Helvetica, Arial, sans-serif; color: ${textColor};">
-            Please click below to reset your password
-          </td>
-        </tr>
-        <tr>
-          <td align="center" style="padding: 20px 0;">
-            <table border="0" cellspacing="0" cellpadding="0">
-              <tr>
-                <td align="center" style="border-radius: 5px;" bgcolor="${buttonBackgroundColor}"><a href="${escapeHtmlAttribute(url)}" target="_blank" style="font-size: 18px; font-family: Helvetica, Arial, sans-serif; color: ${buttonTextColor}; text-decoration: none; border-radius: 5px; padding: 10px 20px; border: 1px solid ${buttonBorderColor}; display: inline-block; font-weight: bold;">Reset Password</a></td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td align="center" style="padding: 0px 0px 10px 0px; font-size: 16px; line-height: 22px; font-family: Helvetica, Arial, sans-serif; color: ${textColor};">
-            If you did not request this email you can safely ignore it.
-          </td>
-        </tr>
-      </table>
-    </body>
-  `;
+  return emailLayout({
+    preheader: "Use this link to choose a new password.",
+    title: "Reset your password",
+    body: `${emailParagraph("We received a request to reset the password for your account. Use the button below to choose a new one.")}
+${emailButton("Reset password", url)}
+${emailMuted("If you did not request this, you can safely ignore this email. Your password will not change.")}`
+  });
 }
 async function sendPasswordResetEmail(resetToken, to, baseUrl) {
   const url = new URL(await resetPathFor(to), resetLinkOrigin(baseUrl));
@@ -12593,6 +14408,22 @@ var init_mail = __esm({
     "use strict";
     import_nodemailer = require("nodemailer");
     init_domainPrisma();
+    init_email_layout();
+  }
+});
+
+// features/keystone/lib/s3-storage.ts
+function s3ForcePathStyle(endpoint2) {
+  let hostname = "";
+  try {
+    hostname = endpoint2 ? new URL(endpoint2).hostname : "";
+  } catch {
+  }
+  return !(hostname === "storageapi.dev" || hostname.endsWith(".storageapi.dev"));
+}
+var init_s3_storage = __esm({
+  "features/keystone/lib/s3-storage.ts"() {
+    "use strict";
   }
 });
 
@@ -12616,20 +14447,48 @@ var init_runtimeConfig = __esm({
   }
 });
 
+// features/keystone/database-url.ts
+function pooledDatabaseUrl(url, role = "web") {
+  if (!url || !/^postgres(ql)?:\/\//.test(url)) return url;
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+  if (parsed.searchParams.has("connection_limit")) return url;
+  const override = Number(process.env[OVERRIDE_ENV[role]]);
+  parsed.searchParams.set("connection_limit", String(Number.isInteger(override) && override > 0 ? override : POOL_SIZES[role]));
+  return parsed.toString();
+}
+var POOL_SIZES, OVERRIDE_ENV;
+var init_database_url = __esm({
+  "features/keystone/database-url.ts"() {
+    "use strict";
+    POOL_SIZES = { web: 15, worker: 5 };
+    OVERRIDE_ENV = {
+      web: "DATABASE_CONNECTION_LIMIT",
+      worker: "DATABASE_CONNECTION_LIMIT_WORKER"
+    };
+  }
+});
+
 // features/keystone/index.ts
-var import_auth, import_core48, import_config, import_session, databaseURL, sessionConfig, bucketName, region, accessKeyId, secretAccessKey, endpoint, withAuth, keystone_default;
+var import_auth, import_core49, import_config, import_session, databaseURL, sessionConfig, bucketName, region, accessKeyId, secretAccessKey, endpoint, withAuth, keystone_default;
 var init_keystone = __esm({
   "features/keystone/index.ts"() {
     "use strict";
     import_auth = require("@keystone-6/auth");
-    import_core48 = require("@keystone-6/core");
+    import_core49 = require("@keystone-6/core");
     import_config = require("dotenv/config");
     init_models();
     import_session = require("@keystone-6/core/session");
     init_mutations();
     init_mail();
+    init_s3_storage();
     init_domainPrisma();
     init_runtimeConfig();
+    init_database_url();
     ({ databaseURL, sessionConfig } = runtimeConfig());
     ({
       S3_BUCKET_NAME: bucketName = "keystone-test",
@@ -12707,10 +14566,10 @@ var init_keystone = __esm({
   `
     }));
     keystone_default = withAuth(
-      (0, import_core48.config)({
+      (0, import_core49.config)({
         db: {
           provider: "postgresql",
-          url: databaseURL,
+          url: pooledDatabaseUrl(databaseURL),
           extendPrismaClient: bindDomainPrisma
         },
         lists: models,
@@ -12724,7 +14583,7 @@ var init_keystone = __esm({
             secretAccessKey,
             endpoint,
             signed: { expiry: 5e3 },
-            forcePathStyle: true
+            forcePathStyle: s3ForcePathStyle(endpoint)
           }
         },
         ui: {

@@ -4,7 +4,7 @@ import { getGiftCardOptions } from '../lib/data/giftCards';
 import { getPublicStorefrontSettings } from '../lib/data/settings';
 import { StorefrontShell } from './StorefrontShell';
 
-/** Digital gift cards, emailed with a code that pays at checkout in the shop. */
+/** Digital gift cards, with a code that pays at checkout in the shop. */
 export default async function GiftCardsPage() {
   const [settings, options] = await Promise.all([getPublicStorefrontSettings(), getGiftCardOptions()]);
   if (!settings) return <StorefrontShell><></></StorefrontShell>;
@@ -16,7 +16,7 @@ export default async function GiftCardsPage() {
             <h1 className="sf-display">Gift cards</h1>
             <div className="sf-actions"><Link href="/book" className="sf-btn">Book a time</Link></div>
           </div>
-          <p className="sf-lead">A fresh cut for someone else. Emailed in minutes, good for any service, tip or product for a year.</p>
+          <p className="sf-lead">A fresh cut for someone else. Code shown the moment you pay, good for any service, tip or product for a year.</p>
         </section>
         <section className="sf-container-narrow sf-section is-tight">
           {options.online && options.amounts.length

@@ -35,6 +35,7 @@ export const Customer = list({
     },
   },
   ui: {
+    labelField: "fullName",
     listView: {
       initialColumns: ["fullName", "phone", "email", "status", "appointments"],
     },

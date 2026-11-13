@@ -18,7 +18,7 @@ export default async function MembershipsPage() {
             <h1 className="sf-display">Memberships</h1>
             <div className="sf-actions"><Link href="/gift-cards" className="sf-btn">Gift cards</Link><Link href="/account" className="sf-btn">Your balances</Link><Link href="/book" className="sf-btn is-primary">Book a time</Link></div>
           </div>
-          <p className="sf-lead">Bought in the shop, used when you book.</p>
+          <p className="sf-lead">Packages and memberships are bought in the shop and used when you book.</p>
         </section>
         <section className="sf-container sf-section is-tight grid gap-[var(--space-2xl)] lg:grid-cols-2">
           {offers === null ? <p role="alert" className="sf-notice is-error lg:col-span-2">Memberships couldn’t load. Try again in a moment.</p> : null}

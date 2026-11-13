@@ -1,3 +1,6 @@
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { ACCESS_KINDS } from '../lib/access-cookie-names';
 import Link from 'next/link';
 import { phoneHref } from '@/features/shared/storefront-settings';
 import { AppointmentSelfService, AppointmentWaiver } from '../components/AppointmentSelfService';
@@ -36,7 +39,13 @@ export default async function AppointmentStatusPage({
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const params = searchParams ? await searchParams : {};
-  const appointmentId = typeof params.id === 'string' ? params.id : '';
+  let appointmentId = typeof params.id === 'string' ? params.id : '';
+  // "My appointment" in the browser that booked: the access cookie names the visit, so open it.
+  if (!appointmentId) {
+    const prefix = ACCESS_KINDS.appointment.prefix;
+    const held = (await cookies()).getAll().filter((cookie) => cookie.name.startsWith(prefix) && cookie.value).map((cookie) => cookie.name.slice(prefix.length));
+    if (held.length) redirect(`/appointment?id=${encodeURIComponent(held[held.length - 1])}`);
+  }
   // Back from Stripe: record the deposit before showing the visit.
   const depositReturn = params.deposit === 'return' && appointmentId ? await confirmDeposit(appointmentId) : null;
   const [lookup, settings, onlineDeposits] = await Promise.all([
@@ -61,6 +70,10 @@ export default async function AppointmentStatusPage({
     ? transaction.status === 'paid' || transaction.status === 'partially_refunded' || transaction.status === 'refunded'
       ? `Paid${transaction.paymentMethod ? ` by ${statusLabel(transaction.paymentMethod)}` : ''}${transaction.completedAt ? ` · ${timeZone ? formatShopDateTime(transaction.completedAt, timeZone) : transaction.completedAt}` : ''}`
       : transaction.status === 'voided' ? 'Payment voided' : 'Payment not completed'
+    : appointment?.paymentStatus === 'refunded'
+      ? `Deposit refunded${appointment.depositAmount ? `: ${formatMoney(appointment.depositAmount)}` : ''}`
+    : appointment?.paymentStatus === 'deposit_paid' && appointment.status === 'cancelled'
+      ? `Deposit paid: ${formatMoney(appointment.depositAmount)}. The visit is cancelled; the shop will refund the deposit under its policy or contact you.`
     : appointment?.paymentStatus === 'deposit_due'
       ? `Deposit due: ${formatMoney(appointment.depositAmount)}`
       : appointment?.paymentStatus === 'deposit_paid'
@@ -120,7 +133,7 @@ export default async function AppointmentStatusPage({
               <section className="sf-card-dark sf-on-dark content-start" aria-label="Appointment">
                 <div className="flex flex-wrap items-baseline justify-between gap-3">
                   <p className="sf-subtitle capitalize">{statusLabel(appointment.status)}</p>
-                  <span className="sf-tag">{paymentLabel(appointment.paymentStatus)}</span>
+                  <span className="sf-tag">{appointment.paymentStatus === 'deposit_paid' && appointment.status === 'cancelled' ? 'Refund pending' : paymentLabel(appointment.paymentStatus)}</span>
                 </div>
                 {isTerminal(appointment.status) ? (
                   <p className="sf-notice is-error">{appointment.status === 'cancelled' ? 'Visit cancelled' : 'Marked no-show'}</p>

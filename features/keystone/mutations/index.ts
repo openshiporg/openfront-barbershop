@@ -31,6 +31,7 @@ import { confirmDepositCheckout, getPublicPaymentOptions, startDepositCheckout }
 import { sweepStalePaymentSessions } from "../utils/expireStalePaymentSessions";
 import { requireCurrentShopPermission } from "../utils/currentAuthorization";
 import { confirmGiftCardOrder, giftCardOptions, lookupGiftCard, returnGiftCardCheckout, settleOpenGiftCards, startGiftCardCheckout } from "./giftCards";
+import { confirmProductOrder, settleOpenProductOrders, startProductCheckout } from "./productOrders";
 import { cancelDeskCardPayment, checkDeskCardPayment, openDeskCardPayment, startDeskCardPayment } from "./deskCardPayment";
 import markAppointmentNoShow from "./markAppointmentNoShow";
 import { createCommissionPayout, transitionCommission } from "./manageCommissions";
@@ -567,6 +568,8 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         startGiftCardCheckout(amount: Int!, purchaserName: String!, purchaserEmail: String!, recipientName: String, recipientEmail: String, message: String): DomainCommandResult!
         returnGiftCardCheckout(transactionId: ID!, reason: String!, idempotencyKey: String!): DomainCommandResult!
         confirmGiftCardOrder(giftCardId: ID!, token: String!): DomainCommandResult!
+        startProductCheckout(productId: ID!, buyerName: String!, buyerEmail: String!): DomainCommandResult!
+        confirmProductOrder(orderId: ID!, token: String!): DomainCommandResult!
         confirmDepositCheckout(appointmentId: ID!, accessToken: String): DomainCommandResult!
 
         markAppointmentNoShow(appointmentId: ID!, policyId: ID, reason: String!, idempotencyKey: String!): DomainCommandResult!
@@ -696,10 +699,13 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         startGiftCardCheckout,
         returnGiftCardCheckout,
         confirmGiftCardOrder,
+        startProductCheckout,
+        confirmProductOrder,
         expireStalePaymentSessions: async (_root: unknown, _args: unknown, context: any) => {
           try {
             const shopId = await requireCurrentShopPermission(context.session, 'canManagePayments');
             await settleOpenGiftCards(context.prisma, shopId).catch(() => undefined);
+            await settleOpenProductOrders(context.prisma, shopId).catch(() => undefined);
             const force = Boolean(_args && (_args as { force?: boolean }).force);
             const result = await sweepStalePaymentSessions(context.prisma, shopId, new Date(), { force });
             return { success: true, error: null, data: result };

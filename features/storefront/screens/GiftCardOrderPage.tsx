@@ -17,7 +17,7 @@ export default async function GiftCardOrderPage({ searchParams }: { searchParams
         {!order ? <p className="sf-lead mt-3">{error}</p>
           : order.code ? (
             <div className="mt-6 grid gap-4">
-              <p className="sf-lead">{usd(order.amount)} gift card{order.recipientName ? ` for ${order.recipientName}` : ''}. {order.recipientEmail ? `We emailed the code to ${order.recipientEmail}.` : ''}</p>
+              <p className="sf-lead">{usd(order.amount)} gift card{order.recipientName ? ` for ${order.recipientName}` : ''}. Keep this code; it is shown here once paid.</p>
               <div className="sf-card">
                 <span className="sf-small sf-muted">Code</span>
                 <p className="sf-title tabular-nums" style={{ letterSpacing: '0.08em' }}>{order.code}</p>
@@ -26,7 +26,7 @@ export default async function GiftCardOrderPage({ searchParams }: { searchParams
             </div>
           ) : cancelled || order.status === 'cancelled'
             ? <p className="sf-lead mt-3">Checkout was cancelled, so your card wasn’t charged.</p>
-            : <p className="sf-lead mt-3">Stripe is still confirming your payment. Refresh this page in a moment. We’ll email the code once it clears.</p>}
+            : <p className="sf-lead mt-3">Stripe is still confirming your payment. Refresh this page in a moment.</p>}
         <div className="sf-actions mt-8">
           {order && !order.code ? <Link href="/gift-cards" className="sf-btn">Gift cards</Link> : null}
           <Link href="/book" className="sf-btn is-primary">Book a time</Link>
