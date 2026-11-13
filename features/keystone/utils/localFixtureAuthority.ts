@@ -42,8 +42,7 @@ export function localFixtureScopeSql(shop: 'shop' | 's') {
   const ownership = localOwnership();
   if (!ownership) return 'FALSE';
   const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
-  return `(${shop}."isDemo" = true
-    AND current_database() IN (${ownership.databases.map(literal).join(',')})
+  return `(current_database() IN (${ownership.databases.map(literal).join(',')})
     AND current_user = ${literal(ownership.role)} AND session_user = ${literal(ownership.role)}
     AND (SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = current_database()) = current_user
     AND CASE WHEN (SELECT rolsuper OR pg_has_role(current_user, 'pg_read_all_settings', 'USAGE') FROM pg_roles WHERE rolname = current_user)

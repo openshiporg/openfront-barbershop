@@ -59,7 +59,6 @@ type FormState = {
   logoIcon: string;
   logoColor: string;
   isPublic: boolean;
-  isDemo: boolean;
   hours: Record<string, string>;
 };
 
@@ -84,7 +83,6 @@ function toForm(settings: ActiveShopStorefrontSettings): FormState {
     logoIcon: settings.logoIcon || DEFAULT_STORE_LOGO_ICON,
     logoColor: settings.logoColor || '0',
     isPublic: settings.isPublic,
-    isDemo: settings.isDemo,
     hours: toHours(settings.hours),
   };
 }
@@ -437,13 +435,9 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
 
           <section aria-labelledby="settings-publish" className="space-y-1">
             <h2 id="settings-publish" className="border-b pb-2 text-sm font-semibold">Publication</h2>
-            <div className="flex items-center justify-between gap-4 border-b py-3">
+            <div className="flex items-center justify-between gap-4 py-3">
               <Label htmlFor="published"><StatusDot tone={form.isPublic ? 'live' : 'off'} />Published storefront</Label>
               <Switch id="published" checked={form.isPublic} disabled={isLoading} onCheckedChange={(isPublic) => update({ isPublic })} />
-            </div>
-            <div className="flex items-center justify-between gap-4 py-3">
-              <Label htmlFor="demo" className="grid gap-0.5"><span><StatusDot tone={form.isDemo ? 'wait' : 'off'} />Sample shop</span><span className="text-xs font-normal text-muted-foreground">{form.isDemo ? 'Hidden from search engines' : 'Listed for search engines'}</span></Label>
-              <Switch id="demo" checked={form.isDemo} disabled={isLoading} onCheckedChange={(isDemo) => update({ isDemo })} />
             </div>
           </section>
         </div>

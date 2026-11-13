@@ -15,7 +15,6 @@ export type StorefrontSettingsInput = {
   logoIcon?: string;
   logoColor?: string;
   isPublic: boolean;
-  isDemo: boolean;
   hours?: unknown;
 };
 
@@ -64,6 +63,5 @@ export function parseStorefrontSettingsInput(args: StorefrontSettingsInput) {
     ...(args.logoIcon === undefined ? {} : { logoIcon: validLogo(args.logoIcon) }),
     ...(args.logoColor === undefined ? {} : { logoColor: normalizeStoreLogoColor(args.logoColor) }),
     isPublic: Boolean(args.isPublic),
-    isDemo: Boolean(args.isDemo),
   };
 }

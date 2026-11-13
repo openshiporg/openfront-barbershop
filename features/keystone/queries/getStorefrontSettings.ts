@@ -29,7 +29,6 @@ export default async function getPublicStorefrontSettings(
     brandColor: true,
     logoIcon: true,
     logoColor: true,
-    isDemo: true,
   });
 
   if (!shop?.id || !shop.name || !shop.timezone || !shop.currencyCode || !isStorefrontBrandColor(shop.brandColor)) {
@@ -48,6 +47,5 @@ export default async function getPublicStorefrontSettings(
     brandColor: shop.brandColor,
     logoIcon: sanitizeStoreLogoSvg(shop.logoIcon || '') || DEFAULT_STORE_LOGO_ICON,
     logoColor: normalizeStoreLogoColor(shop.logoColor),
-    isDemo: Boolean(shop.isDemo),
   };
 }

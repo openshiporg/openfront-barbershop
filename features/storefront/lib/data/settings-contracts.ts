@@ -16,7 +16,6 @@ export const PUBLIC_STOREFRONT_SETTINGS_QUERY = gql`
       brandColor
       logoIcon
       logoColor
-      isDemo
     }
   }
 `;

@@ -298,7 +298,6 @@ function seedShopData(shop: SeedRecord) {
     brandColor: text(shop.brandColor, 'amber'),
     logoIcon,
     logoColor: normalizeStoreLogoColor(shop.logoColor ?? DEFAULT_STORE_LOGO_COLOR),
-    isDemo: shop.isDemo !== false,
   }
 }
 
@@ -319,7 +318,7 @@ export function applyShopDetails(shop: SeedRecord, details?: OnboardingShopDetai
   const rest = { ...shop }
   delete rest.slug
   delete rest.tagline
-  return { ...rest, name, legalName: name, address, phone, ...(timezone ? { timezone } : {}), isDemo: false }
+  return { ...rest, name, legalName: name, address, phone, ...(timezone ? { timezone } : {}) }
 }
 
 /**

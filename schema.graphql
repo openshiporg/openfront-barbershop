@@ -448,7 +448,6 @@ type Shop {
   hours: JSON
   brandColor: ShopBrandColorType
   isPublic: Boolean
-  isDemo: Boolean
   memberships(where: ShopMembershipWhereInput! = {}, orderBy: [ShopMembershipOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: ShopMembershipWhereUniqueInput): [ShopMembership!]
   membershipsCount(where: ShopMembershipWhereInput! = {}): Int
   activeUsers(where: UserWhereInput! = {}, orderBy: [UserOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: UserWhereUniqueInput): [User!]
@@ -565,7 +564,6 @@ input ShopWhereInput {
   jurisdictionCode: StringFilter
   brandColor: ShopBrandColorTypeNullableFilter
   isPublic: BooleanFilter
-  isDemo: BooleanFilter
   memberships: ShopMembershipManyRelationFilter
   activeUsers: UserManyRelationFilter
   chairs: BarberChairManyRelationFilter
@@ -841,7 +839,6 @@ input ShopOrderByInput {
   jurisdictionCode: OrderDirection
   brandColor: OrderDirection
   isPublic: OrderDirection
-  isDemo: OrderDirection
   createdAt: OrderDirection
   updatedAt: OrderDirection
 }
@@ -862,7 +859,6 @@ input ShopUpdateInput {
   hours: JSON
   brandColor: ShopBrandColorType
   isPublic: Boolean
-  isDemo: Boolean
   memberships: ShopMembershipRelateToManyForUpdateInput
   activeUsers: UserRelateToManyForUpdateInput
   chairs: BarberChairRelateToManyForUpdateInput
@@ -1163,7 +1159,6 @@ input ShopCreateInput {
   hours: JSON
   brandColor: ShopBrandColorType
   isPublic: Boolean
-  isDemo: Boolean
   memberships: ShopMembershipRelateToManyForCreateInput
   activeUsers: UserRelateToManyForCreateInput
   chairs: BarberChairRelateToManyForCreateInput
@@ -7215,7 +7210,7 @@ type Mutation {
   managePublicAppointment(appointmentId: ID!, accessToken: String, action: String!, startsAt: String, reason: String!, idempotencyKey: String!, preview: Boolean, acceptedFeeAmount: Int): DomainCommandResult!
   signPublicWaiver(appointmentId: ID!, accessToken: String, signerName: String!, signerRole: String!, guardianName: String, affirmation: Boolean!, idempotencyKey: String!): DomainCommandResult!
   setPractitionerCredentialStatus(credentialId: ID!, status: String!, reason: String!, idempotencyKey: String!): DomainCommandResult!
-  updateActiveShopStorefrontSettings(name: String!, tagline: String, address: String, phone: String, timezone: String!, currencyCode: String!, brandColor: String!, logoIcon: String, logoColor: String, isPublic: Boolean!, isDemo: Boolean!, hours: JSON, expectedShopId: ID, expectedVersion: String): DomainCommandResult!
+  updateActiveShopStorefrontSettings(name: String!, tagline: String, address: String, phone: String, timezone: String!, currencyCode: String!, brandColor: String!, logoIcon: String, logoColor: String, isPublic: Boolean!, hours: JSON, expectedShopId: ID, expectedVersion: String): DomainCommandResult!
   createPublicQueueEntry(customerName: String!, phone: String!, partySize: Int, requestedServiceId: ID, requestedBarberId: ID, accessToken: String): CreatePublicQueueEntryResult!
   initiateAppointmentPaymentSession(appointmentId: ID!, amount: Int, currencyCode: String, idempotencyKey: String!): AppointmentPaymentSessionResult!
   captureAppointmentPaymentSession(paymentSessionId: ID!): AppointmentPaymentSessionResult!
@@ -7648,7 +7643,6 @@ type PublicStorefrontSettings {
   brandColor: String!
   logoIcon: String
   logoColor: String
-  isDemo: Boolean!
 }
 
 type PublicServiceCategory {

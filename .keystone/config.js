@@ -3393,7 +3393,6 @@ var init_Shop = __esm({
           ui: { description: "Constrained storefront brand palette." }
         }),
         isPublic: (0, import_fields35.checkbox)({ defaultValue: false }),
-        isDemo: (0, import_fields35.checkbox)({ defaultValue: false }),
         memberships: (0, import_fields35.relationship)({ ref: "ShopMembership.shop", many: true, access: { create: () => false, update: () => false } }),
         activeUsers: (0, import_fields35.relationship)({ ref: "User.activeShop", many: true, access: { create: () => false, update: () => false } }),
         chairs: (0, import_fields35.relationship)({ ref: "BarberChair.shop", many: true, access: { create: () => false, update: () => false } }),
@@ -3935,8 +3934,7 @@ function localFixtureScopeSql(shop) {
   const ownership = localOwnership();
   if (!ownership) return "FALSE";
   const literal = (value) => `'${value.replaceAll("'", "''")}'`;
-  return `(${shop}."isDemo" = true
-    AND current_database() IN (${ownership.databases.map(literal).join(",")})
+  return `(current_database() IN (${ownership.databases.map(literal).join(",")})
     AND current_user = ${literal(ownership.role)} AND session_user = ${literal(ownership.role)}
     AND (SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = current_database()) = current_user
     AND CASE WHEN (SELECT rolsuper OR pg_has_role(current_user, 'pg_read_all_settings', 'USAGE') FROM pg_roles WHERE rolname = current_user)
@@ -4296,11 +4294,54 @@ var init_GiftCard = __esm({
 });
 
 // features/keystone/utils/relationshipBoundaries.ts
+async function canReadTarget(target, targetKey, args) {
+  try {
+    const strong = strongTargetGate[targetKey];
+    if (strong && !await strong(args)) return false;
+    const access = target?.access;
+    const query = typeof access === "object" ? access?.operation : void 0;
+    const gate = typeof query === "object" ? query?.query : query;
+    const allowed = typeof gate === "function" ? await gate({ session: args.session, context: args.context, listKey: targetKey, operation: "query" }) : gate ?? true;
+    if (!allowed) return false;
+    const rowFilter = typeof access === "object" ? access?.filter?.query : void 0;
+    if (typeof rowFilter === "function") return await rowFilter({ session: args.session, context: args.context, listKey: targetKey, operation: "query" }) !== false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function canReadField(read, args) {
+  if (read === void 0 || read === true) return true;
+  if (typeof read !== "function") return Boolean(read);
+  try {
+    return await read({ session: args.session, context: args.context, listKey: args.listKey, fieldKey: args.fieldKey, operation: "read", item: {}, inputData: {} }) === true;
+  } catch {
+    return false;
+  }
+}
+function once(args, key, compute) {
+  const scope2 = args.context && typeof args.context === "object" ? args.context : args.session ?? decisions;
+  let cache = decisions.get(scope2);
+  if (!cache) decisions.set(scope2, cache = /* @__PURE__ */ new Map());
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const result = compute();
+  cache.set(key, result);
+  return result;
+}
+function gateFiltering(listKey, fieldKey, field, lists) {
+  const relation = field.dbField;
+  const check = relation.kind === "relation" ? async (args) => await canReadField(field.access?.read, args) && canReadTarget(lists[relation.list], relation.list, args) : (args) => canReadField(field.access?.read, args);
+  const needsGate = relation.kind === "relation" || field.access && typeof field.access === "object" && field.access.read !== void 0 && field.access.read !== true;
+  if (!needsGate) return field;
+  const key = relation.kind === "relation" ? `list:${relation.list}` : `field:${listKey}.${fieldKey}`;
+  return { ...field, isFilterable: both(field.isFilterable, key, check), isOrderable: both(field.isOrderable, key, check) };
+}
 function enforceRelationshipBoundaries(lists) {
   for (const [listKey, config2] of Object.entries(lists)) {
     for (const [fieldKey, factory] of Object.entries(config2.fields)) {
       config2.fields[fieldKey] = (meta) => {
-        const field = factory(meta);
+        const field = gateFiltering(listKey, fieldKey, factory(meta), lists);
         const relation = field.dbField;
         if (relation.kind !== "relation") return field;
         const name = `${listKey}.${fieldKey}`;
@@ -4317,10 +4358,12 @@ function enforceRelationshipBoundaries(lists) {
   }
   return lists;
 }
-var editableCollections, identityRelations, archivedRoots;
+var editableCollections, identityRelations, archivedRoots, strongTargetGate, decisions, both;
 var init_relationshipBoundaries = __esm({
   "features/keystone/utils/relationshipBoundaries.ts"() {
     "use strict";
+    init_access();
+    init_currentAuthorization();
     editableCollections = /* @__PURE__ */ new Set(["Service.specialists", "Barber.specialties"]);
     identityRelations = /* @__PURE__ */ new Set([
       "User.activeShop",
@@ -4342,6 +4385,14 @@ var init_relationshipBoundaries = __esm({
       "Supplier",
       "PaymentProvider"
     ]);
+    strongTargetGate = {
+      User: async ({ session, context }) => Boolean(session?.itemId) && (await hasCurrentRolePermission(session, "canSeeOtherPeople", context?.prisma) || await hasCurrentRolePermission(session, "canManageRoles", context?.prisma)),
+      Role: async ({ session, context }) => hasCurrentRolePermission(session, "canManageRoles", context?.prisma),
+      ShopMembership: ({ session }) => managedShopIds(session).length > 0,
+      CustomerNote: ({ session }) => activeMembershipRole(session) === "owner"
+    };
+    decisions = /* @__PURE__ */ new WeakMap();
+    both = (existing, key, check) => existing === false ? false : async (args) => (typeof existing === "function" ? Boolean(await existing(args)) : existing !== false) && once(args, key, () => check(args));
   }
 });
 
@@ -7646,8 +7697,7 @@ async function getPublicStorefrontSettings(_root, _args, context) {
     hours: true,
     brandColor: true,
     logoIcon: true,
-    logoColor: true,
-    isDemo: true
+    logoColor: true
   });
   if (!shop?.id || !shop.name || !shop.timezone || !shop.currencyCode || !isStorefrontBrandColor(shop.brandColor)) {
     return null;
@@ -7663,8 +7713,7 @@ async function getPublicStorefrontSettings(_root, _args, context) {
     hours: shop.hours && typeof shop.hours === "object" ? shop.hours : null,
     brandColor: shop.brandColor,
     logoIcon: sanitizeStoreLogoSvg(shop.logoIcon || "") || DEFAULT_STORE_LOGO_ICON,
-    logoColor: normalizeStoreLogoColor(shop.logoColor),
-    isDemo: Boolean(shop.isDemo)
+    logoColor: normalizeStoreLogoColor(shop.logoColor)
   };
 }
 var init_getStorefrontSettings = __esm({
@@ -8104,8 +8153,7 @@ function seedShopData(shop) {
     hours: shop.hours ?? {},
     brandColor: text47(shop.brandColor, "amber"),
     logoIcon,
-    logoColor: normalizeStoreLogoColor(shop.logoColor ?? DEFAULT_STORE_LOGO_COLOR),
-    isDemo: shop.isDemo !== false
+    logoColor: normalizeStoreLogoColor(shop.logoColor ?? DEFAULT_STORE_LOGO_COLOR)
   };
 }
 function applyShopDetails(shop, details) {
@@ -8125,7 +8173,7 @@ function applyShopDetails(shop, details) {
   const rest = { ...shop };
   delete rest.slug;
   delete rest.tagline;
-  return { ...rest, name, legalName: name, address, phone, ...timezone ? { timezone } : {}, isDemo: false };
+  return { ...rest, name, legalName: name, address, phone, ...timezone ? { timezone } : {} };
 }
 async function resolveCallerShop(stats, userId, shopSeed) {
   const client = getPrismaClient();
@@ -12529,8 +12577,7 @@ function parseStorefrontSettingsInput(args) {
     brandColor: requireStorefrontBrandColor(args.brandColor),
     ...args.logoIcon === void 0 ? {} : { logoIcon: validLogo(args.logoIcon) },
     ...args.logoColor === void 0 ? {} : { logoColor: normalizeStoreLogoColor(args.logoColor) },
-    isPublic: Boolean(args.isPublic),
-    isDemo: Boolean(args.isDemo)
+    isPublic: Boolean(args.isPublic)
   };
 }
 var init_storefrontSettingsInput = __esm({
@@ -12592,7 +12639,7 @@ var init_manageStorefrontSettings = __esm({
     "use strict";
     init_currentAuthorization();
     init_storefrontSettingsInput();
-    STOREFRONT_SETTINGS_SELECTION = "id name tagline address phone timezone currencyCode hours brandColor logoIcon logoColor isPublic isDemo updatedAt";
+    STOREFRONT_SETTINGS_SELECTION = "id name tagline address phone timezone currencyCode hours brandColor logoIcon logoColor isPublic updatedAt";
     SettingsConflict = class extends Error {
     };
   }
@@ -13467,7 +13514,6 @@ function extendGraphqlSchema(baseSchema) {
         brandColor: String!
         logoIcon: String
         logoColor: String
-        isDemo: Boolean!
       }
 
       type PublicServiceCategory {
@@ -13846,7 +13892,6 @@ function extendGraphqlSchema(baseSchema) {
           logoIcon: String
           logoColor: String
           isPublic: Boolean!
-          isDemo: Boolean!
           hours: JSON
           expectedShopId: ID
           expectedVersion: String

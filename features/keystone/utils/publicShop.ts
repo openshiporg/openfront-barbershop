@@ -10,7 +10,6 @@ type PublishedShop = {
   brandColor?: string | null;
   logoIcon?: string | null;
   logoColor?: string | null;
-  isDemo?: boolean | null;
 };
 
 type PublishedShopClient = {

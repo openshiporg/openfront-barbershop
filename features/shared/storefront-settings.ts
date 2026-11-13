@@ -111,7 +111,6 @@ export type PublicStorefrontSettings = {
   brandColor: StorefrontBrandColor;
   logoIcon?: string;
   logoColor?: string;
-  isDemo: boolean;
 };
 
 export function phoneHref(phone?: string | null) {

@@ -38,7 +38,6 @@ export async function generateMetadata(): Promise<Metadata> {
     description,
     applicationName: settings.name,
     alternates: { canonical: '/' },
-    robots: settings.isDemo ? { index: false, follow: false } : undefined,
     openGraph: {
       type: 'website',
       siteName: settings.name,

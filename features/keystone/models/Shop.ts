@@ -105,7 +105,6 @@ export const Shop = list({
       ui: { description: 'Constrained storefront brand palette.' },
     }),
     isPublic: checkbox({ defaultValue: false }),
-    isDemo: checkbox({ defaultValue: false }),
     memberships: relationship({ ref: 'ShopMembership.shop', many: true, access: { create: () => false, update: () => false } }),
     activeUsers: relationship({ ref: 'User.activeShop', many: true, access: { create: () => false, update: () => false } }),
     chairs: relationship({ ref: 'BarberChair.shop', many: true, access: { create: () => false, update: () => false } }),

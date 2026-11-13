@@ -103,7 +103,6 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         brandColor: String!
         logoIcon: String
         logoColor: String
-        isDemo: Boolean!
       }
 
       type PublicServiceCategory {
@@ -482,7 +481,6 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
           logoIcon: String
           logoColor: String
           isPublic: Boolean!
-          isDemo: Boolean!
           hours: JSON
           expectedShopId: ID
           expectedVersion: String

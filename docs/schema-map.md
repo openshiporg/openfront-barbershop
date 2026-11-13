@@ -18,7 +18,7 @@ Who creates it:
 
 | List | Purpose | Key fields | Relationships | Created by | States / transitions |
 |---|---|---|---|---|---|
-| Shop | The business (tenant). | name, slug, timezone, currencyCode (USD), jurisdictionCode, hours (weekly JSON), brandColor, logoIcon/logoColor, isPublic, isDemo | Parent of every merchant list | O, M (setup) | status: active / paused / inactive. `isPublic` publishes the storefront; only one public shop. |
+| Shop | The business (tenant). | name, slug, timezone, currencyCode (USD), jurisdictionCode, hours (weekly JSON), brandColor, logoIcon/logoColor, isPublic | Parent of every merchant list | O, M (setup) | status: active / paused / inactive. `isPublic` publishes the storefront; only one public shop. |
 | ShopSettings | Legacy singleton for storefront settings. Superseded by Shop fields. | name, tagline, hours | none | O | none |
 | ShopMembership | Staff access to a shop. | membershipRole, status, membershipKey | shop, user | M (owner/manager), S (setup, claim) | invited → active → suspended / revoked. Never deleted. Every shop keeps at least one active owner. Managers can only grant front_desk / barber / viewer. |
 | User | Login for staff and customers. | name, email, password, onboardingStatus | role, shopMemberships, activeShop, barberProfile, customerProfile, bookings | C (sign-up), M (admin) | onboardingStatus: not_started → in_progress → completed / dismissed |
