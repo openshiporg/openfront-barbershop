@@ -30,8 +30,7 @@ export function StorefrontImage({
   priority = false,
   sizes = '(max-width: 768px) 100vw, 50vw',
 }: StorefrontImageProps) {
-  const uploaded = Boolean(src && isStorageUrl(src));
-  const safeSrc = src && (SAFE_IMAGE_PATH.test(src) || uploaded) ? src : fallbackSrc;
+  const safeSrc = src && (SAFE_IMAGE_PATH.test(src) || isStorageUrl(src)) ? src : fallbackSrc;
 
   return (
     <div className={['sf-image', className].filter(Boolean).join(' ')}>
@@ -41,8 +40,10 @@ export function StorefrontImage({
         fill
         priority={priority}
         sizes={sizes}
-        // Signed storage URLs expire, so they are not cached by the optimizer.
-        unoptimized={uploaded}
+        // Served as-is, never through /_next/image. The shop's own photos under public/ are
+        // already web-sized WebP, and signed storage URLs expire. The optimizer stopped answering
+        // for some sizes of a photo on the live shop, which left those photos blank.
+        unoptimized
         className={['object-cover', imageClassName].filter(Boolean).join(' ')}
       />
     </div>
