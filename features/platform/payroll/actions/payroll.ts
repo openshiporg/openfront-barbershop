@@ -43,7 +43,7 @@ export async function getPayrollAction(input: { status?: string; barberId?: stri
       paid: commissionsCount(where: { shop: { id: { equals: $shop } }, status: { equals: paid } })
       voided: commissionsCount(where: { shop: { id: { equals: $shop } }, status: { equals: voided } })
       commissionPayouts(where: { shop: { id: { equals: $shop } } }, orderBy: [{ paidAt: desc }], take: 20) { id payoutNumber status totalAmount commissionCount paidAt notes barber { id displayName } }
-      tips(where: { shop: { id: { equals: $shop } }, paidAt: { gte: $since } }, take: 1000) { amount barber { id displayName } }
+      tips(where: { shop: { id: { equals: $shop } }, paidAt: { gte: $since }, NOT: [{ transaction: { status: { equals: refunded } } }] }, take: 5000) { amount barber { id displayName } }
       barbers(where: { shop: { id: { equals: $shop } } }, orderBy: [{ displayName: asc }]) { id displayName }
     }`, { shop: shop.id, where, since });
   if (!result.ok) return null;

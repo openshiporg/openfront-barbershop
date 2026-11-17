@@ -22,7 +22,7 @@ export async function getPaymentsAction(): Promise<PaymentsData | null> {
       shop(where: { id: $shop }) { timezone }
       paymentProviders(where: { shop: { id: { equals: $shop } } }, orderBy: [{ name: asc }]) { id name code isInstalled paymentSessionsCount }
       paymentSessions(where: { shop: { id: { equals: $shop } }, status: { in: [pending, authorized] } }, orderBy: [{ createdAt: desc }], take: 50) { id status amount currencyCode createdAt paymentProvider { name } appointment { id serviceTitleSnapshot } }
-      checkoutTransactions(where: { shop: { id: { equals: $shop } }, completedAt: { gte: $since } }, orderBy: [{ completedAt: desc }], take: 500) { id status paymentMethod total tipAmount completedAt paymentSession { refundedAmount } cashRefund { amount } customer { firstName lastName } }
+      checkoutTransactions(where: { shop: { id: { equals: $shop } }, completedAt: { gte: $since } }, orderBy: [{ completedAt: desc }], take: 5000) { id status paymentMethod total tipAmount completedAt paymentSession { refundedAmount } cashRefund { amount } customer { firstName lastName } }
       paymentReconciliations(where: { shop: { id: { equals: $shop } } }, orderBy: [{ observedAt: desc }], take: 20) { id localStatusBefore remoteStatus localStatusAfter changed amount observedAt }
       giftCards(where: { shop: { id: { equals: $shop } }, status: { not: { equals: pending } } }, orderBy: [{ createdAt: desc }], take: 20) { id code status initialValue balance purchaserName recipientName activatedAt createdAt paymentSession { id status } }
     }`, { shop: shop.id, since });
