@@ -76,7 +76,8 @@ async function assertStaffSlot(transaction: Prisma.TransactionClient, input: Slo
   const chairId = barber.chair.id;
   const [schedule, exceptions, shifts, appointments] = await Promise.all([
     transaction.barberSchedule.findFirst({ where: { barberId: barber.id, dayOfWeek: dayKeyForDate(startsAt, timeZone) as Prisma.EnumBarberScheduleDayOfWeekTypeFilter['equals'], isWorking: true } }),
-    transaction.scheduleException.findMany({ where: { shopId: input.shopId, status: 'active', startsAt: { lt: endsAt }, endsAt: { gt: startsAt }, OR: [{ barberId: barber.id }, { chairId }, { exceptionType: 'shop_closure', barberId: null, chairId: null }] } }),
+    // The whole day is read: an hours override bounds the day even where it does not touch this slot.
+    transaction.scheduleException.findMany({ where: { shopId: input.shopId, status: 'active', startsAt: { lt: end }, endsAt: { gt: start }, OR: [{ barberId: barber.id }, { chairId }, { exceptionType: 'shop_closure', barberId: null, chairId: null }] } }),
     transaction.staffShift.findMany({ where: { shopId: input.shopId, barberId: barber.id, status: { in: ['scheduled', 'clocked_in'] }, scheduledStart: { lt: end }, scheduledEnd: { gt: start } } }),
     transaction.appointment.findMany({
       where: {
@@ -90,7 +91,7 @@ async function assertStaffSlot(transaction: Prisma.TransactionClient, input: Slo
     }),
   ]);
   assertAppointmentCandidateSetComplete(appointments);
-  const blocking = exceptions.filter((item) => item.exceptionType !== 'working_override');
+  const blocking = exceptions.filter((item) => item.exceptionType !== 'working_override' && item.startsAt < endsAt && item.endsAt > startsAt);
   if (blocking.length) throw new Error(blocking[0].reason || 'That time is blocked by a schedule exception.');
   if (shifts.length && !shifts.some((shift) => startsAt >= shift.scheduledStart && endsAt <= shift.scheduledEnd)) throw new Error('That time is outside the barber’s scheduled shift.');
   const override = exceptions.find((item) => item.exceptionType === 'working_override');

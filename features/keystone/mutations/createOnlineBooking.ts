@@ -198,7 +198,8 @@ export async function createLockedAppointment({
     }),
     transaction.scheduleException.findMany({
       where: {
-        shopId: service.shopId, status: 'active', startsAt: { lt: occupiedEndsAt }, endsAt: { gt: startsAt },
+        // The whole day is read: an hours override bounds the day even where it does not touch this slot.
+        shopId: service.shopId, status: 'active', startsAt: { lt: end }, endsAt: { gt: start },
         OR: [
           { barberId },
           { exceptionType: 'shop_closure', barberId: null, chairId: null },
@@ -208,7 +209,7 @@ export async function createLockedAppointment({
     }),
     transaction.staffShift.findMany({ where: { shopId: service.shopId, barberId, status: { in: ['scheduled', 'clocked_in'] }, scheduledStart: { lt: end }, scheduledEnd: { gt: start } }, orderBy: { scheduledStart: 'asc' } }),
   ]);
-  const blockingExceptions = exceptions.filter((item) => item.exceptionType !== 'working_override');
+  const blockingExceptions = exceptions.filter((item) => item.exceptionType !== 'working_override' && item.startsAt < occupiedEndsAt && item.endsAt > startsAt);
   if (blockingExceptions.length) throw new BookingRejected(blockingExceptions[0].reason || 'That time is blocked by a schedule exception.');
   const override = exceptions.find((item) => item.exceptionType === 'working_override');
   const baseSchedule = override ? {

@@ -120,7 +120,8 @@ export default async function seatWalkInQueueEntry(_root: unknown, args: Args, c
           }),
           transaction.scheduleException.findMany({
             where: {
-              shopId: shopIdForEntry, status: 'active', startsAt: { lt: capacityEndsAt }, endsAt: { gt: startsAt },
+              // The whole day is read: an hours override bounds the day even where it does not touch this slot.
+              shopId: shopIdForEntry, status: 'active', startsAt: { lt: shiftDayEnd }, endsAt: { gt: shiftDayStart },
               OR: [
                 { barberId: barber.id },
                 { exceptionType: 'shop_closure', barberId: null, chairId: null },
@@ -136,10 +137,11 @@ export default async function seatWalkInQueueEntry(_root: unknown, args: Args, c
           }),
         ]);
         if (conflict) throw new Error('The requested barber or chair is currently occupied.');
-        const blocking = exceptions.find((item) => item.exceptionType !== 'working_override');
+        const blocking = exceptions.find((item) => item.exceptionType !== 'working_override' && item.startsAt < capacityEndsAt && item.endsAt > startsAt);
         if (blocking) throw new Error(blocking.reason || 'The requested barber or chair is unavailable.');
-        const override = exceptions.find((item) => item.exceptionType === 'working_override' && item.startsAt <= startsAt && item.endsAt >= capacityEndsAt);
-        if (!override) {
+        const dayOverride = exceptions.find((item) => item.exceptionType === 'working_override');
+        if (dayOverride && !(dayOverride.startsAt <= startsAt && dayOverride.endsAt >= capacityEndsAt)) throw new Error('The barber is outside working hours for this service.');
+        if (!dayOverride) {
           // Weekly working hours apply to walk-ins exactly as to online bookings.
           const startMinute = shopMinute(startsAt, timeZone);
           const endMinute = startMinute + durationMinutes + bufferMinutes;
