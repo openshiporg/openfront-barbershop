@@ -172,7 +172,8 @@ export default async function checkoutAppointment(
 
       const completedAt = new Date();
       // A deposit paid online is part of this receipt's total; staff collect the balance.
-      const depositSession = appointment.paymentStatus === 'deposit_paid'
+      // A prepaid visit costs nothing here, so the deposit stays off the receipt and can still be refunded from the board.
+      const depositSession = appointment.paymentStatus === 'deposit_paid' && paymentMethod !== 'package'
         ? (await transaction.paymentSession.findMany({ where: { appointmentId: appointment.id, status: 'captured', transaction: null, ...(paymentSession ? { id: { not: paymentSession.id } } : {}) }, orderBy: { capturedAt: 'desc' }, take: 5 }))
           .find((row) => (row.metadata as Record<string, unknown> | null)?.purpose !== 'desk_card') || null
         : null;
