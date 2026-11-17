@@ -46,8 +46,9 @@ export default async function AppointmentStatusPage({
     const held = (await cookies()).getAll().filter((cookie) => cookie.name.startsWith(prefix) && cookie.value).map((cookie) => cookie.name.slice(prefix.length));
     if (held.length) redirect(`/appointment?id=${encodeURIComponent(held[held.length - 1])}`);
   }
-  // Back from Stripe: record the deposit before showing the visit.
-  const depositReturn = params.deposit === 'return' && appointmentId ? await confirmDeposit(appointmentId) : null;
+  // Record a paid deposit before showing the visit, whether or not the browser came back from Stripe.
+  const depositPaid = appointmentId ? await confirmDeposit(appointmentId) : null;
+  const depositReturn = params.deposit === 'return' ? depositPaid : null;
   const [lookup, settings, onlineDeposits] = await Promise.all([
     appointmentId ? getPublicAppointment(appointmentId) : Promise.resolve(null),
     getPublicStorefrontSettings(),

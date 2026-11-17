@@ -45,6 +45,8 @@ export async function startDepositCheckout(_root: unknown, args: Args, context: 
     if (!['requested', 'confirmed'].includes(String(appointment.status)) || appointment.paymentStatus !== 'deposit_due') throw new Error('This visit has no deposit to pay.');
     const amount = appointment.depositAmount || 0;
     if (amount <= 0) throw new Error('This visit has no deposit to pay.');
+    // A Checkout paid earlier whose browser never came back is recorded first, so the guest is never charged twice.
+    if (await recordPaidDeposit(prisma, appointment)) throw new Error('Your deposit is already paid.');
     const provider = await onlineDepositProvider(prisma, appointment.shopId);
     if (!provider) throw new Error('Online deposits are not available. Pay the deposit in the shop.');
 
@@ -79,28 +81,42 @@ export async function confirmDepositCheckout(_root: unknown, args: Args, context
   try {
     const { prisma, appointment } = await loadAppointment(context, args);
     if (appointment.paymentStatus === 'deposit_paid') return { success: true, error: null, data: { paid: true } };
-    const session = (await prisma.paymentSession.findMany({ where: { appointmentId: appointment.id, status: 'pending', paymentProvider: { code: STRIPE_CODE } }, orderBy: { createdAt: 'desc' }, take: 5, include: { paymentProvider: { select: { code: true } } } }))
-      .find((row) => (row.metadata as Record<string, unknown> | null)?.purpose !== 'desk_card');
-    if (!session || !session.paymentProvider) return { success: true, error: null, data: { paid: false } };
+    return { success: true, error: null, data: { paid: await recordPaidDeposit(prisma, appointment) } };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unable to check the deposit.', data: null };
+  }
+}
+
+/**
+ * Reads every pending deposit Checkout of the visit back from Stripe and records the first one paid. Expired ones are
+ * closed. Returns whether a deposit is now recorded.
+ */
+async function recordPaidDeposit(prisma: Awaited<ReturnType<typeof loadAppointment>>['prisma'], appointment: Awaited<ReturnType<typeof loadAppointment>>['appointment']) {
+  if (appointment.paymentStatus !== 'deposit_due') return appointment.paymentStatus === 'deposit_paid';
+  const sessions = (await prisma.paymentSession.findMany({ where: { appointmentId: appointment.id, status: 'pending', paymentProvider: { code: STRIPE_CODE } }, orderBy: { createdAt: 'desc' }, take: 20, include: { paymentProvider: { select: { code: true } } } }))
+    .filter((row) => (row.metadata as Record<string, unknown> | null)?.purpose !== 'desk_card');
+  for (const session of sessions) {
+    if (!session.paymentProvider) continue;
     const status = await getPaymentStatus({ provider: { code: session.paymentProvider.code }, paymentId: session.providerPaymentId }) as { status?: string; amount?: number | null };
     if (status.status === 'expired') {
       await prisma.paymentSession.update({ where: { id: session.id }, data: { status: 'expired' } });
-      return { success: true, error: null, data: { paid: false } };
+      continue;
     }
-    if (status.status !== 'captured') return { success: true, error: null, data: { paid: false } };
+    if (status.status !== 'captured') continue;
     if (Number(status.amount) !== session.amount) throw new Error('The amount paid does not match the deposit. Contact the shop.');
     const capturedAt = new Date();
+    let recorded = false;
     await prisma.$transaction(async (transaction) => {
       const claimed = await transaction.paymentSession.updateMany({ where: { id: session.id, status: 'pending' }, data: { status: 'captured', capturedAt } });
       if (!claimed.count) return;
-      await transaction.appointment.update({ where: { id: appointment.id }, data: { paymentStatus: 'deposit_paid' } });
+      const moved = await transaction.appointment.updateMany({ where: { id: appointment.id, paymentStatus: 'deposit_due' }, data: { paymentStatus: 'deposit_paid' } });
+      recorded = moved.count > 0;
       await recordCommandReceipt(transaction, buildCommandReceipt({
         eventKey: `payment-session:${session.id}:captured:v1`, eventType: 'payment_session.captured', aggregateType: 'payment_session', aggregateId: session.id,
         shopId: appointment.shopId, occurredAt: capturedAt, data: { paymentSession: { id: session.id, appointmentId: appointment.id, amount: session.amount, purpose: 'deposit' } },
       }));
     });
-    return { success: true, error: null, data: { paid: true } };
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : 'Unable to check the deposit.', data: null };
+    if (recorded) return true;
   }
+  return false;
 }
