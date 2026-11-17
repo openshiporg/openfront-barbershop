@@ -64,6 +64,10 @@ export default async function refundAppointmentPaymentSession(_root: unknown, ar
         throw new Error('The payment provider changed after this session started. Reconcile it before refunding.');
       }
       if (!paymentSession.providerPaymentId) throw new Error('This session has no processor payment reference to refund.');
+      // A deposit refunded while the guest is in the shop would leave the visit with no way to check out or close.
+      if (!paymentSession.transaction && ['checked_in', 'in_chair'].includes(String(paymentSession.appointment?.status))) {
+        throw new Error('This guest is in the shop. Check the visit out, or mark it a no-show, before refunding the deposit.');
+      }
       if (metadata.purpose === 'gift_card') {
         const card = await transaction.giftCard.findFirst({ where: { paymentSessionId: paymentSession.id, shopId } });
         if (card && card.balance < card.initialValue) throw new Error('This gift card has been used. Only an unused gift card can be refunded.');
