@@ -56,7 +56,7 @@ export default async function AccountPage({ searchParams }: { searchParams?: Pro
                           </span>
                           <span className="grid justify-items-end gap-1 text-end">
                             <span className="sf-product-price">{formatMoney(booking.price)}</span>
-                            <span className="sf-small sf-muted"><span className="capitalize">{statusLabel(booking.status)}</span> · {paymentLabel(booking.paymentStatus)}</span>
+                            <span className="sf-small sf-muted"><span>{statusLabel(booking.status)}</span> · {paymentLabel(booking.paymentStatus)}</span>
                           </span>
                         </Link>
                       </li>

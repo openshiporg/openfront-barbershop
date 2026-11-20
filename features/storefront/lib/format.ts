@@ -28,8 +28,10 @@ export function paymentLabel(status?: string | null) {
   return PAYMENT_LABELS[status || ''] || statusLabel(status);
 }
 
+/** Customer wording for a raw status value, in sentence case ("no_show" → "No show"). */
 export function statusLabel(status?: string | null) {
-  return status?.replace(/_/g, ' ') || 'unknown';
+  const text = status?.replace(/_/g, ' ').toLowerCase() || 'unknown';
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 /** Today's date in the shop, printed on the "Book a time" ticket stub. */

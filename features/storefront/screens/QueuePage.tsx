@@ -37,7 +37,7 @@ export default async function QueuePage({ searchParams }: { searchParams?: Promi
                 <span className="sf-small font-semibold text-end">{settings?.name}</span>
               </div>
               <dl>
-                <div><dt>Status</dt><dd className="capitalize"><span className={`sf-dot ${queueTone[lookup.entry.status] || ''}`} aria-hidden="true" />{statusLabel(lookup.entry.status)}</dd></div>
+                <div><dt>Status</dt><dd><span className={`sf-dot ${queueTone[lookup.entry.status] || ''}`} aria-hidden="true" />{statusLabel(lookup.entry.status)}</dd></div>
                 {place > 0 ? <div><dt>Place in line</dt><dd className="sf-mono">{place} of {summary!.waiting}</dd></div> : null}
                 <div><dt>Quoted wait</dt><dd>{lookup.entry.quotedWaitMinutes != null ? `About ${lookup.entry.quotedWaitMinutes} minutes` : 'Not quoted yet'}</dd></div>
                 <div><dt>Barber</dt><dd>{lookup.entry.requestedBarber?.displayName || 'Next available'}</dd></div>

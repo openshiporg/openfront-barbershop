@@ -69,7 +69,7 @@ export default async function AppointmentStatusPage({
   const telephoneHref = phoneHref(settings?.phone);
   const paymentLine = transaction
     ? transaction.status === 'paid' || transaction.status === 'partially_refunded' || transaction.status === 'refunded'
-      ? `Paid${transaction.paymentMethod ? ` by ${statusLabel(transaction.paymentMethod)}` : ''}${transaction.completedAt ? ` · ${timeZone ? formatShopDateTime(transaction.completedAt, timeZone) : transaction.completedAt}` : ''}`
+      ? `Paid${transaction.paymentMethod ? ` by ${statusLabel(transaction.paymentMethod).toLowerCase()}` : ''}${transaction.completedAt ? ` · ${timeZone ? formatShopDateTime(transaction.completedAt, timeZone) : transaction.completedAt}` : ''}`
       : transaction.status === 'voided' ? 'Payment voided' : 'Payment not completed'
     : appointment?.paymentStatus === 'refunded'
       ? `Deposit refunded${appointment.depositAmount ? `: ${formatMoney(appointment.depositAmount)}` : ''}`
@@ -102,7 +102,7 @@ export default async function AppointmentStatusPage({
                               <span className="sf-subtitle text-[1.35rem]"><span className={`sf-dot ${statusTone[booking.status] ?? ''}`} aria-hidden="true" />{booking.serviceTitleSnapshot}</span>
                               <span className="sf-small sf-muted break-words">{booking.timeZone ? formatShopDateTime(booking.startsAt, booking.timeZone) : booking.startsAt} · {booking.barberNameSnapshot}</span>
                             </span>
-                            <span className="sf-small sf-muted capitalize">{statusLabel(booking.status)}</span>
+                            <span className="sf-small sf-muted">{statusLabel(booking.status)}</span>
                           </Link>
                         </li>
                       ))}
@@ -133,7 +133,7 @@ export default async function AppointmentStatusPage({
             <div className="grid gap-8 pt-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:gap-12">
               <section className="sf-card-dark sf-on-dark content-start" aria-label="Appointment">
                 <div className="flex flex-wrap items-baseline justify-between gap-3">
-                  <p className="sf-subtitle capitalize">{statusLabel(appointment.status)}</p>
+                  <p className="sf-subtitle">{statusLabel(appointment.status)}</p>
                   <span className="sf-tag">{appointment.paymentStatus === 'deposit_paid' && appointment.status === 'cancelled' ? 'Refund pending' : paymentLabel(appointment.paymentStatus)}</span>
                 </div>
                 {isTerminal(appointment.status) ? (
@@ -198,7 +198,7 @@ export default async function AppointmentStatusPage({
                     <h2 id="balances-heading" className="sf-subtitle">Packages & memberships</h2>
                     <dl className="sf-ledger">
                       {appointment.customer.packageBalances.map((balance) => (
-                        <div key={balance.id}><dt>{balance.servicePackageName || balance.membershipPlanName || 'Balance'}</dt><dd>{balance.remainingVisits} visits left · {statusLabel(balance.status)}</dd></div>
+                        <div key={balance.id}><dt>{balance.servicePackageName || balance.membershipPlanName || 'Balance'}</dt><dd>{balance.remainingVisits} visits left · {statusLabel(balance.status).toLowerCase()}</dd></div>
                       ))}
                     </dl>
                   </section>
