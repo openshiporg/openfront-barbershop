@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient';
+import { platformRequest, trimmed } from '@/features/platform/lib/platformRequest';
 
 export type CustomerStatus = 'active' | 'vip' | 'needs_attention' | 'blocked';
 
@@ -192,4 +193,18 @@ export async function mergeCustomersAction(input: { keepCustomerId: string; dupl
       mergeCustomers(keepCustomerId: $keep, duplicateCustomerId: $duplicate, idempotencyKey: $key) { success error data }
     }
   `, { keep: input.keepCustomerId, duplicate: input.duplicateCustomerId, key: input.idempotencyKey }, ['/dashboard/platform/customers', '/dashboard/customers', '/dashboard/platform/booking']);
+}
+
+// Name and contact details, edited in place on the customer page.
+export async function updateCustomerProfileAction(id: string, form: FormData) {
+  const firstName = trimmed(form.get('firstName'), 80);
+  const phone = trimmed(form.get('phone'), 40);
+  const email = trimmed(form.get('email'), 254);
+  if (!firstName) return { success: false, error: 'Enter a first name.' };
+  if (phone.replace(/\D/g, '').length < 7) return { success: false, error: 'Enter a phone number.' };
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { success: false, error: 'Check the email address.' };
+  const result = await platformRequest(`mutation($id: ID!, $data: CustomerUpdateInput!) { updateCustomer(where: { id: $id }, data: $data) { id } }`, { id, data: { firstName, lastName: trimmed(form.get('lastName'), 80), phone, email } });
+  if (!result.ok) return { success: false, error: result.error };
+  revalidatePath('/dashboard/platform/customers');
+  return { success: true, error: null };
 }

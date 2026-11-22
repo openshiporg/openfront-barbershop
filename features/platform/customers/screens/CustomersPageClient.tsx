@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { DrawerForm, Field } from '@/features/platform/lib/forms';
 import { useCommandKey } from '@/features/platform/lib/useCommandKey';
 import { cn } from '@/lib/utils';
 import { Empty, Notice, Pager, Pill, PillLink, Restricted, Section, selectClass, StatusCell, StatusDot, Tag, Track, type Tone } from '@/features/platform/lib/ui';
@@ -16,6 +17,7 @@ import {
   manageMembershipAction,
   mergeCustomersAction,
   setCustomerConsentAction,
+  updateCustomerProfileAction,
   updateCustomerStatusAction,
   type CustomerCommandResult,
   type CustomerHistoryItem,
@@ -359,7 +361,12 @@ function CustomerDetail({ customer, data, search, planSearch, merged, openMerge 
             )}
           </div>
           <Track>
-            <PillLink size="sm" href={`/dashboard/customers/${customer.id}`}>Edit profile</PillLink>
+            <DrawerForm trigger="Edit details" title={`Edit ${fullName(customer)}`} action={(form) => updateCustomerProfileAction(customer.id, form)}>
+              <Field id="customer-first" label="First name"><Input id="customer-first" name="firstName" defaultValue={customer.firstName || ''} required maxLength={80} autoComplete="off" className="h-9 rounded-[6px]" /></Field>
+              <Field id="customer-last" label="Last name"><Input id="customer-last" name="lastName" defaultValue={customer.lastName || ''} maxLength={80} autoComplete="off" className="h-9 rounded-[6px]" /></Field>
+              <Field id="customer-phone" label="Phone"><Input id="customer-phone" name="phone" type="tel" defaultValue={customer.phone || ''} required maxLength={40} autoComplete="off" className="h-9 rounded-[6px]" /></Field>
+              <Field id="customer-email" label="Email"><Input id="customer-email" name="email" type="email" defaultValue={customer.email || ''} maxLength={254} autoComplete="off" className="h-9 rounded-[6px]" /></Field>
+            </DrawerForm>
             <MergeCustomerButton customerName={fullName(customer)} current={asCandidate(customer)} candidates={mergeCandidates} timeZone={timeZone} openSignal={mergeSignal} disabled={pending} onConfirm={mergeInto} />
           </Track>
         </div>
