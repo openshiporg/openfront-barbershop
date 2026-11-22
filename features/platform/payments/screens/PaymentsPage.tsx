@@ -16,7 +16,14 @@ const breadcrumbs = [
   { type: 'page' as const, label: 'Payments' },
 ];
 const money = (cents?: number | null) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((cents ?? 0) / 100);
-const TENDER: Record<string, string> = { cash: 'Cash', card: 'Card terminal', package: 'Package visit', gift_card: 'Gift card', other: 'Other' };
+// An online shop order is paid on Stripe by the buyer; the receipt shows who and how.
+const onlineOrder = (receipt: { paymentSession?: { metadata?: Record<string, unknown> | null } | null }) => {
+  const meta = receipt.paymentSession?.metadata || {};
+  return meta.purpose === 'product_order' ? { buyer: String(meta.buyerName || 'Online order'), item: String(meta.productName || '') } : null;
+};
+const receiptName = (receipt: Parameters<typeof onlineOrder>[0] & { customer?: { firstName: string; lastName: string | null } | null; notes?: string | null }) =>
+  [receipt.customer?.firstName, receipt.customer?.lastName].filter(Boolean).join(' ') || onlineOrder(receipt)?.buyer || (receipt.notes?.startsWith('Retail sale') ? 'Counter sale' : 'Walk-in sale');
+const TENDER: Record<string, string> = { online: 'Online card', cash: 'Cash', card: 'Card terminal', package: 'Package visit', gift_card: 'Gift card', other: 'Other' };
 const label = (value: string) => value.replaceAll('_', ' ');
 
 /** Provider codes are internal; show the operator what each one does. */
@@ -55,10 +62,10 @@ export default async function PaymentsPage() {
   const settled = data.receipts.filter((receipt) => ['paid', 'partially_refunded', 'refunded'].includes(receipt.status));
   const byTender = new Map<string, { count: number; total: number }>();
   for (const receipt of settled) {
-    const entry = byTender.get(receipt.paymentMethod) || { count: 0, total: 0 };
+    const entry = byTender.get(onlineOrder(receipt) ? 'online' : receipt.paymentMethod) || { count: 0, total: 0 };
     entry.count += 1;
     entry.total += netReceiptTotal(receipt);
-    byTender.set(receipt.paymentMethod, entry);
+    byTender.set(onlineOrder(receipt) ? 'online' : receipt.paymentMethod, entry);
   }
 
   const cardStatus = stripeOn ? 'Connected' : data.stripeKeyConfigured ? (stripeProvider ? 'Turned off' : 'Ready to connect') : 'Not connected';
@@ -139,8 +146,8 @@ export default async function PaymentsPage() {
               <DataTable label="Recent receipts" className="relative" head={[{ label: 'Customer' }, { label: 'Tender', className: 'max-sm:hidden' }, { label: 'When', className: 'max-md:hidden' }, { label: 'Status' }, { label: 'Total', className: 'text-right' }]}>
                 {data.receipts.slice(0, 15).map((receipt) => (
                   <tr key={receipt.id}>
-                    <Td><Link className="font-medium underline-offset-4 hover:underline" href={`/dashboard/platform/pos?receipt=${encodeURIComponent(receipt.id)}`}>{[receipt.customer?.firstName, receipt.customer?.lastName].filter(Boolean).join(' ') || 'Walk-in sale'}</Link></Td>
-                    <Td className="text-muted-foreground max-sm:hidden">{TENDER[receipt.paymentMethod] || label(receipt.paymentMethod)}</Td>
+                    <Td><Link className="font-medium underline-offset-4 hover:underline" href={`/dashboard/platform/pos?receipt=${encodeURIComponent(receipt.id)}`}>{receiptName(receipt)}</Link>{onlineOrder(receipt)?.item ? <span className="block text-xs text-muted-foreground">Shop order · {onlineOrder(receipt)?.item}</span> : null}</Td>
+                    <Td className="text-muted-foreground max-sm:hidden">{onlineOrder(receipt) ? 'Online card' : TENDER[receipt.paymentMethod] || label(receipt.paymentMethod)}</Td>
                     <Td className="whitespace-nowrap tabular-nums text-muted-foreground max-md:hidden">{receipt.completedAt ? formatShopDateTime(receipt.completedAt, data.timezone) : '—'}</Td>
                     <Td><StatusCell tone={receipt.status === 'paid' ? 'live' : receipt.status === 'voided' ? 'off' : 'wait'}><span className="capitalize">{label(receipt.status)}</span></StatusCell></Td>
                     <Td className="text-right font-medium tabular-nums">{money(receipt.total)}</Td>
