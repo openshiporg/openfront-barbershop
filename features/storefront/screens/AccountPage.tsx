@@ -110,7 +110,7 @@ export default async function AccountPage({ searchParams }: { searchParams?: Pro
               <section aria-labelledby="your-data-heading" className="grid gap-3 border-t border-[var(--rule)] pt-5">
                 <h2 id="your-data-heading" className="sf-subtitle">Your data</h2>
                 <AccountDataExport />
-                <p className="sf-small sf-muted">To delete your account, contact the shop{telephoneHref && settings?.phone ? <> at <a className="sf-link" href={`tel:${telephoneHref}`}>{settings.phone}</a></> : null}.</p>
+                <p className="sf-small sf-muted">To delete your account, contact the shop{telephoneHref && settings?.phone ? <> at <span className="whitespace-nowrap"><a className="sf-link" href={`tel:${telephoneHref}`}>{settings.phone}</a>.</span></> : '.'}</p>
               </section>
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--rule)] pt-4">
                 <Link href="/appointment" className="sf-arrow-link">Find an appointment <ArrowRight aria-hidden="true" /></Link>
