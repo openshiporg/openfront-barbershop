@@ -350,7 +350,7 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
         <p className="sf-lead mb-8 mt-3">{createdAppointment.status === 'confirmed'
           ? <><span className="sf-dot is-live" aria-hidden="true" />Confirmed. See you then.</>
           : <><span className="sf-dot is-wait" aria-hidden="true" />{createdAppointment.paymentStatus === 'deposit_due' ? 'Pay the deposit to confirm it.' : 'Requested. The shop confirms it next.'}</>}</p>
-        <section className="sf-ticket" role="status" aria-label="Booking request">
+        <section className="sf-ticket" role="status" aria-label="Your booking">
           <div className="sf-ticket-head">
             <p className="sf-subtitle text-[2.25rem]">{createdAppointment.service?.name}</p>
           </div>
@@ -536,7 +536,7 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
             {error && !savedCommand && <p role="alert" className="sf-notice is-error">{error}</p>}
             {!selectedSlot && !savedCommand ? <p className="sf-small sf-muted">Choose a time</p> : null}
             <div className="sf-actions is-block">
-              <button type="submit" disabled={!canSubmit} className="sf-btn is-accent">{pending ? 'Booking…' : 'Request appointment'}</button>
+              <button type="submit" disabled={!canSubmit} className="sf-btn is-accent">{pending ? 'Booking…' : 'Book appointment'}</button>
             </div>
             {settings.phone ? <p className="sf-small sf-muted">Questions: <span className="sf-mono">{settings.phone}</span></p> : null}
           </aside>
@@ -551,7 +551,7 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
               </p>
               <span className="sf-dock-total">{formatMoney(selectedService?.price)}</span>
             </div>
-            <button type="submit" disabled={!canSubmit} className="sf-btn is-accent">{pending ? 'Booking…' : 'Request appointment'}</button>
+            <button type="submit" disabled={!canSubmit} className="sf-btn is-accent">{pending ? 'Booking…' : 'Book appointment'}</button>
           </div>
         </form>
       )}
