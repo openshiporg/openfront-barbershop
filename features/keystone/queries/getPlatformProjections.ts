@@ -201,7 +201,8 @@ async function scope(context: Context, permission: Parameters<typeof requireCurr
       // barber (who manage appointments and the queue but not the catalog) are not locked out.
       canManageAppointments: ['canManageCustomers'],
       canManageQueue: ['canManageCustomers', 'canManageAppointments'],
-      canViewReports: ['canManageAppointments', 'canManagePayments', 'canManageQueue', 'canManageSchedules', 'canManageStaff', 'canManageMemberships'],
+      // Reports are read-only totals and canViewReports is the grant for them. The Viewer role holds
+      // only that grant, so requiring the manage permissions here left Viewer with no page at all.
       canManageSchedules: ['canManageStaff'],
     };
     for (const required of dependencies[permission] || []) await requireCurrentShopPermission(context.session, required, context.prisma);

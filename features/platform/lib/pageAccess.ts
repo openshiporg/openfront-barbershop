@@ -13,7 +13,8 @@ export type PageAccessUser = {
   shopMemberships?: Array<{ membershipRole?: string | null; shop?: { id: string; status?: string | null } | null }> | null;
 } | null | undefined;
 
-const REPORT_DEPENDENCIES = ['canViewReports', 'canManageAppointments', 'canManagePayments', 'canManageQueue', 'canManageSchedules', 'canManageStaff', 'canManageMemberships'];
+// Reports are read-only totals: the reports grant alone opens them (this is the Viewer role's one page).
+const REPORT_DEPENDENCIES = ['canViewReports'];
 
 // First path segment under /platform -> permissions the page needs (all of them).
 export const PLATFORM_PAGE_PERMISSIONS: Record<string, string[]> = {
