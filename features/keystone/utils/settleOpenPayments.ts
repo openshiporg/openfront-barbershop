@@ -14,6 +14,8 @@ import { sweepStalePaymentSessions } from './expireStalePaymentSessions';
  * Runs in the web process once a minute (instrumentation.ts); it is not a separate worker service.
  */
 const RECENT_MS = 25 * 3600_000;
+// Arbitrary constant naming the settle job in pg advisory locks.
+const SETTLE_LOCK_KEY = 7_301_122_001;
 
 export async function settleOpenPayments(prisma: PrismaClient) {
   const open = await prisma.paymentSession.findMany({
@@ -47,6 +49,7 @@ export async function settleOpenPayments(prisma: PrismaClient) {
 }
 
 export function startPaymentSettler(prisma: PrismaClient) {
+  // One timer per process: register() can run again on a hot reload, and the globalThis slot survives it.
   const state = globalThis as unknown as { __paymentSettler?: ReturnType<typeof setInterval> };
   if (state.__paymentSettler || process.env.NODE_ENV === 'test') return;
   let running = false;
@@ -54,7 +57,12 @@ export function startPaymentSettler(prisma: PrismaClient) {
     if (running) return;
     running = true;
     try {
-      const settled = await settleOpenPayments(prisma);
+      // One tick across all processes: with more than one replica, only the holder of this Postgres
+      // transaction lock settles; the others skip the minute. (Each record is idempotent anyway.)
+      const settled = await prisma.$transaction(async (tx) => {
+        const [lock] = await tx.$queryRaw<Array<{ ok: boolean }>>`SELECT pg_try_advisory_xact_lock(${SETTLE_LOCK_KEY}::bigint) AS ok`;
+        return lock?.ok ? settleOpenPayments(prisma) : 0;
+      }, { timeout: 55_000, maxWait: 5_000 });
       if (settled) console.log(`Payment settle: recorded ${settled} paid checkout(s).`);
     } catch (error) {
       console.error('Payment settle failed:', error instanceof Error ? error.message : error);
