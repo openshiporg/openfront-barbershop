@@ -1148,3 +1148,12 @@ html:has([data-storefront]) body { overflow-x: clip; background: oklch(93.6% 0.0
 [data-storefront] .sf-account-password > summary { display: inline-flex; min-height: 2.75rem; align-items: center; font-weight: 700; text-decoration: underline; text-decoration-color: var(--red); text-decoration-thickness: 2px; text-underline-offset: 0.25em; cursor: pointer; list-style: none; }
 [data-storefront] .sf-account-password > summary::-webkit-details-marker { display: none; }
 [data-storefront] .sf-input[readonly] { background: transparent; color: var(--ink-muted); }
+
+/* Desktop home, fewer Book actions: the quick-book card and the header button do the job, so the side tab and the closing "Book now" step back here. Times get three roomy columns. */
+@media (min-width: 64rem) {
+  [data-storefront]:has(.sf-home) .sf-side-tab { display: none; }
+  [data-storefront] .sf-home .sf-closer-book { display: none; }
+  [data-storefront] .sf-quick-slots { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35rem; }
+  [data-storefront] .sf-quick-slots > .sf-quick-slot:nth-child(n + 7) { display: none; }
+  [data-storefront] .sf-quick-slot { min-height: 2.4rem; font-size: 0.85rem; }
+}
