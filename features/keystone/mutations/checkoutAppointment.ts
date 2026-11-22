@@ -92,7 +92,7 @@ export default async function checkoutAppointment(
     const tipAmount = money(args.tipAmount);
     const discountAmount = Math.min(money(args.discountAmount), subtotal);
     // Sales tax comes from the shop's rate (Store settings) on the service after discount; tips are not taxed.
-    const taxAmount = Math.round(((subtotal - discountAmount) * Math.max(0, preview.shop.taxRateBps || 0)) / 10_000);
+    const taxAmount = Math.round(((subtotal - discountAmount) * (preview.shop.taxServices ? Math.max(0, preview.shop.taxRateBps || 0) : 0)) / 10_000);
     const total = Math.max(0, subtotal + tipAmount + taxAmount - discountAmount);
 
     if (!Number.isSafeInteger(total) || total > 2_000_000_000) throw new Error('Checkout total exceeds the supported limit.');
@@ -198,7 +198,7 @@ export default async function checkoutAppointment(
           completedAt,
           currencyCode: 'USD',
           merchantSnapshot: { name: appointment.shop.name, legalName: appointment.shop.legalName, address: appointment.shop.address, phone: appointment.shop.phone, timezone: appointment.shop.timezone },
-          taxRuleSnapshot: { mode: 'shop_rate', rateBps: preview.shop.taxRateBps || 0, amount: taxAmount },
+          taxRuleSnapshot: { mode: 'shop_rate', rateBps: preview.shop.taxServices ? preview.shop.taxRateBps || 0 : 0, amount: taxAmount },
           notes: [clean(args.notes), depositNote, giftCardCode ? `Gift card ${giftCardCode.slice(-4)}` : ''].filter(Boolean).join(' · '),
         },
       });

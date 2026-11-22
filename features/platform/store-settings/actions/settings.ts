@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient';
 import type { PublicStorefrontSettings, StorefrontBrandColor } from '@/features/shared/storefront-settings';
 
-export type ActiveShopStorefrontSettings = PublicStorefrontSettings & { isPublic: boolean; requireBookingApproval?: boolean | null; taxRateBps?: number | null };
+export type ActiveShopStorefrontSettings = PublicStorefrontSettings & { isPublic: boolean; requireBookingApproval?: boolean | null; taxRateBps?: number | null; taxServices?: boolean | null };
 
 export async function getActiveShopStorefrontSettingsAction() {
   const response = await keystoneClient<{
@@ -38,9 +38,10 @@ export type StorefrontSettingsInput = {
   hours: Record<string, string>;
   requireBookingApproval: boolean;
   taxRateBps: number;
+  taxServices: boolean;
 };
 
-const EDITABLE_FIELDS = ['name', 'tagline', 'address', 'phone', 'timezone', 'currencyCode', 'brandColor', 'logoIcon', 'logoColor', 'isPublic', 'hours', 'requireBookingApproval', 'taxRateBps'] as const;
+const EDITABLE_FIELDS = ['name', 'tagline', 'address', 'phone', 'timezone', 'currencyCode', 'brandColor', 'logoIcon', 'logoColor', 'isPublic', 'hours', 'requireBookingApproval', 'taxRateBps', 'taxServices'] as const;
 
 function editableSnapshot(settings: Partial<ActiveShopStorefrontSettings> | null | undefined) {
   return JSON.stringify(EDITABLE_FIELDS.map((field) => settings?.[field] ?? null));
@@ -86,6 +87,7 @@ export async function updateActiveShopStorefrontSettingsAction(
       $hours: JSON
       $requireBookingApproval: Boolean
       $taxRateBps: Int
+      $taxServices: Boolean
       $expectedShopId: ID
       $expectedVersion: String
     ) {
@@ -103,6 +105,7 @@ export async function updateActiveShopStorefrontSettingsAction(
         hours: $hours
         requireBookingApproval: $requireBookingApproval
         taxRateBps: $taxRateBps
+        taxServices: $taxServices
         expectedShopId: $expectedShopId
         expectedVersion: $expectedVersion
       ) { success error data }

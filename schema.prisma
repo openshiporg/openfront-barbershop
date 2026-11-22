@@ -79,6 +79,7 @@ model Shop {
   brandColor                    ShopBrandColorType       @default(amber)
   isPublic                      Boolean                  @default(false)
   requireBookingApproval        Boolean                  @default(false)
+  taxServices                   Boolean                  @default(false)
   taxRateBps                    Int?                     @default(0)
   memberships                   ShopMembership[]         @relation("ShopMembership_shop")
   activeUsers                   User[]                   @relation("User_activeShop")

@@ -173,7 +173,7 @@ export function PosPageClient({ data, query }: { data: PosProjectionData; query:
         <section id="pos-tender" aria-labelledby="pos-tender-heading" className="min-w-0 xl:sticky xl:top-4">
           <h2 id="pos-tender-heading" className="sr-only">Take payment</h2>
           {selected
-            ? <TenderPanel key={selected.id} taxRateBps={Math.max(0, data.taxRateBps || 0)} onlineCard={Boolean(data.onlineCard)} appointment={selected} closed={requestedClosed && selected.id === requestedAppointment?.id} timeZone={timeZone} />
+            ? <TenderPanel key={selected.id} taxRateBps={Math.max(0, data.serviceTaxRateBps || 0)} onlineCard={Boolean(data.onlineCard)} appointment={selected} closed={requestedClosed && selected.id === requestedAppointment?.id} timeZone={timeZone} />
             : <div className="rounded-[6px] border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">{appointments.length ? 'Choose a ticket to take payment.' : 'Nothing to check out.'}</div>}
         </section>
       </div>

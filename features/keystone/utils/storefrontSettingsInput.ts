@@ -18,6 +18,7 @@ export type StorefrontSettingsInput = {
   hours?: unknown;
   requireBookingApproval?: boolean | null;
   taxRateBps?: number | null;
+  taxServices?: boolean | null;
 };
 
 function validLogo(svg: string) {
@@ -72,5 +73,6 @@ export function parseStorefrontSettingsInput(args: StorefrontSettingsInput) {
     isPublic: Boolean(args.isPublic),
     ...(args.requireBookingApproval == null ? {} : { requireBookingApproval: Boolean(args.requireBookingApproval) }),
     ...(args.taxRateBps == null ? {} : { taxRateBps: validTaxRate(args.taxRateBps) }),
+    ...(args.taxServices == null ? {} : { taxServices: Boolean(args.taxServices) }),
   };
 }

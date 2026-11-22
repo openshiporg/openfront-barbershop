@@ -106,6 +106,7 @@ export const Shop = list({
     }),
     isPublic: checkbox({ defaultValue: false }),
     requireBookingApproval: checkbox({ defaultValue: false, ui: { description: 'Online bookings wait for staff to confirm them. Off: a free slot is confirmed at once.' } }),
+    taxServices: checkbox({ defaultValue: false, ui: { description: 'Also charge sales tax on services. Off: tax applies to retail only (for example New York, where haircuts are not taxed).' } }),
     taxRateBps: integer({ defaultValue: 0, validation: { min: 0, max: 10000 }, ui: { description: 'Sales tax in basis points (887 = 8.875%). Applied by POS to services and retail.' } }),
     memberships: relationship({ ref: 'ShopMembership.shop', many: true, access: { create: () => false, update: () => false } }),
     activeUsers: relationship({ ref: 'User.activeShop', many: true, access: { create: () => false, update: () => false } }),

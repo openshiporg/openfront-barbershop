@@ -449,7 +449,7 @@ export async function getPosProjection(_root: unknown, args: PosArgs, context: C
   await expireStalePaymentSessions(context.prisma, shopId).catch(() => 0);
   // Tickets display accepted service/barber snapshots, so live staff/service grants are not required.
   for (const permission of ['canManageAppointments', 'canManageCustomers', 'canManageMemberships'] as const) await requireCurrentShopPermission(context.session, permission, context.prisma);
-  const shop = await context.prisma.shop.findUnique({ where: { id: shopId }, select: { currencyCode: true, taxRateBps: true } });
+  const shop = await context.prisma.shop.findUnique({ where: { id: shopId }, select: { currencyCode: true, taxRateBps: true, taxServices: true } });
   assertUsdSettlementCurrency(shop?.currencyCode);
   const timeZone = await shopTimeZone(context.prisma, shopId);
   const { start, end } = shopDayRange(new Date(), timeZone);
@@ -508,6 +508,7 @@ export async function getPosProjection(_root: unknown, args: PosArgs, context: C
   return {
     timeZone,
     taxRateBps: shop?.taxRateBps ?? 0,
+    serviceTaxRateBps: shop?.taxServices ? shop.taxRateBps ?? 0 : 0,
     onlineCard: Boolean(await onlineDepositProvider(context.prisma, shopId)),
     appointments: appointments.map(eligible),
     requestedAppointment: requested ? eligible(requested) : null,

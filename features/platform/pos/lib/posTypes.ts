@@ -80,6 +80,8 @@ export type PosProjectionData = {
   timeZone: string;
   // Shop sales tax in basis points (Store settings); POS never asks for it per sale.
   taxRateBps?: number;
+  // Same rate when the shop taxes services, else 0.
+  serviceTaxRateBps?: number;
   onlineCard?: boolean;
   appointments: PosAppointment[];
   requestedAppointment: PosAppointment | null;

@@ -6,7 +6,7 @@ import {
 } from '../utils/storefrontSettingsInput';
 
 // Same bounded storefront DTO the screen and action already consume.
-const STOREFRONT_SETTINGS_SELECTION = 'id name tagline address phone timezone currencyCode hours brandColor logoIcon logoColor isPublic requireBookingApproval taxRateBps updatedAt';
+const STOREFRONT_SETTINGS_SELECTION = 'id name tagline address phone timezone currencyCode hours brandColor logoIcon logoColor isPublic requireBookingApproval taxRateBps taxServices updatedAt';
 
 type ShopQueryApi = {
   findOne(args: { where: { id: string }; query: string }): Promise<Record<string, unknown> | null>;

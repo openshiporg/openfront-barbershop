@@ -484,6 +484,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
           hours: JSON
           requireBookingApproval: Boolean
           taxRateBps: Int
+          taxServices: Boolean
           expectedShopId: ID
           expectedVersion: String
         ): DomainCommandResult!

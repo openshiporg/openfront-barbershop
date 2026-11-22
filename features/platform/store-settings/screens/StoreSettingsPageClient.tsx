@@ -62,6 +62,7 @@ type FormState = {
   hours: Record<string, string>;
   requireBookingApproval: boolean;
   taxRateBps: number;
+  taxServices: boolean;
 };
 
 const DAY_LABELS: Record<string, string> = { monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' };
@@ -88,6 +89,7 @@ function toForm(settings: ActiveShopStorefrontSettings): FormState {
     hours: toHours(settings.hours),
     requireBookingApproval: Boolean(settings.requireBookingApproval),
     taxRateBps: settings.taxRateBps ?? 0,
+    taxServices: Boolean(settings.taxServices),
   };
 }
 
@@ -453,13 +455,20 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
             <div className="flex items-center justify-between gap-4 py-3">
               <Label htmlFor="tax-rate" className="grid gap-0.5">
                 <span>Sales tax (%)</span>
-                <span className="text-xs font-normal text-muted-foreground">POS adds it to every service and retail sale.</span>
+                <span className="text-xs font-normal text-muted-foreground">POS adds it to retail sales, and to services when the switch below is on.</span>
               </Label>
               <Input id="tax-rate" type="number" inputMode="decimal" min={0} max={25} step="0.001" value={taxText} disabled={isLoading}
                 onChange={(event) => { setTaxText(event.target.value); const rate = Number(event.target.value); if (event.target.value.trim() !== '' && Number.isFinite(rate) && rate >= 0 && rate <= 25) update({ taxRateBps: Math.round(rate * 100) }); }}
                 aria-invalid={taxInvalid} className="h-9 w-28 rounded-[6px] text-right tabular-nums" />
             </div>
             {taxInvalid ? <p role="alert" className="text-xs text-destructive">Enter a rate from 0 to 25.</p> : null}
+            <div className="flex items-center justify-between gap-4 py-3">
+              <Label htmlFor="tax-services" className="grid gap-0.5">
+                <span>Tax services too</span>
+                <span className="text-xs font-normal text-muted-foreground">Leave off where haircuts are not taxed (New York, for example).</span>
+              </Label>
+              <Switch id="tax-services" checked={form.taxServices} disabled={isLoading} onCheckedChange={(taxServices) => update({ taxServices })} />
+            </div>
           </section>
 
           <section aria-labelledby="settings-publish" className="space-y-1">
