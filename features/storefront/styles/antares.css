@@ -1157,3 +1157,9 @@ html:has([data-storefront]) body { overflow-x: clip; background: oklch(93.6% 0.0
   [data-storefront] .sf-quick-slots > .sf-quick-slot:nth-child(n + 7) { display: none; }
   [data-storefront] .sf-quick-slot { min-height: 2.4rem; font-size: 0.85rem; }
 }
+
+/* Narrowest phones: the service tick sat on top of the price. The red edge already marks the chosen service, so the tick steps aside. */
+@media (max-width: 22.99rem) {
+  [data-storefront] .sf-quick-check { display: none; }
+  [data-storefront] .sf-quick-service { padding-right: 0.45rem; }
+}
