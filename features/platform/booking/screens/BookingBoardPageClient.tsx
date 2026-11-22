@@ -274,6 +274,7 @@ export function BookingBoardPageClient({ data, breadcrumbs }: { data: BookingPro
               <div className="flex flex-wrap gap-1.5 md:justify-end">
                 {refundable && <RefundDepositButton amountLabel={formatMoney(refundable.remaining)} customer={customerName(appointment.customer)} disabled={pending} onOpen={() => setMessage(null)} onConfirm={(key) => refundDeposit(refundable.id, key)} />}
                 {!closedVisit && action && <Pill size="sm" variant="primary" disabled={pending} onClick={() => moveAppointment(appointment.id, action.value)}>{action.label}</Pill>}
+                {!closedVisit && rawAction && !action && <span className="self-center text-xs text-muted-foreground">{rawAction.label} opens on the day of the visit</span>}
                 {status === 'in_chair' && <PillLink size="sm" variant="primary" href={`/dashboard/platform/pos?appointment=${encodeURIComponent(appointment.id)}`}>Checkout</PillLink>}
                 {!closedVisit && status !== 'in_chair' && started && <Pill size="sm" variant="flat" disabled={pending} onClick={() => markNoShow(appointment.id)}>No-show</Pill>}
                 {!closedVisit && hasStatus(changeableStatuses, status) && (

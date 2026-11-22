@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { Search } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -372,7 +372,16 @@ function RetailSale({ data }: { data: PosProjectionData }) {
   const [productId, setProductId] = useState('');
   const [retailTender, setRetailTender] = useState<'cash' | 'card'>('cash');
   const [quantity, setQuantity] = useState('1');
-  const [taxRate, setTaxRate] = useState('0');
+  const [taxRate, setTaxRateState] = useState('0');
+  // The counter keeps the last tax rate typed on this device, so it is entered once, not on every sale.
+  useEffect(() => {
+    const saved = window.localStorage.getItem('pos-retail-tax-rate');
+    if (saved !== null && saved !== '') setTaxRateState(saved);
+  }, []);
+  const setTaxRate = (value: string) => {
+    setTaxRateState(value);
+    try { window.localStorage.setItem('pos-retail-tax-rate', value); } catch { /* private mode: the rate just is not remembered */ }
+  };
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [pending, startTransition] = useTransition();
   const saleKey = useCommandKey('product-sale');
