@@ -119,6 +119,7 @@ export async function reconcileSessionInTransaction(transaction: Prisma.Transact
       : null;
     if (appointment && recordOf(paymentSession.metadata).purpose !== 'desk_card' && !appointmentSettledElsewhere(appointment.paymentStatus) && next === 'captured') {
       await transaction.appointment.update({ where: { id: appointment.id }, data: { paymentStatus: 'deposit_paid' } });
+      await transaction.appointment.updateMany({ where: { id: appointment.id, status: 'requested' }, data: { status: 'confirmed' } });
     }
     if (appointment && next === 'refunded' && appointment.paymentStatus === 'deposit_paid' && !appointment.transactionId) {
       await transaction.appointment.update({ where: { id: appointment.id }, data: { paymentStatus: 'refunded' } });

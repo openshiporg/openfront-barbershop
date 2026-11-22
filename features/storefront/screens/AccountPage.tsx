@@ -5,6 +5,7 @@ import { phoneHref } from '@/features/shared/storefront-settings';
 import { StorefrontShell } from './StorefrontShell';
 import { AccountForms } from '../components/AccountForms';
 import { AccountDataExport } from '../components/AccountDataExport';
+import { AccountDetails } from '../components/AccountDetails';
 import { getStorefrontAccountState, getStorefrontBookingHistory, signOutAccount } from '../lib/data/account';
 import { getPublicStorefrontSettings } from '../lib/data/settings';
 import { getAccountBalances } from '../lib/data/offers';
@@ -102,11 +103,19 @@ export default async function AccountPage({ searchParams }: { searchParams?: Pro
                     </ul>
                   )}
               </section>
-              <h2 id="your-data-heading" className="sf-subtitle mt-4">Your data</h2>
-              <AccountDataExport />
-              <p className="sf-small sf-muted">Corrections or deletion: contact the shop{telephoneHref && settings?.phone ? <> at <a className="sf-link" href={`tel:${telephoneHref}`}>{settings.phone}</a></> : null}.</p>
-              <Link href="/appointment" className="sf-arrow-link">Find an appointment <ArrowRight aria-hidden="true" /></Link>
-              <form action={signOutAccount} className="border-t border-[var(--rule)] pt-4"><button className="sf-btn is-quiet">Sign out</button></form>
+              <section aria-labelledby="details-heading" className="grid gap-3 border-t border-[var(--rule)] pt-5">
+                <h2 id="details-heading" className="sf-subtitle">Your details</h2>
+                <AccountDetails name={user.name} phone={user.phone || ''} email={user.email} />
+              </section>
+              <section aria-labelledby="your-data-heading" className="grid gap-3 border-t border-[var(--rule)] pt-5">
+                <h2 id="your-data-heading" className="sf-subtitle">Your data</h2>
+                <AccountDataExport />
+                <p className="sf-small sf-muted">To delete your account, contact the shop{telephoneHref && settings?.phone ? <> at <a className="sf-link" href={`tel:${telephoneHref}`}>{settings.phone}</a></> : null}.</p>
+              </section>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--rule)] pt-4">
+                <Link href="/appointment" className="sf-arrow-link">Find an appointment <ArrowRight aria-hidden="true" /></Link>
+                <form action={signOutAccount}><button className="sf-btn is-quiet">Sign out</button></form>
+              </div>
             </aside>
           </div>
         )}

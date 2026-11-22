@@ -286,7 +286,9 @@ export async function createLockedAppointment({
       serviceModifiersSnapshot: [],
       barberNameSnapshot: barber.displayName || '',
       barberChairNumberSnapshot: barber.chairNumber || '',
-      status: 'requested',
+      // The slot, the barber's hours and their authority were all checked above, so a booking with
+      // nothing left to pay is confirmed at once. One that owes a deposit is confirmed when it is paid.
+      status: service.depositRequired ? 'requested' : 'confirmed',
       source: 'online',
       paymentStatus: service.depositRequired ? 'deposit_due' : 'not_required',
       price: service.price || 0,

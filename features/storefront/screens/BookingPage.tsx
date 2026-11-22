@@ -346,8 +346,10 @@ export function BookingPage({ services, barbers, settings, bookingEligibility, a
   if (createdAppointment) {
     return (
       <main id="main-content" className="sf-container-narrow py-[var(--space-2xl)]">
-        <h1 className="sf-display sf-h1">Chair held</h1>
-        <p className="sf-lead mb-8 mt-3"><span className="sf-dot is-wait" aria-hidden="true" />Requested. The shop confirms it next.</p>
+        <h1 className="sf-display sf-h1">{createdAppointment.status === 'confirmed' ? 'You’re booked' : 'Chair held'}</h1>
+        <p className="sf-lead mb-8 mt-3">{createdAppointment.status === 'confirmed'
+          ? <><span className="sf-dot is-live" aria-hidden="true" />Confirmed. See you then.</>
+          : <><span className="sf-dot is-wait" aria-hidden="true" />{createdAppointment.paymentStatus === 'deposit_due' ? 'Pay the deposit to confirm it.' : 'Requested. The shop confirms it next.'}</>}</p>
         <section className="sf-ticket" role="status" aria-label="Booking request">
           <div className="sf-ticket-head">
             <p className="sf-subtitle text-[2.25rem]">{createdAppointment.service?.name}</p>

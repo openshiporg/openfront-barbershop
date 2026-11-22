@@ -62,6 +62,31 @@ export async function signOutAccount() {
   redirect('/account');
 }
 
+/** A signed-in customer changes their own name and phone, and optionally their password (current password required). */
+export async function updateAccountDetails(_previous: AccountState, form: FormData): Promise<AccountState> {
+  const name = String(form.get('name') || '').trim();
+  const phone = String(form.get('phone') || '').trim();
+  const currentPassword = String(form.get('currentPassword') || '');
+  const newPassword = String(form.get('newPassword') || '');
+  const account = await getStorefrontAccount();
+  if (!account) return { error: 'Sign in again to change your details.' };
+  if (!name || name.length > 120) return { error: 'Enter your name.' };
+  if (phone.replace(/\D/g, '').length < 7 || phone.length > 40) return { error: 'Enter a phone number for your bookings.' };
+  const data: Record<string, string> = { name, phone };
+  if (newPassword || currentPassword) {
+    if (newPassword.length < 10 || newPassword.length > 1000) return { error: 'Choose a new password of at least 10 characters.' };
+    if (currentPassword.length > 1000) return { error: 'Your current password is not right.' };
+    const check = await keystoneClient<{ authenticateUserWithPassword: { sessionToken?: string } }>('mutation($email: String!, $password: String!) { authenticateUserWithPassword(email: $email, password: $password) { ... on UserAuthenticationWithPasswordSuccess { sessionToken } } }', { email: account.email, password: currentPassword });
+    if (!check.success) return { error: 'Your details couldn’t be saved right now. Try again in a moment.' };
+    if (!check.data.authenticateUserWithPassword?.sessionToken) return { error: 'Your current password is not right.' };
+    data.password = newPassword;
+  }
+  const result = await keystoneClient<{ updateUser: { id: string } | null }>('mutation($id: ID!, $data: UserUpdateInput!) { updateUser(where: { id: $id }, data: $data) { id } }', { id: account.id, data });
+  if (!result.success || !result.data.updateUser) return { error: 'Your details couldn’t be saved right now. Try again in a moment.' };
+  revalidatePath('/account');
+  return { error: null, success: data.password ? 'Saved. Your password is changed.' : 'Saved.' };
+}
+
 export type StorefrontAccount = { id: string; name: string; email: string; phone?: string | null };
 
 /** Distinguishes a signed-out visitor from an identity lookup that failed. */

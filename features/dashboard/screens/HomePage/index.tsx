@@ -9,7 +9,9 @@ import { PlusIcon, Database } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { PageContainer } from '../../components/PageContainer'
-import { getAdminMetaAction, getListCounts } from '../../actions'
+import { getAdminMetaAction, getAuthenticatedUser, getListCounts } from '../../actions'
+import { platformNavItems } from '@/features/platform/lib/navigation'
+import { canUsePlatformPage } from '@/features/platform/lib/pageAccess'
 import { cn } from '@/lib/utils'
 
 interface ListCardProps {
@@ -76,7 +78,10 @@ function EmptyState() {
 
 export async function HomePage() {
   // Fetch admin meta server-side
-  const adminMetaResponse = await getAdminMetaAction()
+  const [adminMetaResponse, userResponse] = await Promise.all([getAdminMetaAction(), getAuthenticatedUser()])
+  const user = userResponse.success ? userResponse.data?.authenticatedItem : null
+  // The pages this person runs the shop from, first; the data tables come after.
+  const shopPages = platformNavItems.filter((item) => canUsePlatformPage(user, item.href.split('/platform/')[1] ?? ''))
   
   if (!adminMetaResponse.success) {
     console.error('Failed to fetch admin meta:', adminMetaResponse.error)
@@ -108,9 +113,6 @@ export async function HomePage() {
   const header = (
     <div className="flex flex-col">
       <h1 className="text-lg font-semibold md:text-2xl">Dashboard</h1>
-      {enhancedLists.length > 0 && (
-        <p className="text-muted-foreground">{enhancedLists.length} Models</p>
-      )}
     </div>
   )
 
@@ -129,6 +131,28 @@ export async function HomePage() {
   return (
     <PageContainer title="Dashboard" header={header} breadcrumbs={breadcrumbs}>
       <div className="w-full max-w-4xl p-4 md:p-6 flex flex-col gap-4">
+        {shopPages.length > 0 && (
+          <div className="mb-4">
+            <h2 className="tracking-wide uppercase font-medium mb-2 text-muted-foreground text-sm">
+              Shop
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2 md:gap-4">
+              {shopPages.map((item) => (
+                <Link key={item.href} href={`/dashboard${item.href}`} className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <Card className="h-full bg-gradient-to-bl from-background to-muted/80 shadow-xs hover:bg-muted transition-colors">
+                    <CardContent className="flex gap-3 p-4">
+                      <item.icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
+                        <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="mb-4">
           <h2 className="tracking-wide uppercase font-medium mb-2 text-muted-foreground text-sm">
             Data Models

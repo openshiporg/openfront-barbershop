@@ -170,7 +170,7 @@ export function Sidebar({ adminMeta, user, onOpenDialog }: SidebarProps) {
               <Collapsible
                 key={platformItem.title}
                 asChild
-                defaultOpen={platformItem.isActive}
+                defaultOpen
                 className="group/collapsible"
               >
                 <SidebarMenuItem>
