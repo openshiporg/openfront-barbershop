@@ -1,5 +1,13 @@
 [
   {
+    "date": "2026-11-22",
+    "macrostructure": "Photographic",
+    "theme": "Stack & Fade warm ink (kept)",
+    "enrichment": "none added; phone home cut back",
+    "nav": "phone: logo + account + full-height drawer; tab bar Home/Book/Walk-ins/My visit",
+    "brief": "Launch-ready redesign pass inside the existing design: calm phone home, real drawer, one Book action per screen"
+  },
+  {
     "date": "2026-07-12",
     "macrostructure": "Photographic",
     "theme": "Stack & Fade warm ink",
@@ -13,6 +21,6 @@
     "macrostructure": "Workbench",
     "theme": "custom barbershop",
     "enrichment": "none",
-    "brief": "Stack & Fade storefront redesign — editorial grooming house"
+    "brief": "Stack & Fade storefront redesign \u2014 editorial grooming house"
   }
 ]

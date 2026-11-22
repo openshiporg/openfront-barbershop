@@ -1,3 +1,4 @@
+/* Hallmark · macrostructure: Photographic · tone: streetwear flash sheet · anchor hue: barber-pole red */
 /* Antares: a streetwear flash sheet. Torn newsprint paper, black ink, one red
  * (the barber-pole red), oversized poster grotesk with a brush-marker hand on top.
  * Cards are taped-down paper with small radii; tickets keep their perforations.
@@ -1138,7 +1139,8 @@ html:has([data-storefront]) body { overflow-x: clip; background: oklch(93.6% 0.0
   [data-storefront] .sf-quick-slots > .sf-quick-slot:nth-child(n + 9) { display: none; }
   [data-storefront] .sf-quick-slots > .sf-quick-empty { grid-column: 1 / -1; }
   [data-storefront] .sf-quick-slot { padding: 0 0.2rem; border-radius: var(--radius-sm); }
-  [data-storefront] .sf-hero-note-big, [data-storefront] .sf-hero-note-small { text-wrap: balance; }
+  /* The sticker says one thing (open or opens when); full hours are in the footer block. */
+  [data-storefront] .sf-hero-note-small { display: none; }
   [data-storefront] .sf-hero-banner { white-space: normal; text-wrap: balance; }
 }
 
