@@ -163,7 +163,7 @@ export function AppointmentSelfService(props: { timeZone: string; appointmentId:
           <div className="sf-slot-list" role="group" aria-label="Open times" aria-busy={loading}>
             {loading ? <p role="status">Checking times…</p>
               : !slots.length ? <p role="status">{slotError || 'No open times with your barber that day. Try another day.'}</p>
-              : shown.map((slot) => <button key={slot.startsAt} type="button" className="sf-slot-line" aria-pressed={slot.startsAt === startsAt} onClick={() => { setStartsAt(slot.startsAt); setReview(null); }}>{slot.label}</button>)}
+              : shown.map((slot) => <button key={slot.startsAt} type="button" className="sf-slot" aria-pressed={slot.startsAt === startsAt} onClick={() => { setStartsAt(slot.startsAt); setReview(null); }}>{slot.label}</button>)}
           </div>
           {!loading && shown.length < slots.length ? <button type="button" className="sf-btn is-quiet justify-self-start" onClick={() => setShowAll(true)}>{slots.length - shown.length} more {slots.length - shown.length === 1 ? 'time' : 'times'}</button> : null}
         </div>

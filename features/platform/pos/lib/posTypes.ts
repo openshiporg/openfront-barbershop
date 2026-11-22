@@ -78,6 +78,8 @@ export type Paging = { page: number; pageSize: number; total: number };
 
 export type PosProjectionData = {
   timeZone: string;
+  // Shop sales tax in basis points (Store settings); POS never asks for it per sale.
+  taxRateBps?: number;
   onlineCard?: boolean;
   appointments: PosAppointment[];
   requestedAppointment: PosAppointment | null;

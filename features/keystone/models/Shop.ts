@@ -1,5 +1,5 @@
 import { list } from '@keystone-6/core';
-import { checkbox, json, relationship, select, text } from '@keystone-6/core/fields';
+import { checkbox, integer, json, relationship, select, text } from '@keystone-6/core/fields';
 
 import { permissions, type Session } from '../access';
 import { currentManagedShopIds, currentMembershipShopIds, hasCurrentRolePermission } from '../utils/currentAuthorization';
@@ -105,6 +105,8 @@ export const Shop = list({
       ui: { description: 'Constrained storefront brand palette.' },
     }),
     isPublic: checkbox({ defaultValue: false }),
+    requireBookingApproval: checkbox({ defaultValue: false, ui: { description: 'Online bookings wait for staff to confirm them. Off: a free slot is confirmed at once.' } }),
+    taxRateBps: integer({ defaultValue: 0, validation: { min: 0, max: 10000 }, ui: { description: 'Sales tax in basis points (887 = 8.875%). Applied by POS to services and retail.' } }),
     memberships: relationship({ ref: 'ShopMembership.shop', many: true, access: { create: () => false, update: () => false } }),
     activeUsers: relationship({ ref: 'User.activeShop', many: true, access: { create: () => false, update: () => false } }),
     chairs: relationship({ ref: 'BarberChair.shop', many: true, access: { create: () => false, update: () => false } }),

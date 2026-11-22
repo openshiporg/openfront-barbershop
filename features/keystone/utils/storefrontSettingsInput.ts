@@ -16,6 +16,8 @@ export type StorefrontSettingsInput = {
   logoColor?: string;
   isPublic: boolean;
   hours?: unknown;
+  requireBookingApproval?: boolean | null;
+  taxRateBps?: number | null;
 };
 
 function validLogo(svg: string) {
@@ -29,6 +31,11 @@ function boundedText(value: unknown, label: string, max: number, required = fals
   if (required && !normalized) throw new Error(`${label} is required.`);
   if (normalized.length > max) throw new Error(`${label} must be ${max} characters or fewer.`);
   return normalized;
+}
+
+function validTaxRate(value: number) {
+  if (!Number.isInteger(value) || value < 0 || value > 2500) throw new Error('Sales tax must be between 0% and 25%.');
+  return value;
 }
 
 export function parseStorefrontSettingsInput(args: StorefrontSettingsInput) {
@@ -63,5 +70,7 @@ export function parseStorefrontSettingsInput(args: StorefrontSettingsInput) {
     ...(args.logoIcon === undefined ? {} : { logoIcon: validLogo(args.logoIcon) }),
     ...(args.logoColor === undefined ? {} : { logoColor: normalizeStoreLogoColor(args.logoColor) }),
     isPublic: Boolean(args.isPublic),
+    ...(args.requireBookingApproval == null ? {} : { requireBookingApproval: Boolean(args.requireBookingApproval) }),
+    ...(args.taxRateBps == null ? {} : { taxRateBps: validTaxRate(args.taxRateBps) }),
   };
 }

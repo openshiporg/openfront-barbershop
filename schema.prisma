@@ -78,6 +78,8 @@ model Shop {
   hours                         Json?                    @default("{}")
   brandColor                    ShopBrandColorType       @default(amber)
   isPublic                      Boolean                  @default(false)
+  requireBookingApproval        Boolean                  @default(false)
+  taxRateBps                    Int?                     @default(0)
   memberships                   ShopMembership[]         @relation("ShopMembership_shop")
   activeUsers                   User[]                   @relation("User_activeShop")
   chairs                        BarberChair[]            @relation("BarberChair_shop")

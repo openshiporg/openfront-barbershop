@@ -1163,3 +1163,7 @@ html:has([data-storefront]) body { overflow-x: clip; background: oklch(93.6% 0.0
   [data-storefront] .sf-quick-check { display: none; }
   [data-storefront] .sf-quick-service { padding-right: 0.45rem; }
 }
+
+/* Visit page "Change this visit": the same time grid as booking (44px buttons, filled when chosen). */
+[data-storefront] .sf-slot-list { grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr)); gap: 0.4rem; }
+[data-storefront] .sf-slot-list > .sf-slot { min-height: 2.75rem; }

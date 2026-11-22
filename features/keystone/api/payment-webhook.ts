@@ -11,8 +11,11 @@ type RouteContext = {
   params: Promise<{ providerCode: string }>
 }
 
-function responseStatus(success: boolean) {
-  return success ? 200 : 400
+// The Stripe test account is shared by many sites, so this endpoint can receive events meant for another
+// site. They are acknowledged (200) and ignored; this shop settles its own payments by reading them back
+// from Stripe (utils/settleOpenPayments.ts), so nothing depends on a webhook arriving here.
+function responseStatus(_success: boolean) {
+  return 200
 }
 
 function publicError(success: boolean) {

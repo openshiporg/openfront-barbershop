@@ -130,7 +130,7 @@ export async function createLockedAppointment({
     transaction.service.findUnique({
       where: { id: serviceId },
       include: {
-        shop: { select: { id: true, status: true, isPublic: true, timezone: true, hours: true } },
+        shop: { select: { id: true, status: true, isPublic: true, timezone: true, hours: true, requireBookingApproval: true } },
         category: { select: { id: true, shopId: true, status: true } },
         specialists: { select: { id: true } },
       },
@@ -288,7 +288,8 @@ export async function createLockedAppointment({
       barberChairNumberSnapshot: barber.chairNumber || '',
       // The slot, the barber's hours and their authority were all checked above, so a booking with
       // nothing left to pay is confirmed at once. One that owes a deposit is confirmed when it is paid.
-      status: service.depositRequired ? 'requested' : 'confirmed',
+      // A free slot confirms at once (Booksy/Squire); a deposit or the shop's approval setting holds it as a request.
+      status: service.depositRequired || service.shop.requireBookingApproval ? 'requested' : 'confirmed',
       source: 'online',
       paymentStatus: service.depositRequired ? 'deposit_due' : 'not_required',
       price: service.price || 0,

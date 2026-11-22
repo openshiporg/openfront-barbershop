@@ -107,6 +107,9 @@ export async function recordProductSale(_root: unknown, args: { productId: strin
       const shopId = await requireCurrentShopPermission(context.session, 'canManagePayments', transaction);
       await transaction.$executeRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', 'barbershop-product-sale', args.productId);
       const lineNumber = `product-sale-${hash.slice(0, 24)}`;
+      // The counter never types tax: the shop's rate from Store settings applies.
+      const shopTax = await transaction.shop.findUnique({ where: { id: shopId }, select: { taxRateBps: true } });
+      args = { ...args, taxRateBps: shopTax?.taxRateBps || 0 };
       const replay = await transaction.productSaleLine.findUnique({ where: { lineNumber }, include: { transaction: true } });
       if (replay) {
         if (replay.shopId !== shopId) throw new Error('Product sale idempotency key was reused with different input.');

@@ -50,7 +50,11 @@ export async function startDeskCardPayment(_root: unknown, args: { appointmentId
   if (!permissions.canManagePayments({ session: context.session })) return fail('Not authorized to take payments.');
   try {
     const shopId = await requireCurrentShopPermission(context.session, 'canManagePayments');
-    const ticket: Ticket = { tipAmount: cents(args.tipAmount), discountAmount: cents(args.discountAmount), taxAmount: cents(args.taxAmount), notes: (args.notes || '').trim().slice(0, 500) };
+    const shop = await context.prisma.shop.findUnique({ where: { id: shopId }, select: { taxRateBps: true } });
+    const priced = await context.prisma.appointment.findFirst({ where: { id: args.appointmentId, shopId }, select: { price: true } });
+    const base = Math.max(0, (priced?.price || 0) - Math.min(cents(args.discountAmount), priced?.price || 0));
+    // Tax follows the shop rate, exactly as checkout records it.
+    const ticket: Ticket = { tipAmount: cents(args.tipAmount), discountAmount: cents(args.discountAmount), taxAmount: Math.round((base * Math.max(0, shop?.taxRateBps || 0)) / 10_000), notes: (args.notes || '').trim().slice(0, 500) };
     const { appointment, collect } = await ticketTotal(context.prisma, shopId, args.appointmentId, ticket);
     if (collect <= 0) return fail('Nothing to collect by card. Record the visit with cash tender.');
     const provider = await onlineDepositProvider(context.prisma, shopId);

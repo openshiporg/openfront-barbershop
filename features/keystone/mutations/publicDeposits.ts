@@ -111,7 +111,7 @@ async function recordPaidDeposit(prisma: Awaited<ReturnType<typeof loadAppointme
       if (!claimed.count) return;
       const moved = await transaction.appointment.updateMany({ where: { id: appointment.id, paymentStatus: 'deposit_due' }, data: { paymentStatus: 'deposit_paid' } });
       // Paying the deposit is what holds the chair: a request becomes a confirmed visit.
-      if (moved.count) await transaction.appointment.updateMany({ where: { id: appointment.id, status: 'requested' }, data: { status: 'confirmed' } });
+      if (moved.count) await transaction.appointment.updateMany({ where: { id: appointment.id, status: 'requested', shop: { requireBookingApproval: false } }, data: { status: 'confirmed' } });
       recorded = moved.count > 0;
       await recordCommandReceipt(transaction, buildCommandReceipt({
         eventKey: `payment-session:${session.id}:captured:v1`, eventType: 'payment_session.captured', aggregateType: 'payment_session', aggregateId: session.id,

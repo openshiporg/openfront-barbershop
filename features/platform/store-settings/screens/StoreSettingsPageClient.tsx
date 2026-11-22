@@ -60,6 +60,8 @@ type FormState = {
   logoColor: string;
   isPublic: boolean;
   hours: Record<string, string>;
+  requireBookingApproval: boolean;
+  taxRateBps: number;
 };
 
 const DAY_LABELS: Record<string, string> = { monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' };
@@ -84,6 +86,8 @@ function toForm(settings: ActiveShopStorefrontSettings): FormState {
     logoColor: settings.logoColor || '0',
     isPublic: settings.isPublic,
     hours: toHours(settings.hours),
+    requireBookingApproval: Boolean(settings.requireBookingApproval),
+    taxRateBps: settings.taxRateBps ?? 0,
   };
 }
 
@@ -112,6 +116,7 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
   const [status, setStatus] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [drafts, setDrafts] = useState(() => draftsFrom(initialData ? toForm(initialData).hours : undefined));
+  const [taxText, setTaxText] = useState(() => String((initialData?.taxRateBps ?? 0) / 100));
   // The full IANA list is filled in after mount so server and browser markup agree.
   const [zones, setZones] = useState<string[]>([]);
   useEffect(() => { Promise.resolve().then(() => setZones(timeZoneOptions(initialData?.timezone || 'America/New_York'))); }, [initialData?.timezone]);
@@ -164,6 +169,8 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
   // Find matching preset icon, but don't default to first icon if not found
   const selectedIcon = LOGO_ICONS.find((icon) => icon.lightSvg === logoIcon)
 
+  const taxNumber = Number(taxText);
+  const taxInvalid = taxText.trim() === '' || !Number.isFinite(taxNumber) || taxNumber < 0 || taxNumber > 25;
   const hoursInvalid = SHOP_HOURS_DAYS.some((day) => draftInvalid(drafts[day]));
   const setDraft = (day: string, patch: Partial<DayDraft>) => {
     const next = { ...drafts[day], ...patch };
@@ -175,6 +182,7 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
     event.preventDefault();
     if (!dirty) { setError(null); setStatus('No changes to save.'); return; }
     if (hoursInvalid) { setError('Fix the highlighted hours before saving.'); return; }
+    if (taxInvalid) { setError('Enter a sales tax from 0 to 25%.'); return; }
     if (!safeLogo) {
       setError('The logo SVG is invalid. Fix it or choose a library icon before saving.');
       return;
@@ -431,6 +439,27 @@ export function StoreSettingsPageClient({ initialData, initialError, shopChoices
                 </div>
               );
             })}
+          </section>
+
+          <section aria-labelledby="settings-booking" className="space-y-1">
+            <h2 id="settings-booking" className="border-b pb-2 text-sm font-semibold">Bookings and tax</h2>
+            <div className="flex items-center justify-between gap-4 py-3">
+              <Label htmlFor="booking-approval" className="grid gap-0.5">
+                <span>Require approval for online bookings</span>
+                <span className="text-xs font-normal text-muted-foreground">Off: a free time is confirmed as soon as the client books.</span>
+              </Label>
+              <Switch id="booking-approval" checked={form.requireBookingApproval} disabled={isLoading} onCheckedChange={(requireBookingApproval) => update({ requireBookingApproval })} />
+            </div>
+            <div className="flex items-center justify-between gap-4 py-3">
+              <Label htmlFor="tax-rate" className="grid gap-0.5">
+                <span>Sales tax (%)</span>
+                <span className="text-xs font-normal text-muted-foreground">POS adds it to every service and retail sale.</span>
+              </Label>
+              <Input id="tax-rate" type="number" inputMode="decimal" min={0} max={25} step="0.001" value={taxText} disabled={isLoading}
+                onChange={(event) => { setTaxText(event.target.value); const rate = Number(event.target.value); if (event.target.value.trim() !== '' && Number.isFinite(rate) && rate >= 0 && rate <= 25) update({ taxRateBps: Math.round(rate * 100) }); }}
+                aria-invalid={taxInvalid} className="h-9 w-28 rounded-[6px] text-right tabular-nums" />
+            </div>
+            {taxInvalid ? <p role="alert" className="text-xs text-destructive">Enter a rate from 0 to 25.</p> : null}
           </section>
 
           <section aria-labelledby="settings-publish" className="space-y-1">

@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient';
 import type { PublicStorefrontSettings, StorefrontBrandColor } from '@/features/shared/storefront-settings';
 
-export type ActiveShopStorefrontSettings = PublicStorefrontSettings & { isPublic: boolean };
+export type ActiveShopStorefrontSettings = PublicStorefrontSettings & { isPublic: boolean; requireBookingApproval?: boolean | null; taxRateBps?: number | null };
 
 export async function getActiveShopStorefrontSettingsAction() {
   const response = await keystoneClient<{
@@ -36,9 +36,11 @@ export type StorefrontSettingsInput = {
   logoColor: string;
   isPublic: boolean;
   hours: Record<string, string>;
+  requireBookingApproval: boolean;
+  taxRateBps: number;
 };
 
-const EDITABLE_FIELDS = ['name', 'tagline', 'address', 'phone', 'timezone', 'currencyCode', 'brandColor', 'logoIcon', 'logoColor', 'isPublic', 'hours'] as const;
+const EDITABLE_FIELDS = ['name', 'tagline', 'address', 'phone', 'timezone', 'currencyCode', 'brandColor', 'logoIcon', 'logoColor', 'isPublic', 'hours', 'requireBookingApproval', 'taxRateBps'] as const;
 
 function editableSnapshot(settings: Partial<ActiveShopStorefrontSettings> | null | undefined) {
   return JSON.stringify(EDITABLE_FIELDS.map((field) => settings?.[field] ?? null));
@@ -82,6 +84,8 @@ export async function updateActiveShopStorefrontSettingsAction(
       $logoColor: String
       $isPublic: Boolean!
       $hours: JSON
+      $requireBookingApproval: Boolean
+      $taxRateBps: Int
       $expectedShopId: ID
       $expectedVersion: String
     ) {
@@ -97,6 +101,8 @@ export async function updateActiveShopStorefrontSettingsAction(
         logoColor: $logoColor
         isPublic: $isPublic
         hours: $hours
+        requireBookingApproval: $requireBookingApproval
+        taxRateBps: $taxRateBps
         expectedShopId: $expectedShopId
         expectedVersion: $expectedVersion
       ) { success error data }

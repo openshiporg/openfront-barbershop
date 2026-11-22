@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { Search } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -173,7 +173,7 @@ export function PosPageClient({ data, query }: { data: PosProjectionData; query:
         <section id="pos-tender" aria-labelledby="pos-tender-heading" className="min-w-0 xl:sticky xl:top-4">
           <h2 id="pos-tender-heading" className="sr-only">Take payment</h2>
           {selected
-            ? <TenderPanel key={selected.id} onlineCard={Boolean(data.onlineCard)} appointment={selected} closed={requestedClosed && selected.id === requestedAppointment?.id} timeZone={timeZone} />
+            ? <TenderPanel key={selected.id} taxRateBps={Math.max(0, data.taxRateBps || 0)} onlineCard={Boolean(data.onlineCard)} appointment={selected} closed={requestedClosed && selected.id === requestedAppointment?.id} timeZone={timeZone} />
             : <div className="rounded-[6px] border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">{appointments.length ? 'Choose a ticket to take payment.' : 'Nothing to check out.'}</div>}
         </section>
       </div>
@@ -203,12 +203,11 @@ export function PosPageClient({ data, query }: { data: PosProjectionData; query:
 type CounterTab = 'retail' | 'returns' | 'receipts';
 
 // Keyed by appointment id: tender drafts belong to exactly this ticket.
-function TenderPanel({ appointment, closed, timeZone, onlineCard }: { appointment: PosAppointment; closed: boolean; timeZone: string; onlineCard: boolean }) {
+function TenderPanel({ appointment, closed, timeZone, onlineCard, taxRateBps = 0 }: { appointment: PosAppointment; closed: boolean; timeZone: string; onlineCard: boolean; taxRateBps?: number }) {
   const [paymentMethod, setPaymentMethod] = useState<string>(onlineCard ? 'stripe' : 'cash');
   const [packageBalanceId, setPackageBalanceId] = useState('');
   const [tipAmount, setTipAmount] = useState('0');
   const [discountAmount, setDiscountAmount] = useState('0');
-  const [taxAmount, setTaxAmount] = useState('0');
   const [notes, setNotes] = useState('');
   const [giftCode, setGiftCode] = useState('');
   const [giftCard, setGiftCard] = useState<GiftCardLookup | null>(null);
@@ -220,10 +219,12 @@ function TenderPanel({ appointment, closed, timeZone, onlineCard }: { appointmen
   const checkoutKey = useCommandKey(`checkout:${appointment.id}`);
 
   const packageBalances = appointment.customer?.packageBalances || [];
-  const tip = parseCents(tipAmount), discount = parseCents(discountAmount), tax = parseCents(taxAmount);
-  const amountsValid = tip !== null && discount !== null && tax !== null;
+  const tip = parseCents(tipAmount), discount = parseCents(discountAmount);
+  const amountsValid = tip !== null && discount !== null;
   const subtotal = paymentMethod === 'package' ? 0 : appointment.price || 0;
   const appliedDiscount = Math.min(discount || 0, subtotal);
+  // Shop rate from Store settings, on the service after discount (tips untaxed); the server applies the same rule.
+  const tax = Math.round(((subtotal - appliedDiscount) * taxRateBps) / 10_000);
   const total = subtotal + (tip || 0) + (tax || 0) - appliedDiscount;
   // A deposit paid online counts toward the receipt; only the balance is collected here.
   const depositPaid = appointment.paymentStatus === 'deposit_paid' && paymentMethod !== 'package' ? Math.min(appointment.depositAmount || 0, total) : 0;
@@ -233,7 +234,7 @@ function TenderPanel({ appointment, closed, timeZone, onlineCard }: { appointmen
   const id = appointment.id;
 
   const submitCheckout = () => {
-    if (!eligible || tip === null || discount === null || tax === null) return;
+    if (!eligible || tip === null || discount === null) return;
     setFeedback(null);
     const input = {
       appointmentId: id, paymentMethod,
@@ -268,14 +269,14 @@ function TenderPanel({ appointment, closed, timeZone, onlineCard }: { appointmen
       <dl className="grid grid-cols-4 gap-2 border-y py-2 text-xs tabular-nums">
         <div><dt className="text-muted-foreground">Service</dt><dd>{formatMoney(subtotal)}</dd></div>
         <div><dt className="text-muted-foreground">Tip</dt><dd>{formatMoney(tip || 0)}</dd></div>
-        <div><dt className="text-muted-foreground">Tax</dt><dd>{formatMoney(tax || 0)}</dd></div>
+        <div><dt className="text-muted-foreground">Tax {taxRateBps / 100}%</dt><dd>{formatMoney(tax || 0)}</dd></div>
         <div><dt className="text-muted-foreground">Discount</dt><dd>−{formatMoney(appliedDiscount)}</dd></div>
       </dl>
       {appointment.status === 'checked_in' && !closed && <Notice>Seat this visit on the booking board before checkout.</Notice>}
       {depositPaid > 0 && !closed && <Notice>Deposit {formatMoney(depositPaid)} paid online · collect {formatMoney(collect)}</Notice>}
       {!closed && appointment.startsAt && shopDateKey(String(appointment.startsAt), timeZone) < shopDateKey(new Date(), timeZone) && <Notice tone="alert">Visit from {formatDateTime(appointment.startsAt, timeZone)}, an earlier day</Notice>}
       {paymentMethod === 'package' && total > 0 && <Notice tone="alert">A prepaid visit can’t include tip or tax. Mixed tender isn’t supported.</Notice>}
-      {!amountsValid && <Notice tone="alert">Tip, discount and tax must be zero or positive amounts.</Notice>}
+      {!amountsValid && <Notice tone="alert">Tip and discount must be zero or positive amounts.</Notice>}
 
       <div className="grid gap-1.5">
         <span className="text-xs font-medium text-muted-foreground">Tender</span>
@@ -336,10 +337,6 @@ function TenderPanel({ appointment, closed, timeZone, onlineCard }: { appointmen
           <Label htmlFor={`discount-${id}`} className="text-xs text-muted-foreground">Discount ($)</Label>
           <Input id={`discount-${id}`} className="rounded-[6px] tabular-nums" value={discountAmount} onChange={(event) => setDiscountAmount(event.target.value)} inputMode="decimal" />
         </div>
-        <div className="grid gap-1">
-          <Label htmlFor={`tax-${id}`} className="text-xs text-muted-foreground">Tax ($)</Label>
-          <Input id={`tax-${id}`} className="rounded-[6px] tabular-nums" value={taxAmount} onChange={(event) => setTaxAmount(event.target.value)} inputMode="decimal" />
-        </div>
       </div>
 
       <div className="grid gap-1">
@@ -372,16 +369,7 @@ function RetailSale({ data }: { data: PosProjectionData }) {
   const [productId, setProductId] = useState('');
   const [retailTender, setRetailTender] = useState<'cash' | 'card'>('cash');
   const [quantity, setQuantity] = useState('1');
-  const [taxRate, setTaxRateState] = useState('0');
-  // The counter keeps the last tax rate typed on this device, so it is entered once, not on every sale.
-  useEffect(() => {
-    const saved = window.localStorage.getItem('pos-retail-tax-rate');
-    if (saved !== null && saved !== '') setTaxRateState(saved);
-  }, []);
-  const setTaxRate = (value: string) => {
-    setTaxRateState(value);
-    try { window.localStorage.setItem('pos-retail-tax-rate', value); } catch { /* private mode: the rate just is not remembered */ }
-  };
+
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [pending, startTransition] = useTransition();
   const saleKey = useCommandKey('product-sale');
@@ -389,9 +377,10 @@ function RetailSale({ data }: { data: PosProjectionData }) {
   const product = products.find((item) => item.id === productId) || null;
   const parsedQuantity = Number(quantity);
   const quantityValid = Number.isInteger(parsedQuantity) && parsedQuantity >= 1 && parsedQuantity <= 100;
-  const parsedRate = Number(taxRate);
-  const rateValid = taxRate.trim() !== '' && Number.isFinite(parsedRate) && parsedRate >= 0 && parsedRate <= 100;
-  const taxRateBps = rateValid ? Math.round(parsedRate * 100) : 0;
+  // Shop rate from Store settings; the server applies the same rate.
+  const taxRateBps = Math.max(0, data.taxRateBps || 0);
+  const parsedRate = taxRateBps / 100;
+  const rateValid = true;
   const unitPrice = Math.max(0, Math.floor(product?.price || 0));
   const subtotal = quantityValid ? unitPrice * parsedQuantity : 0;
   const taxAmount = Math.round((subtotal * taxRateBps) / 10_000);
@@ -430,11 +419,6 @@ function RetailSale({ data }: { data: PosProjectionData }) {
               <Label htmlFor="retail-quantity">Quantity</Label>
               <Input id="retail-quantity" className="rounded-[6px] tabular-nums" inputMode="numeric" value={quantity} aria-invalid={!quantityValid} aria-describedby="retail-quantity-error" onChange={(event) => setQuantity(event.target.value)} />
               <p id="retail-quantity-error" className="text-xs text-destructive">{!quantityValid ? 'Enter a whole number from 1 to 100.' : product && !enough ? `Only ${product.availableQuantity} available.` : ''}</p>
-            </div>
-            <div className="grid gap-1">
-              <Label htmlFor="retail-tax-rate">Tax rate (%)</Label>
-              <Input id="retail-tax-rate" className="rounded-[6px] tabular-nums" inputMode="decimal" value={taxRate} aria-invalid={!rateValid} aria-describedby="retail-tax-help" onChange={(event) => setTaxRate(event.target.value)} />
-              <p id="retail-tax-help" className={`text-xs ${rateValid ? 'text-muted-foreground' : 'text-destructive'}`}>{rateValid ? '' : 'Enter a rate from 0 to 100.'}</p>
             </div>
           </div>
           <dl className="grid grid-cols-2 gap-2 border-y py-2 text-sm tabular-nums sm:grid-cols-4">
