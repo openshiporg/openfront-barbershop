@@ -138,8 +138,8 @@ export async function HomePage() {
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2 md:gap-4">
               {shopPages.map((item) => (
-                <Link key={item.href} href={`/dashboard${item.href}`} className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <Card className="h-full bg-gradient-to-bl from-background to-muted/80 shadow-xs hover:bg-muted transition-colors">
+                <Link key={item.href} href={`/dashboard${item.href}`} className="block min-w-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <Card className="h-full w-full bg-gradient-to-bl from-background to-muted/80 shadow-xs hover:bg-muted transition-colors">
                     <CardContent className="flex gap-3 p-4">
                       <item.icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                       <div className="min-w-0">
